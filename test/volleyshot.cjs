@@ -1,0 +1,20 @@
+const { chromium } = require('playwright');
+const path = require('path');
+(async () => {
+  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+  const ctx = await browser.newContext({ viewport: { width: 800, height: 380 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true });
+  const page = await ctx.newPage();
+  const errs = []; page.on('pageerror', e => errs.push(String(e)));
+  await page.goto('file://' + path.resolve(__dirname, '../www/index.html'));
+  await page.evaluate(() => localStorage.setItem('bgp_prefs', JSON.stringify({ maps: ['volley'], target: 5, level: 'hard', sound: true })));
+  await page.reload(); await page.waitForTimeout(600);
+  await page.tap('[data-act="2p"]');
+  await page.waitForTimeout(1700);
+  await page.screenshot({ path: path.resolve(__dirname, '../shots/volley_serve.png') });
+  const y1 = await page.evaluate(() => __game.world.ball.y.toFixed(0));
+  await page.waitForTimeout(1000);
+  const y2 = await page.evaluate(() => __game.world.ball.y.toFixed(0));
+  await page.screenshot({ path: path.resolve(__dirname, '../shots/volley_1s.png') });
+  console.log('ball y at serve', y1, 'after 1s', y2, 'errors', errs);
+  await browser.close();
+})();

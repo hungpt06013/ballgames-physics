@@ -1,0 +1,10 @@
+# APK signing key: keep it private, never commit it
+*.jks
+*.keystore
+*.idsig
+# build output and test artifacts
+build/
+shots*/
+*.webm
+test/*.txt
+node_modules/
