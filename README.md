@@ -1,4 +1,4 @@
-# Ballgames Physics (bản tự làm) – v2.5
+# Ballgames Physics (bản tự làm) – v2.6
 
 Game 2 đội × 2 cầu thủ ragdoll, mỗi đội **1 nút** (bấm = nhảy + vung chân sút, giữ khi đang bay = xoay người).
 Khi vào trận, tích chọn các môn muốn chơi; chọn nhiều môn thì sau mỗi điểm đổi sang môn khác.
@@ -54,10 +54,12 @@ Cầu thủ ngã (kể cả lộn ngược) tự bật dậy sau khoảng 0,3 gi
 ## Sau mỗi trận đấu
 Một trận là từ lúc bắt đầu đến khi có người chạm mốc điểm / hết giờ / hoà (không phải từng bàn).
 - **Thống kê từng người**: ⚽ bàn thắng · 🧤 cứu thua · 🎯 sút trúng đích · 👟 chạm bóng · 😬 phản lưới (nếu có) và **⭐ điểm** (3,0–10,0; trận bình thường khoảng 6), người điểm cao nhất là **🏅 MVP**.
+  Kết quả và cách biệt tỉ số ảnh hưởng nhiều nhất (thua 1–6 chỉ còn khoảng 4 điểm, thắng đậm khoảng 9–10), sau đó tới bàn thắng, cứu thua, sút trúng đích, chạm bóng; phản lưới bị trừ nặng.
   Ở chế độ 2 người / đấu bot mỗi bên là 1 người (1 nút điều khiển cả 2 cầu thủ); ở 4 người / 2 vs 2 mỗi ô là 1 người.
-- **🎬 Highlight**: mọi bàn thắng, các ván bị dừng vì sét đánh trúng bóng, và những pha **cứu thua** (bóng sắp vào trong khoảng 1 giây thì bị cầu thủ bên kia chặn bằng chân / đầu / người, hoặc khiên chắn).
+- **🎬 Highlight**: mọi bàn thắng, các ván bị dừng vì sét đánh trúng bóng, và những pha **cứu thua**.
+  Cứu thua = bóng sắp vào trong khoảng 1 giây thì bị cầu thủ bên kia chặn lại bằng chân / đầu / người, **ở nửa sân nhà**, và người đó **có bấm nút** (nhảy, sút, đánh đầu, lao người) ngay trước lúc chạm bóng. Đứng yên để bóng đập vào người, khiên chắn, hay chặn bóng bên nửa sân đối phương thì không tính.
   Các pha cứu thua liên tiếp (cách nhau dưới 3 giây, cùng một bên) gộp thành 1 pha lớn và luôn có trong highlight; với các pha cứu thua lẻ, giữ khoảng 1/3 pha nguy hiểm nhất.
-  Pha nào cũng có quay chậm lúc vào lưới / lúc cứu thua. Xem ngay ở màn hình cuối trận hoặc trong Lịch sử (chạm để sang pha tiếp, ✖ để thoát).
+  Pha nào cũng có quay chậm lúc vào lưới / lúc cứu thua. Các pha chồng lên nhau trong cùng một ván (vd. cứu thua rồi phản công ghi bàn luôn) được gộp thành 1 đoạn, không chiếu 2 lần. Xem ngay ở màn hình cuối trận hoặc trong Lịch sử (chạm để sang pha tiếp, ✖ để thoát).
 - **⬇️ Tải highlight**: tạo video WebM của highlight trận đó (mất khoảng bằng thời lượng highlight, vài MB). Điện thoại: lưu vào **Movies/Ballgames** (Android 9 trở xuống sẽ hỏi quyền bộ nhớ; nếu từ chối thì lưu vào thư mục riêng của app). Trình duyệt: tải về như file bình thường.
 - **📜 Lịch sử trận đấu**: ngày giờ, chế độ, mức bot, thể thức, các môn, tỉ số, thắng/thua/hoà, thời lượng, danh sách bàn thắng, bảng thống kê. Lọc theo chế độ (2 người / đấu bot / 4 người / 2 vs 2), mức bot (Dễ / Thường / Khó), kết quả (thắng bot / thua bot / hoà), môn; sắp xếp mới nhất / cũ nhất / cách biệt nhiều nhất. Lưu tối đa 500 trận.
 - **Lưu highlight**: lần đầu đấu xong game hỏi 1 lần: 💾 lưu tất cả / 🔢 chỉ lưu N trận gần nhất (1–100) / 🚫 không lưu (chỉ xem / tải ngay sau trận). Đổi lại trong ⚙️ Cài đặt (có xác nhận trước khi xoá bớt). Mỗi trận khoảng 0,05–0,2 MB. Bản điện thoại lưu trong máy, bản web lưu trong trình duyệt.
@@ -83,7 +85,7 @@ Dữ liệu (xu, đồ, thống kê, cài đặt, lịch sử) lưu trong máy (
 - `android/` – vỏ Android (WebView toàn màn hình, khoá màn hình ngang, nút Back, cầu nối `BGNative` để lưu highlight và video).
 - `build_apk.sh` – build APK không cần Gradle (aapt2 → javac → d8 → zipalign → apksigner).
 - `build_html.py` – gộp thành 1 file HTML chơi trên trình duyệt.
-- `test/` – kiểm tra vật lý (`sanity2.cjs`), bot đấu nhau (`match2.cjs`), kiểm tra giao diện bằng Playwright (`v21.cjs`, `v22.cjs`, `v23.cjs`, `flow2.cjs`, `tut.cjs`, `migrate.cjs`), thời gian đứng dậy sau khi ngã (`getup.cjs`), thiên tai (`hazards.cjs`), bóng mọi cỡ đều vào được khung thành (`goalfit.cjs`), quay chậm liền mạch (`slowmo.cjs`), lời bình xe đạp chổng ngược (`bicycle.cjs`), highlight / lịch sử / thống kê / bình chọn / xuất video (`v25.cjs`), đường đi của bản Android với cầu nối giả lập (`native.cjs`), dung lượng highlight (`hlsize.cjs`).
+- `test/` – kiểm tra vật lý (`sanity2.cjs`), bot đấu nhau (`match2.cjs`), kiểm tra giao diện bằng Playwright (`v21.cjs`, `v22.cjs`, `v23.cjs`, `flow2.cjs`, `tut.cjs`, `migrate.cjs`), thời gian đứng dậy sau khi ngã (`getup.cjs`), thiên tai (`hazards.cjs`), bóng mọi cỡ đều vào được khung thành (`goalfit.cjs`), quay chậm liền mạch (`slowmo.cjs`), lời bình xe đạp chổng ngược (`bicycle.cjs`), highlight / lịch sử / thống kê / bình chọn / xuất video (`v25.cjs`), luật cứu thua, gộp pha trùng, cách tính điểm (`v26.cjs`), đường đi của bản Android với cầu nối giả lập (`native.cjs`), dung lượng highlight (`hlsize.cjs`).
 
 ## Tuỳ chỉnh vật lý
 Trong game: Menu → ⚙️ Cài đặt.
@@ -92,7 +94,7 @@ Trong code: sửa từng môn ở `MAPS` trong `www/engine.js` (`g`, `gBall`, `j
 ## Build
 Cần JDK 17+ và Android SDK (build-tools 36.1.0, platforms;android-34):
 ```
-ANDROID_HOME=/đường/dẫn/sdk VERSION_CODE=12 VERSION_NAME=2.5 ./build_apk.sh
+ANDROID_HOME=/đường/dẫn/sdk VERSION_CODE=13 VERSION_NAME=2.6 ./build_apk.sh
 python3 build_html.py BallgamesPhysics.html
 ```
 Chạy kiểm tra: `node test/sanity2.cjs` (engine), các file Playwright như `node test/v25.cjs` (cần `npm i -g playwright` và Chromium).
