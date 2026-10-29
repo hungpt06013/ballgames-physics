@@ -10,13 +10,23 @@
     --red: #ef5b5b; --red-d: #c63e44; --blue: #3fb4ea; --blue-d: #2387bd;
     --green: #5cc04f; --green-d: #3f9a3b; --orange: #f5a524; --purple: #a66bea; --yellow: #f2c230;
     --ink: #1d1d1f; --paper: #ffffff; --muted: #6b7280; --soft: #f3f6f8;
+    --text: #1d1d1f; --btn: #ffffff; --on-bg: #1d1d1f; --on-text: #ffffff; --rule: #ccd5db; --bodybg: #b9ecfb;
+    --ok-soft: #e9ffd9; --ok-soft2: #eef9ea; --ok-strong: #d8f5cf; --bad-soft: #ffd9d9; --gold-soft: #fff6d6; --draw-soft: #fff1c2; --gold-text: #b37a00;
+    --r-text: var(--red-d); --b-text: var(--blue-d); --veil: linear-gradient(rgba(185,236,251,0.35), rgba(185,236,251,0.15));
     --u: min(1vh, 0.6vw);
   }
+  /* dark mode (⚙️ Cài đặt or the 🌙 button on the menu; follows the phone until chosen) */
+  :root[data-theme="dark"] {
+    --ink: #0b0d10; --paper: #23272e; --muted: #a3acb8; --soft: #2b3038;
+    --text: #eef1f4; --btn: #313740; --on-bg: #eef1f4; --on-text: #1d1d1f; --rule: #3c434d; --bodybg: #0f1720;
+    --ok-soft: #234a2c; --ok-soft2: #1f3a26; --ok-strong: #2b5a35; --bad-soft: #522a2a; --gold-soft: #4a3f17; --draw-soft: #4a4119; --gold-text: #f2c230;
+    --r-text: #ff8f8f; --b-text: #86d4f7; --veil: linear-gradient(rgba(8,14,28,0.5), rgba(8,14,28,0.35));
+  }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #b9ecfb; overscroll-behavior: none; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bodybg); overscroll-behavior: none; }
   body {
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    color: var(--ink); user-select: none; -webkit-user-select: none; touch-action: none;
+    color: var(--text); user-select: none; -webkit-user-select: none; touch-action: none;
   }
   canvas { position: fixed; inset: 0; display: block; }
   #touch { position: fixed; inset: 0; }
@@ -28,7 +38,7 @@
   }
   .overlay.dim { background: rgba(10, 20, 30, 0.5); }
 
-  #menu { gap: calc(4 * var(--u)); background: linear-gradient(rgba(185,236,251,0.35), rgba(185,236,251,0.15)); }
+  #menu { gap: calc(4 * var(--u)); background: var(--veil); }
   .logo {
     width: calc(34 * var(--u)); height: calc(34 * var(--u)); border-radius: calc(7 * var(--u));
     background: var(--green); border: calc(0.9 * var(--u)) solid var(--ink); position: relative; overflow: hidden;
@@ -48,7 +58,7 @@
   .panel h2 { margin: 0 0 calc(2 * var(--u)); font-size: calc(5.6 * var(--u)); font-weight: 900; text-align: center; }
   .btn {
     appearance: none; border: calc(0.6 * var(--u)) solid var(--ink); border-radius: calc(3 * var(--u));
-    background: #fff; color: var(--ink); font: inherit; font-weight: 900; cursor: pointer;
+    background: var(--btn); color: var(--text); font: inherit; font-weight: 900; cursor: pointer;
     font-size: calc(4 * var(--u)); padding: calc(1.6 * var(--u)) calc(2.6 * var(--u));
     box-shadow: 0 calc(0.8 * var(--u)) 0 var(--ink); transition: transform .06s, box-shadow .06s;
   }
@@ -58,7 +68,9 @@
   .btn.red { background: var(--red); color: #fff; } .btn.blue { background: var(--blue); color: #fff; } .btn.green { background: var(--green); color: #fff; }
   .btn.orange { background: var(--orange); color: #fff; } .btn.purple { background: var(--purple); color: #fff; } .btn.yellow { background: var(--yellow); color: #fff; }
   .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: calc(1.6 * var(--u)); font-weight: 900; font-size: calc(4 * var(--u)); }
-  .coins { background: #fff6d6; border: calc(0.5 * var(--u)) solid var(--ink); border-radius: 99px; padding: calc(0.6 * var(--u)) calc(2.4 * var(--u)); font-weight: 900; }
+  .topRight { display: flex; align-items: center; gap: calc(1.2 * var(--u)); }
+  .topRight .chip { font-size: calc(3.4 * var(--u)); padding: calc(0.4 * var(--u)) calc(1.6 * var(--u)); border-radius: 99px; }
+  .coins { background: var(--gold-soft); border: calc(0.5 * var(--u)) solid var(--ink); border-radius: 99px; padding: calc(0.6 * var(--u)) calc(2.4 * var(--u)); font-weight: 900; }
   .modes { display: grid; grid-template-columns: 1fr 1fr; gap: calc(1.6 * var(--u)); }
   .btn.mode { color: #fff; font-size: calc(4.8 * var(--u)); padding: calc(2.4 * var(--u)) calc(1 * var(--u)); line-height: 1.15; }
   .btn.mode small { display: block; font-size: calc(2.9 * var(--u)); font-weight: 700; opacity: 0.95; margin-top: calc(0.4 * var(--u)); }
@@ -69,10 +81,10 @@
   .row > span { font-weight: 800; font-size: calc(3.7 * var(--u)); }
   .seg { display: flex; gap: calc(1 * var(--u)); flex-wrap: wrap; }
   .seg button, .chip {
-    appearance: none; border: calc(0.5 * var(--u)) solid var(--ink); background: #fff; border-radius: calc(2.4 * var(--u));
-    font: inherit; font-weight: 800; font-size: calc(3.4 * var(--u)); padding: calc(1 * var(--u)) calc(2.2 * var(--u)); cursor: pointer; color: var(--ink);
+    appearance: none; border: calc(0.5 * var(--u)) solid var(--ink); background: var(--btn); border-radius: calc(2.4 * var(--u));
+    font: inherit; font-weight: 800; font-size: calc(3.4 * var(--u)); padding: calc(1 * var(--u)) calc(2.2 * var(--u)); cursor: pointer; color: var(--text);
   }
-  .seg button.on, .chip.on { background: var(--ink); color: #fff; }
+  .seg button.on, .chip.on { background: var(--on-bg); color: var(--on-text); }
   .tools { display: flex; gap: calc(1.6 * var(--u)); margin-top: calc(2 * var(--u)); }
   .tools .btn { flex: 1; font-size: calc(3.6 * var(--u)); padding: calc(1.4 * var(--u)) calc(1 * var(--u)); }
   .sportHead { display: flex; justify-content: space-between; align-items: center; gap: calc(2 * var(--u)); }
@@ -81,23 +93,24 @@
   .sportGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: calc(1 * var(--u)); margin-top: calc(1 * var(--u)); }
   .sportBox {
     display: flex; align-items: center; gap: calc(1 * var(--u)); border: calc(0.5 * var(--u)) solid var(--ink); border-radius: calc(2.4 * var(--u));
-    background: #fff; padding: calc(0.8 * var(--u)) calc(1.2 * var(--u)); font-weight: 800; font-size: calc(3.2 * var(--u)); cursor: pointer; line-height: 1.1;
+    background: var(--btn); padding: calc(0.8 * var(--u)) calc(1.2 * var(--u)); font-weight: 800; font-size: calc(3.2 * var(--u)); cursor: pointer; line-height: 1.1;
   }
-  .sportBox.on { background: #e9ffd9; }
+  .sportBox.on { background: var(--ok-soft); }
   .sportBox input, .optBox input { width: calc(4.2 * var(--u)); height: calc(4.2 * var(--u)); margin: 0; flex: none; accent-color: var(--green-d); }
   .fmt { display: flex; align-items: center; gap: calc(1.4 * var(--u)); flex-wrap: wrap; }
   .numBox { display: flex; align-items: center; gap: calc(1 * var(--u)); font-weight: 800; font-size: calc(3.4 * var(--u)); }
   input.num { font: inherit; font-weight: 900; font-size: calc(3.8 * var(--u)); width: calc(17 * var(--u)); padding: calc(0.8 * var(--u)) calc(1.4 * var(--u));
-    border: calc(0.5 * var(--u)) solid var(--ink); border-radius: calc(2 * var(--u)); text-align: center; user-select: text; -webkit-user-select: text; }
+    border: calc(0.5 * var(--u)) solid var(--ink); border-radius: calc(2 * var(--u)); text-align: center; user-select: text; -webkit-user-select: text;
+    background: var(--btn); color: var(--text); }
   .hint { font-weight: 700; font-size: calc(2.9 * var(--u)); color: var(--muted); }
   .opt { display: flex; align-items: center; gap: calc(1.2 * var(--u)); flex-wrap: wrap; margin: calc(1.1 * var(--u)) 0; }
   .opt > .chip { flex: none; }
   .optList { display: flex; flex-wrap: wrap; gap: calc(0.8 * var(--u)); }
   .optBox {
     display: flex; align-items: center; gap: calc(0.8 * var(--u)); border: calc(0.4 * var(--u)) solid var(--ink); border-radius: 99px;
-    background: #fff; padding: calc(0.5 * var(--u)) calc(1.4 * var(--u)) calc(0.5 * var(--u)) calc(0.9 * var(--u)); font-weight: 800; font-size: calc(3 * var(--u)); cursor: pointer;
+    background: var(--btn); padding: calc(0.5 * var(--u)) calc(1.4 * var(--u)) calc(0.5 * var(--u)) calc(0.9 * var(--u)); font-weight: 800; font-size: calc(3 * var(--u)); cursor: pointer;
   }
-  .optBox.on { background: #e9ffd9; }
+  .optBox.on { background: var(--ok-soft); }
   .slots { display: grid; grid-template-columns: repeat(4, 1fr); gap: calc(1.2 * var(--u)); width: 100%; }
   .slots button { padding: calc(1 * var(--u)); font-size: calc(3.2 * var(--u)); }
 
@@ -107,14 +120,14 @@
   .slider input { width: 100%; accent-color: var(--green-d); height: calc(5 * var(--u)); margin: 0; }
   .chips { display: flex; flex-wrap: wrap; gap: calc(1.2 * var(--u)); margin: calc(1.2 * var(--u)) 0 calc(1.6 * var(--u)); }
   .chips button { opacity: 0.45; border-radius: 99px; }
-  .chips button.on { opacity: 1; background: #e9ffd9; color: var(--ink); }
+  .chips button.on { opacity: 1; background: var(--ok-soft); color: var(--text); }
   .sub { font-weight: 800; font-size: calc(3.7 * var(--u)); margin-top: calc(1.6 * var(--u)); }
   .help p { font-size: calc(3.6 * var(--u)); line-height: 1.4; margin: calc(1.2 * var(--u)) 0; }
-  .help kbd { border: 2px solid var(--ink); border-radius: 6px; padding: 0 6px; font-weight: 800; font-family: inherit; background: #f3f4f6; }
+  .help kbd { border: 2px solid var(--ink); border-radius: 6px; padding: 0 6px; font-weight: 800; font-family: inherit; background: var(--soft); }
   .result { font-size: calc(8 * var(--u)); font-weight: 900; margin: 0 0 calc(1 * var(--u)); text-align: center; }
   .result-score { font-size: calc(5 * var(--u)); font-weight: 900; text-align: center; margin-bottom: calc(1.4 * var(--u)); }
   .result-score .r { color: var(--red); } .result-score .b { color: var(--blue); }
-  .reward { text-align: center; font-weight: 900; font-size: calc(4.2 * var(--u)); margin-bottom: calc(2 * var(--u)); color: #b37a00; min-height: 1em; }
+  .reward { text-align: center; font-weight: 900; font-size: calc(4.2 * var(--u)); margin-bottom: calc(2 * var(--u)); color: var(--gold-text); min-height: 1em; }
 
   .tabs { display: flex; gap: calc(1 * var(--u)); margin-bottom: calc(1.6 * var(--u)); flex-wrap: wrap; }
   .tabs .chip { flex: 1; text-align: center; }
@@ -124,27 +137,27 @@
     font-weight: 800; font-size: calc(3.2 * var(--u)); cursor: pointer; display: flex; flex-direction: column; gap: calc(0.6 * var(--u)); align-items: center;
   }
   .card .ic { font-size: calc(8 * var(--u)); line-height: 1.1; }
-  .card .price { font-size: calc(3 * var(--u)); color: #b37a00; }
-  .card.owned { background: #eef9ea; } .card.eq { background: #d8f5cf; outline: calc(0.6 * var(--u)) solid var(--green-d); }
+  .card .price { font-size: calc(3 * var(--u)); color: var(--gold-text); }
+  .card.owned { background: var(--ok-soft2); } .card.eq { background: var(--ok-strong); outline: calc(0.6 * var(--u)) solid var(--green-d); }
   .card.locked { opacity: 0.6; }
   .prof { display: grid; grid-template-columns: calc(34 * var(--u)) 1fr; gap: calc(2.4 * var(--u)); }
   .prof canvas { position: static; width: calc(34 * var(--u)); height: calc(44 * var(--u)); border: calc(0.5 * var(--u)) solid var(--ink); border-radius: calc(3 * var(--u)); background: linear-gradient(#c9f0fc, #e9fbff); }
   .swatches { display: flex; flex-wrap: wrap; gap: calc(1 * var(--u)); }
   .swatches button { width: calc(6.4 * var(--u)); height: calc(6.4 * var(--u)); border-radius: 50%; border: calc(0.5 * var(--u)) solid var(--ink); cursor: pointer; padding: 0; }
   .swatches button.on { outline: calc(0.8 * var(--u)) solid var(--ink); outline-offset: 2px; }
-  input.name { font: inherit; font-weight: 800; font-size: calc(3.8 * var(--u)); padding: calc(1 * var(--u)) calc(2 * var(--u)); border: calc(0.5 * var(--u)) solid var(--ink); border-radius: calc(2 * var(--u)); width: 100%; user-select: text; -webkit-user-select: text; }
-  .stat { display: flex; justify-content: space-between; font-size: calc(3.6 * var(--u)); padding: calc(0.8 * var(--u)) 0; border-bottom: 1px dashed #ccd5db; font-weight: 700; }
+  input.name { font: inherit; font-weight: 800; font-size: calc(3.8 * var(--u)); padding: calc(1 * var(--u)) calc(2 * var(--u)); border: calc(0.5 * var(--u)) solid var(--ink); border-radius: calc(2 * var(--u)); width: 100%; user-select: text; -webkit-user-select: text;  background: var(--btn); color: var(--text); }
+  .stat { display: flex; justify-content: space-between; font-size: calc(3.6 * var(--u)); padding: calc(0.8 * var(--u)) 0; border-bottom: 1px dashed var(--rule); font-weight: 700; }
   .stat b { font-weight: 900; }
 
   #pauseBtn {
     position: fixed; left: 50%; bottom: max(8px, env(safe-area-inset-bottom)); transform: translateX(-50%);
     width: calc(11 * var(--u)); height: calc(11 * var(--u)); min-width: 40px; min-height: 40px; border-radius: 50%;
-    border: none; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.18); display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0;
+    border: none; background: var(--btn); box-shadow: 0 2px 8px rgba(0,0,0,0.18); display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0;
   }
   #pauseBtn svg { width: 46%; height: 46%; }
   #coach {
     position: fixed; left: 50%; top: calc(17 * var(--u)); transform: translateX(-50%); pointer-events: none;
-    background: #fff; border: calc(0.6 * var(--u)) solid var(--ink); border-radius: calc(3 * var(--u)); box-shadow: 0 calc(0.8 * var(--u)) 0 var(--ink);
+    background: var(--paper); border: calc(0.6 * var(--u)) solid var(--ink); border-radius: calc(3 * var(--u)); box-shadow: 0 calc(0.8 * var(--u)) 0 var(--ink);
     padding: calc(1.6 * var(--u)) calc(3 * var(--u)); font-weight: 900; font-size: calc(4.2 * var(--u)); text-align: center; max-width: 80vw;
   }
   #coach small { display: block; font-weight: 700; font-size: calc(3 * var(--u)); color: var(--muted); margin-top: calc(0.6 * var(--u)); }
@@ -165,15 +178,15 @@
   /* highlight player */
   #hlClose, #exportBar { position: fixed; right: max(12px, env(safe-area-inset-right)); top: calc(11 * var(--u)); z-index: 10; }
   #hlClose { width: calc(10 * var(--u)); height: calc(10 * var(--u)); min-width: 40px; min-height: 40px; border-radius: 50%; border: calc(0.5 * var(--u)) solid var(--ink);
-    background: #fff; font-size: calc(4.6 * var(--u)); font-weight: 900; cursor: pointer; padding: 0; line-height: 1; }
-  #exportBar { display: flex; align-items: center; gap: calc(1.4 * var(--u)); background: #fff; border: calc(0.5 * var(--u)) solid var(--ink); border-radius: 99px;
+    background: var(--btn); color: var(--text); font-size: calc(4.6 * var(--u)); font-weight: 900; cursor: pointer; padding: 0; line-height: 1; }
+  #exportBar { display: flex; align-items: center; gap: calc(1.4 * var(--u)); background: var(--paper); border: calc(0.5 * var(--u)) solid var(--ink); border-radius: 99px;
     padding: calc(0.8 * var(--u)) calc(0.8 * var(--u)) calc(0.8 * var(--u)) calc(2.6 * var(--u)); font-weight: 900; font-size: calc(3.4 * var(--u)); }
   #exportBar .chip { font-size: calc(3 * var(--u)); }
   /* match history */
   .filters { display: flex; flex-wrap: wrap; gap: calc(1 * var(--u)) calc(1.6 * var(--u)); align-items: center; margin-bottom: calc(1.2 * var(--u)); }
   .filters .seg button { font-size: calc(3 * var(--u)); padding: calc(0.6 * var(--u)) calc(1.5 * var(--u)); }
   select.sel { font: inherit; font-weight: 800; font-size: calc(3.1 * var(--u)); padding: calc(0.6 * var(--u)) calc(1.2 * var(--u));
-    border: calc(0.5 * var(--u)) solid var(--ink); border-radius: calc(2.4 * var(--u)); background: #fff; color: var(--ink); }
+    border: calc(0.5 * var(--u)) solid var(--ink); border-radius: calc(2.4 * var(--u)); background: var(--btn); color: var(--text); }
   .hbar { display: flex; align-items: center; gap: calc(1.2 * var(--u)); flex-wrap: wrap; margin-bottom: calc(1.2 * var(--u)); }
   .hbar .hint { flex: 1; white-space: nowrap; }
   .hbar .btn { font-size: calc(3.1 * var(--u)); padding: calc(0.8 * var(--u)) calc(1.8 * var(--u)); }
@@ -183,9 +196,9 @@
   .hmain { flex: 1 1 calc(60 * var(--u)); min-width: 0; cursor: pointer; }
   .hmeta { font-weight: 700; font-size: calc(3 * var(--u)); color: var(--muted); }
   .hscore { font-weight: 900; font-size: calc(4 * var(--u)); margin: calc(0.3 * var(--u)) 0; }
-  .hscore .r { color: var(--red-d); } .hscore .b { color: var(--blue-d); }
+  .hscore .r { color: var(--r-text); } .hscore .b { color: var(--b-text); }
   .htag { font-size: calc(3 * var(--u)); padding: 0 calc(1.4 * var(--u)); border-radius: 99px; border: calc(0.4 * var(--u)) solid var(--ink); vertical-align: middle; white-space: nowrap; }
-  .htag.win { background: #d8f5cf; } .htag.loss { background: #ffd9d9; } .htag.draw { background: #fff1c2; }
+  .htag.win { background: var(--ok-strong); } .htag.loss { background: var(--bad-soft); } .htag.draw { background: var(--draw-soft); }
   .hacts { display: flex; gap: calc(0.8 * var(--u)); flex-wrap: wrap; align-items: center; align-self: center; }
   .hacts .chip { font-size: calc(3 * var(--u)); }
   .hpick { width: calc(5 * var(--u)); height: calc(5 * var(--u)); margin: calc(1 * var(--u)) 0 0; accent-color: var(--green-d); flex: none; }
@@ -197,13 +210,13 @@
   .pstats .ph { text-align: center; font-size: calc(3.2 * var(--u)); }
   .pstats .pv { text-align: center; }
   .pstats .pn { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .pstats .mvp { background: #fff6d6; }
+  .pstats .mvp { background: var(--gold-soft); }
   .pstats .pr { font-weight: 900; }
-  .pmvp { text-align: center; font-weight: 900; font-size: calc(3.4 * var(--u)); color: #b37a00; margin-top: calc(0.6 * var(--u)); }
+  .pmvp { text-align: center; font-weight: 900; font-size: calc(3.4 * var(--u)); color: var(--gold-text); margin-top: calc(0.6 * var(--u)); }
   /* time up vote */
   .voteRow { display: flex; align-items: center; justify-content: center; gap: calc(1.4 * var(--u)); margin: calc(1.2 * var(--u)) 0; flex-wrap: wrap; }
   .voteName { font-weight: 900; font-size: calc(4 * var(--u)); min-width: calc(20 * var(--u)); text-align: right; }
-  .voteBtn.on { background: var(--ink); color: #fff; }
+  .voteBtn.on { background: var(--on-bg); color: var(--on-text); }
   #voteHint { font-size: calc(3.2 * var(--u)); line-height: 1.35; }
   #rotate { background: #1d1d1f; color: #fff; flex-direction: column; text-align: center; font-weight: 800; font-size: 20px; gap: 12px; display: none; }
   @media (orientation: portrait) and (max-width: 700px) { #rotate.need { display: flex; } }
@@ -222,7 +235,7 @@
 <div id="menu" class="overlay">
   <div class="logo" aria-hidden="true"><div class="lball"></div><div class="lleg"></div><div class="lname">BALLGAMES<br>PHYSICS</div></div>
   <div class="panel">
-    <div class="topbar"><span>Chọn chế độ</span><span class="coins" id="menuCoins">🪙 0</span></div>
+    <div class="topbar"><span>Chọn chế độ</span><span class="topRight"><button class="chip" id="themeBtn" aria-label="Sáng / tối">🌙</button><span class="coins" id="menuCoins">🪙 0</span></span></div>
     <div class="modes">
       <button class="btn mode red" data-act="setup" data-mode="2p">👥 2 NGƯỜI<small>mỗi đội 1 nút</small></button>
       <button class="btn mode blue" data-act="setup" data-mode="bot">🤖 ĐẤU BOT<small>bạn vs máy</small></button>
@@ -277,6 +290,7 @@
       <button id="tgReplay" class="chip">🎬 Phát lại bàn thắng</button>
       <button id="tgMusic" class="chip">🎵 Nhạc nền</button>
       <button id="tgSfx" class="chip">🔊 Hiệu ứng âm thanh</button>
+      <button id="tgDark" class="chip">🌙 Giao diện tối</button>
     </div></div>
     <div class="sub">🎬 Lưu highlight các trận đấu <small class="hint">· mỗi trận khoảng 0,05–0,2 MB</small></div>
     <div id="hlPolicy"></div>
@@ -292,12 +306,12 @@
   <div class="panel wide help">
     <h2>❓ Luật chơi</h2>
     <p>Mỗi đội có <b>2 cầu thủ</b>. Bấm nút để <b>nhảy + vung chân sút</b>. <b>Giữ nút</b> khi đang bay để xoay người tung móc xe đạp! Bấm lúc người <b>nghiêng về trước</b> để lao lên.</p>
-    <p><b>8 môn</b>: bóng đá, bóng rổ, bóng bầu dục, bóng chuyền, bóng đá Mặt Trăng, sân băng, bóng khổng lồ, <b>bóng bom</b> (bom nổ bên sân ai thì người đó thua). Chọn môn muốn chơi khi vào trận; chọn nhiều môn thì sau mỗi điểm đổi sang môn khác. Bóng kẹt ngoài biên (sau khung thành, sau cột rổ, sau cột bầu dục) 3 giây, hoặc nằm im 15 giây không ai chạm, thì được thả lại giữa sân.</p>
+    <p><b>8 môn</b>: bóng đá, bóng rổ, bóng bầu dục, bóng chuyền, bóng đá Mặt Trăng, sân băng, bóng khổng lồ, <b>bóng bom</b> (bom nổ bên sân ai thì người đó thua). Chọn môn muốn chơi khi vào trận; chọn nhiều môn thì sau mỗi điểm đổi sang môn khác. Bóng kẹt ngoài biên (sau khung thành, sau cột rổ, sau cột bầu dục) 3 giây, hoặc nằm im 15 giây không ai chạm, thì được thả lại giữa sân (game báo trước 3 giây).</p>
     <p><b>Vật phẩm</b> rơi từ trời: 🔥 siêu sút · 🛡️ khiên chắn khung thành · 🧲 nam châm hút bóng · ❄️ đóng băng đối thủ · 🍄 phóng to. <b>Biến thể</b> mỗi ván: 2 quả bóng, người khổng lồ/tí hon, sàn bật nhún, xà ngang di động, bóng siêu nảy, trọng lực thấp, quay chậm. Khi vào trận tích chọn những vật phẩm / biến thể muốn có.</p>
     <p><b>Thời tiết &amp; thiên tai</b>: 🌫️ sương mù (cứ 5–10 giây lại mờ đi) · 🏚️ động đất (8–15 giây một lần, rung 10 giây, mọi người lắc lư) · ⚡ sấm sét (đánh xuống đất thì đất thành hố 5 giây; trúng người thì người đó cháy đen, đứng im 5 giây; trúng bóng thì 5 giây sau dừng ván, không ai được điểm và phát lại cú sét; trúng bom thì bom nổ luôn, không ai được điểm) · 🌪️ lốc xoáy (hút mọi thứ trong ¼ sân lên cao và xoay). Thường mỗi lúc chỉ có một hiện tượng; hiếm khi có 2, 3 hay cả 4 cùng lúc.</p>
     <p><b>2 người:</b> chạm nửa trái (Đỏ) / nửa phải (Xanh). <b>4 người:</b> mỗi người 1 góc — P1 dưới trái, P2 trên trái, P3 dưới phải, P4 trên phải; chỗ trống có thể để bot. Chế độ <b>4 người</b>: ai ghi bàn người đó +1 (khung thành mang màu người sẽ được điểm). <b>2 vs 2</b>: cả đội +1. Sau mỗi ván người đứng trước/sau đổi chỗ.</p>
     <p><b>Tính giờ:</b> hết giờ mà đang hoà thì mỗi người chơi chọn <b>🤝 hoà</b> hay <b>⭐ bàn thắng vàng</b> (ai ghi trước thắng); số người chọn bàn vàng nhiều hơn hoặc bằng số người chọn hoà thì đá tiếp, không thì trận đấu kết thúc với tỉ số hoà.</p>
-    <p><b>Sau mỗi trận</b>: bảng thống kê từng người (⚽ bàn thắng · 🧤 cứu thua · 🎯 sút trúng đích · 👟 chạm bóng · ⭐ điểm) và <b>🏅 MVP</b>; <b>🎬 highlight</b> gồm mọi bàn thắng và những pha cứu thua hay nhất (có quay chậm), xem ngay hoặc <b>⬇️ tải về</b> thành video. Mọi trận đã đấu nằm trong <b>📜 Lịch sử</b> (lọc theo chế độ, mức bot, kết quả, môn; xoá highlight để giải phóng bộ nhớ).</p>
+    <p><b>Sau mỗi trận</b>: bảng thống kê từng người (⚽ bàn thắng · 🧤 cứu thua · 🎯 sút trúng đích · 👟 chạm bóng · ⭐ điểm) và <b>🏅 MVP</b>; <b>🎬 highlight</b> gồm mọi bàn thắng, những pha cứu thua hay nhất và những pha suýt vào đẹp nhất (có quay chậm), xem ngay hoặc <b>⬇️ tải về</b> thành video. Mọi trận đã đấu nằm trong <b>📜 Lịch sử</b> (lọc theo chế độ, mức bot, kết quả, môn; xoá highlight để giải phóng bộ nhớ).</p>
     <p>Máy tính: Đỏ <kbd>A</kbd> <kbd>W</kbd> <kbd>Space</kbd> · Xanh <kbd>L</kbd> <kbd>↑</kbd> <kbd>Enter</kbd> · 4 người: <kbd>A</kbd> / <kbd>G</kbd> / <kbd>K</kbd> / <kbd>↑</kbd> · <kbd>Esc</kbd> tạm dừng.</p>
     <div class="tools"><button class="btn green" data-act="back">✔ Đã hiểu</button></div>
   </div>
@@ -1623,7 +1637,7 @@
     BODY: BODY, LEG: LEG, NB: NB, NS: NS, RAD: RAD, LEG_REST: LEG_REST, LEG_KICK: LEG_KICK, BOMB_TIME: BOMB_TIME,
     MAPS: MAPS, MAP_BY_ID: MAP_BY_ID, DEFAULT_SETTINGS: DEFAULT_SETTINGS, LEVELS: LEVELS,
     MODS: MODS, modsFor: modsFor, ITEMS: ITEMS, itemsFor: itemsFor,
-    TOR_R: TOR_R, TOR_TOP: TOR_TOP, STUN_TIME: STUN_TIME, CRATER_TIME: CRATER_TIME, STILL_TIME: STILL_TIME,
+    TOR_R: TOR_R, TOR_TOP: TOR_TOP, STUN_TIME: STUN_TIME, CRATER_TIME: CRATER_TIME, STILL_TIME: STILL_TIME, OUT_TIME: OUT_TIME,
     startQuake: startQuake, startTornado: startTornado, strike: strike, quakeLevel: quakeLevel, torPull: torPull,
     groundAt: groundAt, craterDepth: craterDepth, isBicycle: isBicycle,
     buildArena: buildArena, createWorld: createWorld, resetRound: resetRound, step: step, stepPlayers: stepPlayers,
@@ -2833,6 +2847,24 @@
   delete prefs.sport; delete prefs.knownMaps;
   function savePrefs() { store('prefs', prefs); }
   savePrefs();
+
+  // ---------- light / dark ----------
+  // prefs.theme: 'light' or 'dark' once chosen; until then it follows the phone
+  var darkQuery = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+  function isDark() { return prefs.theme ? prefs.theme === 'dark' : !!(darkQuery && darkQuery.matches); }
+  function applyTheme() {
+    var dark = isDark();
+    document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.content = dark ? '#1b2430' : '#5cc04f';
+    var tb = document.getElementById('themeBtn');
+    if (tb) tb.textContent = dark ? '☀️' : '🌙';
+    var tg = document.getElementById('tgDark');
+    if (tg) tg.classList.toggle('on', dark);
+  }
+  function toggleTheme() { prefs.theme = isDark() ? 'light' : 'dark'; savePrefs(); applyTheme(); }
+  if (darkQuery && darkQuery.addEventListener) darkQuery.addEventListener('change', applyTheme);
+  applyTheme();
   Snd.musicOn = prefs.music; Snd.sfxOn = prefs.sound;
 
   // ---------- game state ----------
@@ -3085,10 +3117,13 @@
     $('tgReplay').classList.toggle('on', prefs.replay);
     $('tgMusic').classList.toggle('on', prefs.music);
     $('tgSfx').classList.toggle('on', prefs.sound);
+    $('tgDark').classList.toggle('on', isDark());
     buildHLSettings();
   }
   $('tgReplay').addEventListener('click', function () { prefs.replay = !prefs.replay; savePrefs(); buildSettings(); });
   $('tgMusic').addEventListener('click', function () { prefs.music = !prefs.music; Snd.init(); Snd.setMusic(prefs.music); savePrefs(); buildSettings(); });
+  $('tgDark').addEventListener('click', function () { toggleTheme(); Snd.click(); });
+  $('themeBtn').addEventListener('click', function () { toggleTheme(); Snd.init(); Snd.click(); });
   $('tgSfx').addEventListener('click', function () { prefs.sound = !prefs.sound; Snd.sfxOn = prefs.sound; savePrefs(); buildSettings(); refreshMenu(); });
 
   // --- shop ---
@@ -3289,7 +3324,7 @@
       items: prefs.items, itemList: prefs.itemList.slice(), weather: prefs.weather, wxList: prefs.wxList.slice(), bombTime: prefs.bombTime,
       beginner: prefs.beginner, slots: prefs.slots.slice() }, cfg);
     G.cfg = cfg; G.mode = cfg.mode; G.demo = false; G.round = 0; G.earned = 0; G.golden = false;
-    G.matchT = 0; G.goalsLog = []; G.playedMaps = []; G.hlm = { clips: [], singles: [] }; G.lastHL = null; G.ps = newStats();
+    G.matchT = 0; G.goalsLog = []; G.playedMaps = []; G.hlm = { clips: [], singles: [], misses: [] }; G.lastHL = null; G.ps = newStats();
     G.score = is4(cfg.mode) ? [0, 0, 0, 0] : [0, 0];
     G.target = cfg.fmt[0] === 'p' ? +cfg.fmt.slice(1) : 0;
     G.clock = cfg.fmt[0] === 't' ? +cfg.fmt.slice(1) : 0;
@@ -3395,7 +3430,7 @@
   function endMatch(draw) {
     G.state = 'over';
     Snd.setCrowd(false);
-    var w = draw ? -1 : matchWinner(), txt, color = INK, html, st = Meta.stats(), reward = G.earned, mode = G.mode;
+    var w = draw ? -1 : matchWinner(), txt, color = '', html, st = Meta.stats(), reward = G.earned, mode = G.mode;
     st.played++; st.byMode[mode] = (st.byMode[mode] || 0) + 1;
     html = scoreHtml();
     if (mode === 'ffa') {
@@ -3451,7 +3486,10 @@
   }
   // white or yellow kits are unreadable as text on the white result card
   function lum(hex) { var n = parseInt(hex.slice(1), 16); return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255; }
-  function textCol(col) { return lum(col.main) < 0.72 ? col.main : (lum(col.dark) < 0.62 ? col.dark : INK); }
+  function textCol(col) {
+    if (isDark()) return lum(col.main) > 0.3 ? col.main : 'var(--text)';
+    return lum(col.main) < 0.72 ? col.main : (lum(col.dark) < 0.62 ? col.dark : 'var(--text)');
+  }
   function scoreSpan(col, txt) { return '<span style="color:' + textCol(col) + '">' + txt + '</span>'; }
   function setOverButtons(main, tools) {
     var m = $('overMain'); m.textContent = main[0][0]; m.dataset.act = main[0][1];
@@ -3806,13 +3844,16 @@
   // single saves the most dangerous third is kept. Every point, and every round stopped by lightning, is kept too.
   var SAVE_LOOK = 1, SAVE_CONFIRM = 0.25, SAVE_CHAIN = 3, SAVE_ACTIVE = 0.6, CLIP_PRE = 3, CLIP_POST = 1.5;
   var ZAP_COL = { main: '#ffd23f', dark: '#c4a612' };
-  function newWatch() { return { tick: 0, threat: [null, null], cand: [], group: null }; }
+  function newWatch() { return { tick: 0, threat: [null, null], cand: [], group: null, seen: [[-1, -1], [-1, -1]], miss: [] }; }
   function watchSaves(w) {
-    var S = G.hlw, A = w.arena, i;
+    var S = G.hlw, A = w.arena, ev = w.events, i;
     if (A.type === 'bomb') return;
+    // a shot hitting the frame (post, bar, rim, board) makes a better miss
+    for (i = 0; i < ev.length; i++) if (ev[i].t === 'post') S.miss.forEach(function (m) { if (w.time >= m.shot && w.time <= m.at + 0.3) m.post = true; });
     if (++S.tick % 2) return; // 60 looks a second are plenty
     for (var bi = 0; bi < w.balls.length && bi < 2; bi++) {
       var b = w.balls[bi], th = S.threat[bi], fut = E.ballFuture(A, b, SAVE_LOOK);
+      if (A.type !== 'volley') lookForMiss(w, S, bi, b, fut);
       if (fut) {
         var att = fut.team, back = null;
         // going in again: the touch a moment ago saved nothing
@@ -3835,6 +3876,68 @@
     }
     for (i = S.cand.length - 1; i >= 0; i--) if (w.time - S.cand[i].t >= SAVE_CONFIRM) addSave(S.cand.splice(i, 1)[0]);
     if (S.group && w.time - S.group.last > SAVE_CHAIN) closeGroup(true);
+    for (i = S.miss.length - 1; i >= 0; i--) {
+      var m = S.miss[i], mb = w.balls[m.bi], lastTouch = Math.max(mb.touchT[0], mb.touchT[1]);
+      if (w.time <= m.at + 0.05 && lastTouch > m.shot + 0.1) S.miss.splice(i, 1); // blocked, or played on, before it got there
+      else if (w.time >= m.at + CLIP_POST) fileMiss(S.miss.splice(i, 1)[0]);
+    }
+  }
+
+  // A near miss: just after a shot the ball on its own goes in nowhere, but the same shot a little stronger, weaker,
+  // higher or lower would have scored, whatever the sport (past the post, over the bar, off the rim). Nobody may touch
+  // it before it gets there. How good a miss it was: how small a change would have scored, hitting the frame,
+  // a long shot, a shot in the air, the power. The best fifth of a match's misses go into its highlight.
+  var MISS_LOOK = 1.5, MISS_SPEED = 500, MISS_SHARE = 0.2;
+  // [power, angle change in radians]
+  var MISS_TRY = [[1, -0.015], [1, 0.015], [0.975, 0], [1.025, 0], [1, -0.03], [1, 0.03], [0.95, 0], [1.05, 0],
+    [1, -0.06], [1, 0.06], [0.9, 0], [1.1, 0], [0.95, -0.03], [0.95, 0.03], [1.05, -0.03], [1.05, 0.03]];
+  var probe = { x: 0, y: 0, vx: 0, vy: 0, ang: 0, spin: 0 };
+  function lookForMiss(w, S, bi, b, fut) {
+    var A = w.arena;
+    for (var team = 0; team < 2; team++) {
+      if (b.touchT[team] <= S.seen[bi][team]) continue;
+      S.seen[bi][team] = b.touchT[team];
+      var sp = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
+      if (b.lastTeam !== team || sp < MISS_SPEED || fut || E.ballFuture(A, b, MISS_LOOK)) continue; // no shot, or going in
+      var dir = Math.atan2(b.vy, b.vx), best = null;
+      for (var i = 0; i < MISS_TRY.length; i++) {
+        var v = MISS_TRY[i], a = dir + v[1];
+        probe.x = b.x; probe.y = b.y; probe.vx = Math.cos(a) * sp * v[0]; probe.vy = Math.sin(a) * sp * v[0]; probe.ang = b.ang; probe.spin = b.spin;
+        var f = E.ballFuture(A, probe, MISS_LOOK);
+        if (!f || f.team !== team) continue;
+        var close = 1 - 0.5 * (Math.abs(v[0] - 1) / 0.1 + Math.abs(v[1]) / 0.06); // 1: the tiniest change would have scored
+        if (!best || close > best.close) best = { close: close, t: f.t };
+      }
+      if (!best) continue;
+      S.miss = S.miss.filter(function (m) { return m.bi !== bi; }); // a newer shot with the same ball replaces it
+      S.miss.push({ bi: bi, team: team, by: b.lastPid, shot: b.touchT[team], at: w.time + best.t, close: best.close,
+        far: Math.abs((team === 0 ? W : 0) - b.x) > 700, air: b.lastAir, sp: sp, post: false });
+    }
+  }
+  function fileMiss(m) {
+    var rec = G.rec, r = recRange();
+    var beauty = m.close + (m.post ? 0.25 : 0) + (m.far ? 0.2 : 0) + (m.air ? 0.15 : 0) + 0.2 * Math.min(1, m.sp / 1800);
+    var from = rec.frameAt(Math.max(m.shot, m.at - 3) - CLIP_PRE, r.oldest, r.newest);
+    var clip = makeClip(from, rec.frameAt(m.at + CLIP_POST, from, r.newest), [{ t: m.at, kind: 'miss', bi: m.bi, by: m.by, team: m.team, beauty: beauty }],
+      [[Math.max(m.shot - 0.35, m.at - 1.2), m.at + 0.6]], {});
+    if (clip) fileClip(clip);
+  }
+  // a finished save or miss clip goes into its list. One that took in a save counts as a save: two saves or more
+  // are always kept, of the single ones the most dangerous third; of the misses the best fifth.
+  function fileClip(clip) {
+    var saves = clip.marks.filter(function (m) { return m.kind === 'save'; }), misses = clip.marks.filter(function (m) { return m.kind === 'miss'; });
+    var list = saves.length ? saves : misses, by = [];
+    list.forEach(function (m) { if (by.indexOf(m.by) < 0) by.push(m.by); });
+    clip.by = by; clip.name = playerNames(by); clip.team = list[list.length - 1].team;
+    if (saves.length) {
+      clip.kind = 'save'; clip.n = saves.length;
+      clip.danger = saves.reduce(function (a, m) { return a + (m.danger || 0.5); }, 0);
+      (clip.n > 1 ? G.hlm.clips : G.hlm.singles).push(clip);
+    } else {
+      clip.kind = 'miss'; clip.n = misses.length;
+      clip.beauty = Math.max.apply(null, misses.map(function (m) { return m.beauty || 0; }));
+      G.hlm.misses.push(clip);
+    }
   }
   function addSave(s) {
     var S = G.hlw, g = S.group;
@@ -3849,19 +3952,12 @@
     if (!g) return;
     S.group = null;
     if (!keep || !G.hlm) return;
-    var rec = G.rec, r = recRange(), first = g.saves[0], last = g.saves[g.saves.length - 1], danger = 0;
-    g.saves.forEach(function (s) { danger += s.danger; });
+    var rec = G.rec, r = recRange(), first = g.saves[0], last = g.saves[g.saves.length - 1];
     var from = rec.frameAt(Math.max(first.shot, first.t - 3) - CLIP_PRE, r.oldest, r.newest);
     var clip = makeClip(from, rec.frameAt(last.t + CLIP_POST, from, r.newest),
-      g.saves.map(function (s) { return { t: s.t, kind: 'save', bi: s.bi, by: s.by, team: s.def }; }),
-      g.saves.map(function (s) { return [Math.max(Math.max(s.shot, s.t - 3) - 0.35, s.t - 1), s.t + 0.6]; }),
-      { kind: 'save', team: g.def, danger: danger });
-    if (!clip) return;
-    // the clip may have taken in an earlier save clip it overlapped
-    var saves = clip.marks.filter(function (m) { return m.kind === 'save'; }), by = [];
-    saves.forEach(function (m) { if (by.indexOf(m.by) < 0) by.push(m.by); });
-    clip.n = saves.length; clip.by = by; clip.name = saverNames(by);
-    (clip.n > 1 ? G.hlm.clips : G.hlm.singles).push(clip);
+      g.saves.map(function (s) { return { t: s.t, kind: 'save', bi: s.bi, by: s.by, team: s.def, danger: s.danger }; }),
+      g.saves.map(function (s) { return [Math.max(Math.max(s.shot, s.t - 3) - 0.35, s.t - 1), s.t + 0.6]; }), {});
+    if (clip) fileClip(clip); // it may have taken in an earlier clip it overlapped
   }
   function recRange() { var n = G.rec.n; return { oldest: Math.max(n - RB + 1, 0), newest: n - 1 }; }
   function clipLen(c) { return c.frames.length / FS / HL.RATE; }
@@ -3871,7 +3967,7 @@
   function makeClip(from, to, marks, slow, meta) {
     var rec = G.rec, oldest = recRange().oldest;
     if (to - from < 60) return null;
-    [G.hlm.clips, G.hlm.singles].forEach(function (list) {
+    [G.hlm.clips, G.hlm.singles, G.hlm.misses].forEach(function (list) {
       for (var i = list.length - 1; i >= 0; i--) {
         var c = list[i];
         if (c.round !== G.round || c.t + clipLen(c) < rec.timeAt(from) - 0.3) continue;
@@ -3886,7 +3982,7 @@
     return Object.assign({
       frames: HL.encode(rec.buf, RB, from, to), map: G.world.arena.map.id, mods: G.roundMods || {}, swap: is4(G.mode) && G.round % 2 === 0,
       round: G.round, t: base,
-      marks: marks.map(function (m) { return { t: rel(m.t), kind: m.kind, bi: m.bi, by: m.by, team: m.team }; }),
+      marks: marks.map(function (m) { return { t: rel(m.t), kind: m.kind, bi: m.bi, by: m.by, team: m.team, danger: m.danger, beauty: m.beauty }; }),
       slow: slow.map(function (q) { return [rel(q[0]), rel(q[1])]; })
     }, meta);
   }
@@ -3907,18 +4003,25 @@
     if (!S) return;
     S.cand.forEach(function (c) { if (c.att !== team) addSave(c); }); // a touch just before the ball went in saved nothing
     S.cand = []; S.threat = [null, null];
+    S.miss.forEach(function (m) { if (G.world.time >= m.at) fileMiss(m); }); // one not there yet went in after all
+    S.miss = [];
     var g = S.group;
     // saves made just before the same side conceded were not enough
     if (g) closeGroup(!(team >= 0 && g.def === 1 - team && G.world.time - g.last < SAVE_CHAIN));
     G.hlw = null;
   }
   function finishHighlights() {
-    if (G.hlw) { closeGroup(true); G.hlw = null; }
+    if (G.hlw) {
+      G.hlw.miss.forEach(function (m) { if (G.world.time >= m.at) fileMiss(m); });
+      closeGroup(true); G.hlw = null;
+    }
     var H = G.hlm;
     G.hlm = null;
     if (!H) return null;
     var singles = H.singles.slice().sort(function (a, b) { return b.danger - a.danger; });
-    var clips = H.clips.concat(singles.slice(0, singles.length ? Math.max(1, Math.round(singles.length / 3)) : 0));
+    var misses = H.misses.slice().sort(function (a, b) { return b.beauty - a.beauty; }); // best miss first
+    var clips = H.clips.concat(singles.slice(0, singles.length ? Math.max(1, Math.round(singles.length / 3)) : 0),
+      misses.slice(0, Math.ceil(misses.length * MISS_SHARE)));
     clips.sort(function (a, b) { return a.round - b.round || a.t - b.t; });
     return clips.length ? clips : null;
   }
@@ -3928,7 +4031,7 @@
     if (soloish(G.mode)) return team === 0 ? nameOf(0) : 'Bot';
     return nameOf(team);
   }
-  function saverNames(by) {
+  function playerNames(by) {
     var out = [];
     by.forEach(function (id) { var n = id >= 0 ? whoName(id) : '🛡️'; if (out.indexOf(n) < 0) out.push(n); });
     return out.join(' + ');
@@ -4053,6 +4156,7 @@
       txt = '🧤 CỨU THUA!'; col = by >= 0 ? G.looks.p[by].col : teamCol(team);
     }
     else if (m.kind === 'zap') { txt = '⚡ SÉT!'; col = ZAP_COL; }
+    else if (m.kind === 'miss') { txt = '😱 SUÝT VÀO!'; col = m.by >= 0 ? G.looks.p[m.by].col : teamCol(m.team); }
     else { txt = FLASH_WORDS[w.arena.type] || 'VÀO!'; col = G.looks.ffa && c.credit >= 0 ? G.looks.p[c.credit].col : teamCol(c.team); }
     burst(b.x, b.y, txt, col, w.arena.P.ballR);
   }
@@ -4080,6 +4184,7 @@
     var icon = E.MAP_BY_ID[c.map] ? E.MAP_BY_ID[c.map].icon + ' ' : '';
     if (c.kind === 'save') return '🧤 ' + (c.n > 1 ? 'Cứu thua liên tiếp ×' + c.n : 'Cứu thua') + (c.name ? ' · ' + c.name : '');
     if (c.kind === 'zap') return icon + '⚡ Không ai được điểm';
+    if (c.kind === 'miss') return '😱 Suýt vào' + (c.name ? ' · ' + c.name : '');
     return icon + (c.name ? c.name + ' · ' : '') + scoreText(c.score, G.hlp.hl.match.mode);
   }
   // white text on a black pill, readable over the film bar
@@ -4582,6 +4687,7 @@
         }
         if (G.state !== 'play') return;
         runPhysics(dt);
+        redropTick();
         // on slow phones fall back to cheaper planners instead of dropping frames
         G.botWin += dt;
         if (G.botWin >= 1) {
@@ -4751,6 +4857,7 @@
     }
     D.structures(c, A, 'front', targetColor);
     D.bolt(c, wv.bolt);
+    drawRedropSpots(c, w);
     for (i = 0; i < 4; i++) {
       p = w.players[i];
       if (p.active && w.fx.big[i] > 0) { c.fillStyle = INK; D.emoji(c, '🍄', p.x, p.y - 170 * p.sc, 30); }
@@ -4826,6 +4933,45 @@
         D.circle(c, sx, by0 + 26, 9); c.fillStyle = '#ffffff'; c.fill(); c.lineWidth = 3; c.strokeStyle = INK; c.stroke();
       }
     }
+  }
+  // ---------- re-drop warning ----------
+  // a ball out of play (3 s) or lying still untouched (15 s) is dropped again in the middle: the last 3 seconds
+  // are announced with a countdown, a beep each second and a dashed ring where it will come down
+  var REDROP_WARN = 3;
+  function redrops() {
+    var w = G.world, out = [];
+    if (!w || G.demo || G.mode === 'tutorial' || G.state !== 'play') return out;
+    for (var i = 0; i < w.balls.length; i++) {
+      var b = w.balls[i], left = Infinity;
+      if (b.outT > 0.25) left = Math.min(left, E.OUT_TIME - b.outT); // a ball just flying over a goal for a moment is no warning
+      if (b.stillT > 0) left = Math.min(left, E.STILL_TIME - b.stillT);
+      if (left <= REDROP_WARN && left > 0) out.push({ left: left, x: W / 2 + (w.balls.length > 1 ? (i === 0 ? -160 : 160) : 0) });
+    }
+    return out;
+  }
+  function redropTick() {
+    var r = redrops(), sec = r.length ? Math.ceil(Math.min.apply(null, r.map(function (x) { return x.left; }))) : 0;
+    if (sec && sec !== G.redropSec) Snd.beep(false);
+    G.redropSec = sec;
+  }
+  function drawRedropSpots(c, w) {
+    var r = redrops();
+    if (!r.length) return;
+    var R = w.arena.P.ballR, pulse = 0.5 + 0.5 * Math.sin(clock * 8);
+    r.forEach(function (d) {
+      c.save(); c.globalAlpha = 0.6 + 0.4 * pulse;
+      c.setLineDash([10, 8]); c.lineWidth = 5; c.strokeStyle = '#ffffff';
+      D.circle(c, d.x, 150, R + 6); c.stroke();
+      c.setLineDash([]); c.lineWidth = 2; c.strokeStyle = INK; D.circle(c, d.x, 150, R + 10); c.stroke();
+      c.restore();
+      D.textOutlined(c, String(Math.ceil(d.left)), d.x, 152, R * 1.1, '#ffd23f', INK);
+    });
+  }
+  function drawRedropWarning(c, u, cx) {
+    var r = redrops();
+    if (!r.length) return;
+    var sec = Math.ceil(Math.min.apply(null, r.map(function (x) { return x.left; })));
+    D.textOutlined(c, '⚠️ Bóng sẽ được phát lại ở giữa sân sau ' + sec + ' giây', cx, view.ch * 0.24, 4.4 * u, '#ffd23f', INK);
   }
   function easeBack(t) { var s = 1.7; t -= 1; return t * t * ((s + 1) * t + s) + 1; }
   function fmtClock(s) { s = Math.ceil(s); return Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2); }
@@ -4915,6 +5061,7 @@
       if (sub) D.textOutlined(c, sub, 0, 12 * u, 5.2 * u, '#ffffff', INK);
       c.restore();
     }
+    drawRedropWarning(c, u, cx);
     if (G.noteT > 0 && G.note && G.state !== 'intro') {
       var s3 = easeBack(Math.min(1, (1.4 - G.noteT) / 0.3));
       c.save(); c.translate(cx, v.ch * (G.state === 'scored' || G.mode === 'tutorial' ? 0.62 : 0.3)); c.scale(Math.max(0, s3), Math.max(0, s3));
@@ -4955,6 +5102,7 @@
     c.setTransform(v.dpr * v.s, 0, 0, v.dpr * v.s, v.dpr * (v.ox + shx), v.dpr * (v.oy + shy));
     var x0 = -v.ox / v.s - 30, x1 = (v.cw - v.ox) / v.s + 30, bottom = (v.ch - v.oy) / v.s + 30;
     D.background(c, m, x0, x1, bottom, clock, G.excite);
+    if (isDark()) { var top = -v.oy / v.s - 30; c.fillStyle = 'rgba(6, 12, 32, 0.38)'; c.fillRect(x0, top, x1 - x0, bottom - top); }
     if (w) {
       drawWorld(c, w, dt);
       for (var i = 0; i < G.parts.length; i++) {

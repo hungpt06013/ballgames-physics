@@ -1201,7 +1201,7 @@
     BODY: BODY, LEG: LEG, NB: NB, NS: NS, RAD: RAD, LEG_REST: LEG_REST, LEG_KICK: LEG_KICK, BOMB_TIME: BOMB_TIME,
     MAPS: MAPS, MAP_BY_ID: MAP_BY_ID, DEFAULT_SETTINGS: DEFAULT_SETTINGS, LEVELS: LEVELS,
     MODS: MODS, modsFor: modsFor, ITEMS: ITEMS, itemsFor: itemsFor,
-    TOR_R: TOR_R, TOR_TOP: TOR_TOP, STUN_TIME: STUN_TIME, CRATER_TIME: CRATER_TIME, STILL_TIME: STILL_TIME,
+    TOR_R: TOR_R, TOR_TOP: TOR_TOP, STUN_TIME: STUN_TIME, CRATER_TIME: CRATER_TIME, STILL_TIME: STILL_TIME, OUT_TIME: OUT_TIME,
     startQuake: startQuake, startTornado: startTornado, strike: strike, quakeLevel: quakeLevel, torPull: torPull,
     groundAt: groundAt, craterDepth: craterDepth, isBicycle: isBicycle,
     buildArena: buildArena, createWorld: createWorld, resetRound: resetRound, step: step, stepPlayers: stepPlayers,
