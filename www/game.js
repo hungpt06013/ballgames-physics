@@ -735,7 +735,7 @@
   function tutorialTick(dt, w) {
     var t = G.tut, p = w.players[1];
     t.t += dt;
-    w.ball.outT = 0; // no automatic re-drop while learning
+    w.ball.outT = 0; w.ball.stillT = 0; // no automatic re-drop while learning
     if (t.ok > 0) { t.ok -= dt; if (t.ok <= 0) advanceTutorial(w); return; }
     if (t.step === 0 && w.events.some(function (e) { return e.t === 'jump' && e.id === 1; })) passStep();
     else if (t.step === 1) {

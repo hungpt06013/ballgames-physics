@@ -1,4 +1,4 @@
-# Ballgames Physics (bản tự làm) – v2.6
+# Ballgames Physics (bản tự làm) – v2.7
 
 Game 2 đội × 2 cầu thủ ragdoll, mỗi đội **1 nút** (bấm = nhảy + vung chân sút, giữ khi đang bay = xoay người).
 Khi vào trận, tích chọn các môn muốn chơi; chọn nhiều môn thì sau mỗi điểm đổi sang môn khác.
@@ -21,7 +21,7 @@ Bóng đá, bóng rổ, bóng bầu dục, bóng chuyền bãi biển, bóng đ�
 Khung thành bóng đá / Mặt Trăng cao 330 (bản cũ 250); bóng khổng lồ cao 400, sâu 300 (bản cũ 180). Khung thành luôn sâu hơn đường kính quả bóng ít nhất 70, nên dù chỉnh cỡ bóng tối đa (×1,6) và bật người mới thì bóng vẫn lọt hẳn vào được; chế độ người mới làm khung cao hơn.
 Các môn có khung thành (bóng đá, Mặt Trăng, sân băng, bóng khổng lồ): bàn thắng chỉ tính khi **cả quả bóng đã vượt qua vạch vôi** trước khung thành (vạch trắng trên sân).
 Bóng rổ, bóng bầu dục: cầu thủ không đi ra sau cột rổ / cột dọc được, tối đa là đứng trên đỉnh cột.
-Bóng chỉ được thả lại giữa sân khi nằm **ngoài biên** (trên nóc khung thành, sau cột rổ, sau cột bầu dục) đủ 3 giây; ở trong sân (kể cả nằm vắt trên vạch vôi) thì bóng nằm yên bao lâu cũng để nguyên.
+Bóng được thả lại giữa sân khi nằm **ngoài biên** (trên nóc khung thành, sau cột rổ, sau cột bầu dục) đủ 3 giây, hoặc khi **nằm im 15 giây mà không ai chạm** (kể cả nằm vắt trên vạch vôi); riêng bóng bom thì không, vì bom tự nổ.
 Cầu thủ ngã (kể cả lộn ngược) tự bật dậy sau khoảng 0,3 giây và xoay vừa đủ để tiếp đất bằng chân; chạm nút lúc đang nằm cũng bật dậy ngay.
 
 ## Chế độ
@@ -85,7 +85,7 @@ Dữ liệu (xu, đồ, thống kê, cài đặt, lịch sử) lưu trong máy (
 - `android/` – vỏ Android (WebView toàn màn hình, khoá màn hình ngang, nút Back, cầu nối `BGNative` để lưu highlight và video).
 - `build_apk.sh` – build APK không cần Gradle (aapt2 → javac → d8 → zipalign → apksigner).
 - `build_html.py` – gộp thành 1 file HTML chơi trên trình duyệt.
-- `test/` – kiểm tra vật lý (`sanity2.cjs`), bot đấu nhau (`match2.cjs`), kiểm tra giao diện bằng Playwright (`v21.cjs`, `v22.cjs`, `v23.cjs`, `flow2.cjs`, `tut.cjs`, `migrate.cjs`), thời gian đứng dậy sau khi ngã (`getup.cjs`), thiên tai (`hazards.cjs`), bóng mọi cỡ đều vào được khung thành (`goalfit.cjs`), quay chậm liền mạch (`slowmo.cjs`), lời bình xe đạp chổng ngược (`bicycle.cjs`), highlight / lịch sử / thống kê / bình chọn / xuất video (`v25.cjs`), luật cứu thua, gộp pha trùng, cách tính điểm (`v26.cjs`), đường đi của bản Android với cầu nối giả lập (`native.cjs`), dung lượng highlight (`hlsize.cjs`).
+- `test/` – kiểm tra vật lý (`sanity2.cjs`), bot đấu nhau (`match2.cjs`), kiểm tra giao diện bằng Playwright (`v21.cjs`, `v22.cjs`, `v23.cjs`, `flow2.cjs`, `tut.cjs`, `migrate.cjs`), thời gian đứng dậy sau khi ngã (`getup.cjs`), thiên tai (`hazards.cjs`), bóng mọi cỡ đều vào được khung thành (`goalfit.cjs`), quay chậm liền mạch (`slowmo.cjs`), lời bình xe đạp chổng ngược (`bicycle.cjs`), highlight / lịch sử / thống kê / bình chọn / xuất video (`v25.cjs`), luật cứu thua, gộp pha trùng, cách tính điểm (`v26.cjs`), bóng nằm im 15 giây được thả lại (`stillball.cjs`), đường đi của bản Android với cầu nối giả lập (`native.cjs`), dung lượng highlight (`hlsize.cjs`).
 
 ## Tuỳ chỉnh vật lý
 Trong game: Menu → ⚙️ Cài đặt.
@@ -94,7 +94,7 @@ Trong code: sửa từng môn ở `MAPS` trong `www/engine.js` (`g`, `gBall`, `j
 ## Build
 Cần JDK 17+ và Android SDK (build-tools 36.1.0, platforms;android-34):
 ```
-ANDROID_HOME=/đường/dẫn/sdk VERSION_CODE=13 VERSION_NAME=2.6 ./build_apk.sh
+ANDROID_HOME=/đường/dẫn/sdk VERSION_CODE=14 VERSION_NAME=2.7 ./build_apk.sh
 python3 build_html.py BallgamesPhysics.html
 ```
 Chạy kiểm tra: `node test/sanity2.cjs` (engine), các file Playwright như `node test/v25.cjs` (cần `npm i -g playwright` và Chromium).
