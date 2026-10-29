@@ -1,4 +1,4 @@
-# Ballgames Physics (bản tự làm) – v2.8
+# Ballgames Physics (bản tự làm) – v2.9
 
 Game 2 đội × 2 cầu thủ ragdoll, mỗi đội **1 nút** (bấm = nhảy + vung chân sút, giữ khi đang bay = xoay người).
 Khi vào trận, tích chọn các môn muốn chơi; chọn nhiều môn thì sau mỗi điểm đổi sang môn khác.
@@ -48,7 +48,8 @@ Cầu thủ ngã (kể cả lộn ngược) tự bật dậy sau khoảng 0,3 gi
   - 🌪️ lốc xoáy: 8–15 giây một lần, ở một phần tư sân bất kỳ, hút người và bóng lên rồi xoay khoảng 6 giây; khung thành không bị ảnh hưởng.
   - Đếm giờ chỉ chạy khi không có hiện tượng nào. Khi một hiện tượng đến: 90% các bộ đếm khác reset (chỉ có 1 hiện tượng), 9% có 2 hiện tượng cùng lúc, 0,9% có 3, 0,1% có cả 4.
 - Mỗi mục trên bật/tắt riêng, và khi bật thì **tích chọn từng thứ** muốn có.
-- **Phát lại** mỗi bàn thắng (chạm để bỏ qua): bắt đầu từ 5 giây trước cú chạm bóng cuối của bên được điểm (với phản lưới là cú sút trúng người bên kia rồi vào lưới), chạy tốc độ thường rồi quay chậm từ ngay trước cú sút (nhiều nhất 2,5 giây trước khi bóng vào) và chậm luôn tới hết phát lại, lúc bóng vào có vòng sáng và chữ "VÀO!" ngay chỗ quả bóng; vật phẩm, khiên, đóng băng, phóng to, thời tiết hiện đúng như lúc diễn ra; bóng hay người bay lên trời có mũi tên ngay dưới vạch đen; kèm bình luận: phản lưới, xe đạp chổng ngược (chỉ khi thật sự lộn ngược trên không: đầu thấp hơn hông, đang bay, chân vung lên), đánh đầu, sút xa, chớp nhoáng…
+- **Phát lại** mỗi bàn thắng (chạm để bỏ qua): bắt đầu từ 5 giây trước cú chạm bóng cuối của bên được điểm (với phản lưới là cú sút trúng người bên kia rồi vào lưới), chạy tốc độ thường rồi quay chậm từ ngay trước cú sút (nhiều nhất 2,5 giây trước khi bóng vào) và chậm luôn tới hết phát lại, lúc bóng vào có vòng sáng quanh quả bóng; vật phẩm, khiên, đóng băng, phóng to, thời tiết hiện đúng như lúc diễn ra; bóng hay người bay lên trời có mũi tên ngay dưới vạch đen; kèm bình luận: phản lưới, xe đạp chổng ngược (chỉ khi thật sự lộn ngược trên không: đầu thấp hơn hông, đang bay, chân vung lên), đánh đầu, sút xa, chớp nhoáng…
+  Khi xem lại (phát lại hay highlight) **mọi chữ nằm trong hai dải đen trên / dưới, không che sân**: dải trên ghi PHÁT LẠI / HIGHLIGHT, tên pha, MVP (và nút ✖); dải dưới ghi lời bình, đúng lúc bóng vào / cứu thua / suýt vào thì đổi thành "VÀO! ✔" / "🧤 CỨU THUA!" / "😱 SUÝT VÀO!", hai bên là QUAY CHẬM và Chạm để bỏ qua.
 - Cầu thủ có **nét mặt** (gắng sức, vui, buồn, choáng, lạnh cóng), đội ghi bàn ăn mừng, khán giả nhảy múa.
 - **Nhạc nền** tự tạo theo môn + tiếng khán giả; bật/tắt riêng nhạc và hiệu ứng.
 
@@ -97,7 +98,7 @@ Trong code: sửa từng môn ở `MAPS` trong `www/engine.js` (`g`, `gBall`, `j
 ## Build
 Cần JDK 17+ và Android SDK (build-tools 36.1.0, platforms;android-34):
 ```
-ANDROID_HOME=/đường/dẫn/sdk VERSION_CODE=15 VERSION_NAME=2.8 ./build_apk.sh
+ANDROID_HOME=/đường/dẫn/sdk VERSION_CODE=16 VERSION_NAME=2.9 ./build_apk.sh
 python3 build_html.py BallgamesPhysics.html
 ```
 Chạy kiểm tra: `node test/sanity2.cjs` (engine), các file Playwright như `node test/v25.cjs` (cần `npm i -g playwright` và Chromium).

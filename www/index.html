@@ -176,9 +176,10 @@
   label.radio input.num { width: calc(14 * var(--u)); }
   .center { text-align: center; }
   /* highlight player */
-  #hlClose, #exportBar { position: fixed; right: max(12px, env(safe-area-inset-right)); top: calc(11 * var(--u)); z-index: 10; }
-  #hlClose { width: calc(10 * var(--u)); height: calc(10 * var(--u)); min-width: 40px; min-height: 40px; border-radius: 50%; border: calc(0.5 * var(--u)) solid var(--ink);
-    background: var(--btn); color: var(--text); font-size: calc(4.6 * var(--u)); font-weight: 900; cursor: pointer; padding: 0; line-height: 1; }
+  /* inside the top film bar of the highlight, off the pitch */
+  #hlClose, #exportBar { position: fixed; right: max(12px, env(safe-area-inset-right)); top: calc(1 * var(--u)); z-index: 10; }
+  #hlClose { width: calc(8 * var(--u)); height: calc(8 * var(--u)); min-width: 30px; min-height: 30px; border-radius: 50%; border: calc(0.5 * var(--u)) solid var(--ink);
+    background: var(--btn); color: var(--text); font-size: calc(3.8 * var(--u)); font-weight: 900; cursor: pointer; padding: 0; line-height: 1; }
   #exportBar { display: flex; align-items: center; gap: calc(1.4 * var(--u)); background: var(--paper); border: calc(0.5 * var(--u)) solid var(--ink); border-radius: 99px;
     padding: calc(0.8 * var(--u)) calc(0.8 * var(--u)) calc(0.8 * var(--u)) calc(2.6 * var(--u)); font-weight: 900; font-size: calc(3.4 * var(--u)); }
   #exportBar .chip { font-size: calc(3 * var(--u)); }

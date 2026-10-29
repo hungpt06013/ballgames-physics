@@ -1390,24 +1390,21 @@
     if (c.kind === 'miss') return '😱 Suýt vào' + (c.name ? ' · ' + c.name : '');
     return icon + (c.name ? c.name + ' · ' : '') + scoreText(c.score, G.hlp.hl.match.mode);
   }
-  // white text on a black pill, readable over the film bar
-  function barLabel(c, txt, x, y, fs) {
-    c.font = '900 ' + fs + 'px ' + D.FONT;
-    var tw = c.measureText(txt).width + fs;
-    D.rrect(c, x - tw / 2, y - fs * 0.75, tw, fs * 1.5, fs * 0.75); c.fillStyle = '#000000'; c.fill();
-    c.fillStyle = '#ffffff'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(txt, x, y + fs * 0.05);
-  }
   function drawHighlightHUD(c, u, cx) {
-    var v = view, h = G.hlp, cl = h.c, bar = replayBars(c, u), N = h.hl.clips.length;
-    D.textOutlined(c, '🎬 HIGHLIGHT ' + (h.ci + 1) + '/' + N, 25 * u, bar + 6 * u, 4.2 * u, '#ff5050', '#ffffff');
-    D.textOutlined(c, clipTitle(cl), cx, bar + 6 * u, 4.2 * u, '#ffffff', INK);
+    var v = view, h = G.hlp, cl = h.c, N = h.hl.clips.length, pad = 3 * u;
+    replayBars(c, u);
+    var ty = barTextY(u), by = v.ch - ty;
+    // top bar: which clip, what it is, the match's MVP (the ✖ button sits at its right end)
+    var lw = barText(c, '🎬 HIGHLIGHT ' + (h.ci + 1) + '/' + N, pad, ty, 3.8 * u, '#ff5050', 'left');
+    var right = v.cw - pad - (h.exporting ? 0 : Math.max(30, 8 * u) + 2 * u), mvp = h.hl.match.mvp;
+    var rw = mvp ? barText(c, '🏅 MVP: ' + mvp.n + ' · ⭐ ' + fmtRating(mvp.r), right, ty, 3.2 * u, '#ffd23f', 'right') : 0;
+    barText(c, clipTitle(cl), cx, ty, 3.8 * u, '#ffffff', 'center', v.cw - 2 * Math.max(pad + lw, v.cw - right + rw) - 4 * u);
+    // bottom bar: slow motion, the moment or the commentary, what a tap does
+    var tip = h.exporting ? 'BALLGAMES PHYSICS' : (h.ci + 1 < N ? 'Chạm để xem pha tiếp ⏭' : 'Chạm để kết thúc ⏹');
+    var tw = barText(c, tip, v.cw - pad, by, 3.2 * u, '#ffffff', 'right');
+    if (h.speed < 0.7) barText(c, SLOW_TXT, pad, by, 3.4 * u, '#ffd23f', 'left');
     var head = cl.kind === 'goal' ? (cl.sub || cl.word) : (cl.kind === 'zap' ? cl.word : '');
-    if (head) D.textOutlined(c, head, cx, v.ch - bar - 6 * u, 4.6 * u, '#ffffff', INK);
-    var mvp = h.hl.match.mvp;
-    if (mvp) barLabel(c, '🏅 MVP: ' + mvp.n + ' · ⭐ ' + fmtRating(mvp.r), cx, bar / 2, 3.2 * u);
-    if (h.exporting) barLabel(c, 'BALLGAMES PHYSICS', v.cw - 24 * u, bar / 2, 3.2 * u);
-    else D.textOutlined(c, h.ci + 1 < N ? 'Chạm để xem pha tiếp ⏭' : 'Chạm để kết thúc ⏹', v.cw - 26 * u, v.ch - bar - 5 * u, 3.4 * u, '#ffffff', INK);
-    if (h.speed < 0.7) D.textOutlined(c, '🐢 QUAY CHẬM', 20 * u, v.ch - bar - 5 * u, 3.6 * u, '#ffd23f', INK);
+    barMiddle(c, u, by, head, v.cw - 2 * (Math.max(textW(SLOW_TXT, 3.4 * u), tw) + pad) - 4 * u);
   }
 
   // ---------- time up with the score level: draw, or golden goal? ----------
@@ -2093,12 +2090,12 @@
   }
   function hudTop(u) { return Math.max(8, u * 2); }
   function edgeY(x, u) {
-    if (playback()) return 9 * u + 4; // under the replay's black bar
+    if (playback()) return barH(u) + 4; // under the replay's black bar
     var half = (is4(G.mode) ? 38 : 22) * u;
     return Math.abs(x - view.cw / 2) < half ? hudTop(u) + 11 * u + 7 * u : 3;
   }
   function drawPlayerMarks(c, u, w) {
-    var v = view, four = !!(G.looks && G.looks.four), hidden = playback() ? 9 * u : 4;
+    var v = view, four = !!(G.looks && G.looks.four), hidden = playback() ? barH(u) : 4;
     var fs = Math.round(Math.max(13, 3.9 * u));
     c.font = '900 ' + fs + 'px ' + D.FONT;
     c.textAlign = 'center'; c.textBaseline = 'middle'; c.lineJoin = 'round';
@@ -2126,7 +2123,7 @@
   }
   // balls above the top of the screen (or hidden under the replay bar) get an arrow and a dot
   function drawBallArrows(c, u, A, w) {
-    var v = view, hidden = playback() ? 9 * u : 0;
+    var v = view, hidden = playback() ? barH(u) : 0;
     if (wxView().bombGone) return;
     for (var bi = 0; bi < w.balls.length; bi++) {
       var b = w.balls[bi], R = A.P.ballR, sy = v.oy + (b.y + R) * v.s;
@@ -2272,22 +2269,43 @@
       c.restore();
     }
   }
-  // the black film bars of a replay or highlight; returns their height
+  // The black film bars of a replay or highlight. All their text is written inside the bars, so nothing covers the
+  // pitch: the holes of the film run along the outer edge, the text in the rest of the bar.
+  var SLOW_TXT = '🐢 QUAY CHẬM';
+  function barH(u) { return 10 * u; }
+  function barTextY(u) { return 6.1 * u; } // middle of the text band of the top bar (the bottom bar mirrors it)
   function replayBars(c, u) {
-    var v = view, bar = 9 * u;
-    c.fillStyle = 'rgba(0,0,0,0.75)'; c.fillRect(0, 0, v.cw, bar); c.fillRect(0, v.ch - bar, v.cw, bar);
-    c.fillStyle = '#ffffff';
-    for (var x = 10; x < v.cw; x += 26) { c.fillRect(x, bar * 0.3, 12, bar * 0.4); c.fillRect(x, v.ch - bar * 0.7, 12, bar * 0.4); }
+    var v = view, bar = barH(u), hole = 1.4 * u;
+    c.fillStyle = 'rgba(0,0,0,0.82)'; c.fillRect(0, 0, v.cw, bar); c.fillRect(0, v.ch - bar, v.cw, bar);
+    c.fillStyle = 'rgba(255,255,255,0.8)';
+    for (var x = 10; x < v.cw; x += 26) { c.fillRect(x, 0.7 * u, 12, hole); c.fillRect(x, v.ch - 0.7 * u - hole, 12, hole); }
     return bar;
   }
+  function textW(txt, fs) { ctx.font = '900 ' + fs + 'px ' + D.FONT; return ctx.measureText(txt).width; }
+  // text in a bar, aligned left / right / center at x; shrunk to fit `room` when given; returns its width
+  function barText(c, txt, x, y, fs, fill, align, room) {
+    if (!txt) return 0;
+    var w = textW(txt, fs);
+    if (room && w > room) { fs *= Math.max(0.55, room / w); w = textW(txt, fs); }
+    D.textOutlined(c, txt, align === 'left' ? x + w / 2 : (align === 'right' ? x - w / 2 : x), y, fs, fill, '#000000');
+    return w;
+  }
+  // a team colour that reads on the black bar
+  function onBlack(col) { return lum(col.main) > 0.25 ? col.main : '#ffffff'; }
+  // middle of the bottom bar: the moment's word ("VÀO! ✔", "CỨU THUA!"…) while it flashes, otherwise the commentary
+  function barMiddle(c, u, y, text, room) {
+    var fl = G.flash;
+    if (fl && fl.t < 1.7) barText(c, fl.txt, view.cw / 2, y, 4.4 * u * (0.7 + 0.3 * easeBack(Math.min(1, fl.t / 0.25))), onBlack(fl.col), 'center', room);
+    else barText(c, text, view.cw / 2, y, 4 * u, '#ffffff', 'center', room);
+  }
   function drawReplayHUD(c, u, cx) {
-    var v = view, bar = replayBars(c, u);
-    D.textOutlined(c, '🎬 PHÁT LẠI', 20 * u, bar + 6 * u, 4.6 * u, '#ff5050', '#ffffff');
-    // the commentary sits above the bottom bar, leaving the top free for the arrows of things up in the air
-    var head = G.noPoint ? G.word : (G.sub || G.word);
-    if (head) D.textOutlined(c, head, cx, v.ch - bar - 6 * u, 4.6 * u, '#ffffff', INK);
-    D.textOutlined(c, 'Chạm để bỏ qua ⏭', v.cw - 22 * u, v.ch - bar - 5 * u, 3.4 * u, '#ffffff', INK);
-    if (G.replay && G.replay.speed < 0.7) D.textOutlined(c, '🐢 QUAY CHẬM', 20 * u, v.ch - bar - 5 * u, 3.6 * u, '#ffd23f', INK);
+    var v = view, pad = 3 * u;
+    replayBars(c, u);
+    var ty = barTextY(u), by = v.ch - ty;
+    barText(c, '🎬 PHÁT LẠI', pad, ty, 3.8 * u, '#ff5050', 'left');
+    if (G.replay && G.replay.speed < 0.7) barText(c, SLOW_TXT, pad, by, 3.4 * u, '#ffd23f', 'left');
+    var tw = barText(c, 'Chạm để bỏ qua ⏭', v.cw - pad, by, 3.2 * u, '#ffffff', 'right');
+    barMiddle(c, u, by, G.noPoint ? G.word : (G.sub || G.word), v.cw - 2 * (Math.max(textW(SLOW_TXT, 3.4 * u), tw) + pad) - 4 * u);
   }
 
   // ---------- render ----------
@@ -2318,17 +2336,7 @@
         else { D.circle(c, q.x, q.y, q.size * (q.kind === 'spark' ? k : 1)); c.fill(); }
       }
       c.globalAlpha = 1;
-      if (G.flash && playback()) {
-        var fl = G.flash, fa = Math.max(0, 1 - Math.max(0, fl.t - 1.3) / 0.4);
-        fl.t += dt;
-        if (fa > 0) {
-          var fs = easeBack(Math.min(1, fl.t / 0.25));
-          c.save(); c.globalAlpha = fa;
-          c.translate(Math.max(150, Math.min(W - 150, fl.x)), Math.max(90, fl.y - 80)); c.scale(fs, fs);
-          D.textOutlined(c, fl.txt, 0, 0, 46, fl.col.main, '#ffffff');
-          c.restore();
-        }
-      }
+      if (G.flash && playback()) G.flash.t += dt; // its word is written in the bottom bar, the rings stay around the ball
     }
     c.setTransform(v.dpr, 0, 0, v.dpr, 0, 0);
     if (w && !G.demo) {
