@@ -50,6 +50,24 @@
   delete prefs.sport; delete prefs.knownMaps;
   function savePrefs() { store('prefs', prefs); }
   savePrefs();
+
+  // ---------- light / dark ----------
+  // prefs.theme: 'light' or 'dark' once chosen; until then it follows the phone
+  var darkQuery = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+  function isDark() { return prefs.theme ? prefs.theme === 'dark' : !!(darkQuery && darkQuery.matches); }
+  function applyTheme() {
+    var dark = isDark();
+    document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.content = dark ? '#1b2430' : '#5cc04f';
+    var tb = document.getElementById('themeBtn');
+    if (tb) tb.textContent = dark ? '☀️' : '🌙';
+    var tg = document.getElementById('tgDark');
+    if (tg) tg.classList.toggle('on', dark);
+  }
+  function toggleTheme() { prefs.theme = isDark() ? 'light' : 'dark'; savePrefs(); applyTheme(); }
+  if (darkQuery && darkQuery.addEventListener) darkQuery.addEventListener('change', applyTheme);
+  applyTheme();
   Snd.musicOn = prefs.music; Snd.sfxOn = prefs.sound;
 
   // ---------- game state ----------
@@ -302,10 +320,13 @@
     $('tgReplay').classList.toggle('on', prefs.replay);
     $('tgMusic').classList.toggle('on', prefs.music);
     $('tgSfx').classList.toggle('on', prefs.sound);
+    $('tgDark').classList.toggle('on', isDark());
     buildHLSettings();
   }
   $('tgReplay').addEventListener('click', function () { prefs.replay = !prefs.replay; savePrefs(); buildSettings(); });
   $('tgMusic').addEventListener('click', function () { prefs.music = !prefs.music; Snd.init(); Snd.setMusic(prefs.music); savePrefs(); buildSettings(); });
+  $('tgDark').addEventListener('click', function () { toggleTheme(); Snd.click(); });
+  $('themeBtn').addEventListener('click', function () { toggleTheme(); Snd.init(); Snd.click(); });
   $('tgSfx').addEventListener('click', function () { prefs.sound = !prefs.sound; Snd.sfxOn = prefs.sound; savePrefs(); buildSettings(); refreshMenu(); });
 
   // --- shop ---
@@ -506,7 +527,7 @@
       items: prefs.items, itemList: prefs.itemList.slice(), weather: prefs.weather, wxList: prefs.wxList.slice(), bombTime: prefs.bombTime,
       beginner: prefs.beginner, slots: prefs.slots.slice() }, cfg);
     G.cfg = cfg; G.mode = cfg.mode; G.demo = false; G.round = 0; G.earned = 0; G.golden = false;
-    G.matchT = 0; G.goalsLog = []; G.playedMaps = []; G.hlm = { clips: [], singles: [] }; G.lastHL = null; G.ps = newStats();
+    G.matchT = 0; G.goalsLog = []; G.playedMaps = []; G.hlm = { clips: [], singles: [], misses: [] }; G.lastHL = null; G.ps = newStats();
     G.score = is4(cfg.mode) ? [0, 0, 0, 0] : [0, 0];
     G.target = cfg.fmt[0] === 'p' ? +cfg.fmt.slice(1) : 0;
     G.clock = cfg.fmt[0] === 't' ? +cfg.fmt.slice(1) : 0;
@@ -612,7 +633,7 @@
   function endMatch(draw) {
     G.state = 'over';
     Snd.setCrowd(false);
-    var w = draw ? -1 : matchWinner(), txt, color = INK, html, st = Meta.stats(), reward = G.earned, mode = G.mode;
+    var w = draw ? -1 : matchWinner(), txt, color = '', html, st = Meta.stats(), reward = G.earned, mode = G.mode;
     st.played++; st.byMode[mode] = (st.byMode[mode] || 0) + 1;
     html = scoreHtml();
     if (mode === 'ffa') {
@@ -668,7 +689,10 @@
   }
   // white or yellow kits are unreadable as text on the white result card
   function lum(hex) { var n = parseInt(hex.slice(1), 16); return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255; }
-  function textCol(col) { return lum(col.main) < 0.72 ? col.main : (lum(col.dark) < 0.62 ? col.dark : INK); }
+  function textCol(col) {
+    if (isDark()) return lum(col.main) > 0.3 ? col.main : 'var(--text)';
+    return lum(col.main) < 0.72 ? col.main : (lum(col.dark) < 0.62 ? col.dark : 'var(--text)');
+  }
   function scoreSpan(col, txt) { return '<span style="color:' + textCol(col) + '">' + txt + '</span>'; }
   function setOverButtons(main, tools) {
     var m = $('overMain'); m.textContent = main[0][0]; m.dataset.act = main[0][1];
@@ -1023,13 +1047,16 @@
   // single saves the most dangerous third is kept. Every point, and every round stopped by lightning, is kept too.
   var SAVE_LOOK = 1, SAVE_CONFIRM = 0.25, SAVE_CHAIN = 3, SAVE_ACTIVE = 0.6, CLIP_PRE = 3, CLIP_POST = 1.5;
   var ZAP_COL = { main: '#ffd23f', dark: '#c4a612' };
-  function newWatch() { return { tick: 0, threat: [null, null], cand: [], group: null }; }
+  function newWatch() { return { tick: 0, threat: [null, null], cand: [], group: null, seen: [[-1, -1], [-1, -1]], miss: [] }; }
   function watchSaves(w) {
-    var S = G.hlw, A = w.arena, i;
+    var S = G.hlw, A = w.arena, ev = w.events, i;
     if (A.type === 'bomb') return;
+    // a shot hitting the frame (post, bar, rim, board) makes a better miss
+    for (i = 0; i < ev.length; i++) if (ev[i].t === 'post') S.miss.forEach(function (m) { if (w.time >= m.shot && w.time <= m.at + 0.3) m.post = true; });
     if (++S.tick % 2) return; // 60 looks a second are plenty
     for (var bi = 0; bi < w.balls.length && bi < 2; bi++) {
       var b = w.balls[bi], th = S.threat[bi], fut = E.ballFuture(A, b, SAVE_LOOK);
+      if (A.type !== 'volley') lookForMiss(w, S, bi, b, fut);
       if (fut) {
         var att = fut.team, back = null;
         // going in again: the touch a moment ago saved nothing
@@ -1052,6 +1079,68 @@
     }
     for (i = S.cand.length - 1; i >= 0; i--) if (w.time - S.cand[i].t >= SAVE_CONFIRM) addSave(S.cand.splice(i, 1)[0]);
     if (S.group && w.time - S.group.last > SAVE_CHAIN) closeGroup(true);
+    for (i = S.miss.length - 1; i >= 0; i--) {
+      var m = S.miss[i], mb = w.balls[m.bi], lastTouch = Math.max(mb.touchT[0], mb.touchT[1]);
+      if (w.time <= m.at + 0.05 && lastTouch > m.shot + 0.1) S.miss.splice(i, 1); // blocked, or played on, before it got there
+      else if (w.time >= m.at + CLIP_POST) fileMiss(S.miss.splice(i, 1)[0]);
+    }
+  }
+
+  // A near miss: just after a shot the ball on its own goes in nowhere, but the same shot a little stronger, weaker,
+  // higher or lower would have scored, whatever the sport (past the post, over the bar, off the rim). Nobody may touch
+  // it before it gets there. How good a miss it was: how small a change would have scored, hitting the frame,
+  // a long shot, a shot in the air, the power. The best fifth of a match's misses go into its highlight.
+  var MISS_LOOK = 1.5, MISS_SPEED = 500, MISS_SHARE = 0.2;
+  // [power, angle change in radians]
+  var MISS_TRY = [[1, -0.015], [1, 0.015], [0.975, 0], [1.025, 0], [1, -0.03], [1, 0.03], [0.95, 0], [1.05, 0],
+    [1, -0.06], [1, 0.06], [0.9, 0], [1.1, 0], [0.95, -0.03], [0.95, 0.03], [1.05, -0.03], [1.05, 0.03]];
+  var probe = { x: 0, y: 0, vx: 0, vy: 0, ang: 0, spin: 0 };
+  function lookForMiss(w, S, bi, b, fut) {
+    var A = w.arena;
+    for (var team = 0; team < 2; team++) {
+      if (b.touchT[team] <= S.seen[bi][team]) continue;
+      S.seen[bi][team] = b.touchT[team];
+      var sp = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
+      if (b.lastTeam !== team || sp < MISS_SPEED || fut || E.ballFuture(A, b, MISS_LOOK)) continue; // no shot, or going in
+      var dir = Math.atan2(b.vy, b.vx), best = null;
+      for (var i = 0; i < MISS_TRY.length; i++) {
+        var v = MISS_TRY[i], a = dir + v[1];
+        probe.x = b.x; probe.y = b.y; probe.vx = Math.cos(a) * sp * v[0]; probe.vy = Math.sin(a) * sp * v[0]; probe.ang = b.ang; probe.spin = b.spin;
+        var f = E.ballFuture(A, probe, MISS_LOOK);
+        if (!f || f.team !== team) continue;
+        var close = 1 - 0.5 * (Math.abs(v[0] - 1) / 0.1 + Math.abs(v[1]) / 0.06); // 1: the tiniest change would have scored
+        if (!best || close > best.close) best = { close: close, t: f.t };
+      }
+      if (!best) continue;
+      S.miss = S.miss.filter(function (m) { return m.bi !== bi; }); // a newer shot with the same ball replaces it
+      S.miss.push({ bi: bi, team: team, by: b.lastPid, shot: b.touchT[team], at: w.time + best.t, close: best.close,
+        far: Math.abs((team === 0 ? W : 0) - b.x) > 700, air: b.lastAir, sp: sp, post: false });
+    }
+  }
+  function fileMiss(m) {
+    var rec = G.rec, r = recRange();
+    var beauty = m.close + (m.post ? 0.25 : 0) + (m.far ? 0.2 : 0) + (m.air ? 0.15 : 0) + 0.2 * Math.min(1, m.sp / 1800);
+    var from = rec.frameAt(Math.max(m.shot, m.at - 3) - CLIP_PRE, r.oldest, r.newest);
+    var clip = makeClip(from, rec.frameAt(m.at + CLIP_POST, from, r.newest), [{ t: m.at, kind: 'miss', bi: m.bi, by: m.by, team: m.team, beauty: beauty }],
+      [[Math.max(m.shot - 0.35, m.at - 1.2), m.at + 0.6]], {});
+    if (clip) fileClip(clip);
+  }
+  // a finished save or miss clip goes into its list. One that took in a save counts as a save: two saves or more
+  // are always kept, of the single ones the most dangerous third; of the misses the best fifth.
+  function fileClip(clip) {
+    var saves = clip.marks.filter(function (m) { return m.kind === 'save'; }), misses = clip.marks.filter(function (m) { return m.kind === 'miss'; });
+    var list = saves.length ? saves : misses, by = [];
+    list.forEach(function (m) { if (by.indexOf(m.by) < 0) by.push(m.by); });
+    clip.by = by; clip.name = playerNames(by); clip.team = list[list.length - 1].team;
+    if (saves.length) {
+      clip.kind = 'save'; clip.n = saves.length;
+      clip.danger = saves.reduce(function (a, m) { return a + (m.danger || 0.5); }, 0);
+      (clip.n > 1 ? G.hlm.clips : G.hlm.singles).push(clip);
+    } else {
+      clip.kind = 'miss'; clip.n = misses.length;
+      clip.beauty = Math.max.apply(null, misses.map(function (m) { return m.beauty || 0; }));
+      G.hlm.misses.push(clip);
+    }
   }
   function addSave(s) {
     var S = G.hlw, g = S.group;
@@ -1066,19 +1155,12 @@
     if (!g) return;
     S.group = null;
     if (!keep || !G.hlm) return;
-    var rec = G.rec, r = recRange(), first = g.saves[0], last = g.saves[g.saves.length - 1], danger = 0;
-    g.saves.forEach(function (s) { danger += s.danger; });
+    var rec = G.rec, r = recRange(), first = g.saves[0], last = g.saves[g.saves.length - 1];
     var from = rec.frameAt(Math.max(first.shot, first.t - 3) - CLIP_PRE, r.oldest, r.newest);
     var clip = makeClip(from, rec.frameAt(last.t + CLIP_POST, from, r.newest),
-      g.saves.map(function (s) { return { t: s.t, kind: 'save', bi: s.bi, by: s.by, team: s.def }; }),
-      g.saves.map(function (s) { return [Math.max(Math.max(s.shot, s.t - 3) - 0.35, s.t - 1), s.t + 0.6]; }),
-      { kind: 'save', team: g.def, danger: danger });
-    if (!clip) return;
-    // the clip may have taken in an earlier save clip it overlapped
-    var saves = clip.marks.filter(function (m) { return m.kind === 'save'; }), by = [];
-    saves.forEach(function (m) { if (by.indexOf(m.by) < 0) by.push(m.by); });
-    clip.n = saves.length; clip.by = by; clip.name = saverNames(by);
-    (clip.n > 1 ? G.hlm.clips : G.hlm.singles).push(clip);
+      g.saves.map(function (s) { return { t: s.t, kind: 'save', bi: s.bi, by: s.by, team: s.def, danger: s.danger }; }),
+      g.saves.map(function (s) { return [Math.max(Math.max(s.shot, s.t - 3) - 0.35, s.t - 1), s.t + 0.6]; }), {});
+    if (clip) fileClip(clip); // it may have taken in an earlier clip it overlapped
   }
   function recRange() { var n = G.rec.n; return { oldest: Math.max(n - RB + 1, 0), newest: n - 1 }; }
   function clipLen(c) { return c.frames.length / FS / HL.RATE; }
@@ -1088,7 +1170,7 @@
   function makeClip(from, to, marks, slow, meta) {
     var rec = G.rec, oldest = recRange().oldest;
     if (to - from < 60) return null;
-    [G.hlm.clips, G.hlm.singles].forEach(function (list) {
+    [G.hlm.clips, G.hlm.singles, G.hlm.misses].forEach(function (list) {
       for (var i = list.length - 1; i >= 0; i--) {
         var c = list[i];
         if (c.round !== G.round || c.t + clipLen(c) < rec.timeAt(from) - 0.3) continue;
@@ -1103,7 +1185,7 @@
     return Object.assign({
       frames: HL.encode(rec.buf, RB, from, to), map: G.world.arena.map.id, mods: G.roundMods || {}, swap: is4(G.mode) && G.round % 2 === 0,
       round: G.round, t: base,
-      marks: marks.map(function (m) { return { t: rel(m.t), kind: m.kind, bi: m.bi, by: m.by, team: m.team }; }),
+      marks: marks.map(function (m) { return { t: rel(m.t), kind: m.kind, bi: m.bi, by: m.by, team: m.team, danger: m.danger, beauty: m.beauty }; }),
       slow: slow.map(function (q) { return [rel(q[0]), rel(q[1])]; })
     }, meta);
   }
@@ -1124,18 +1206,25 @@
     if (!S) return;
     S.cand.forEach(function (c) { if (c.att !== team) addSave(c); }); // a touch just before the ball went in saved nothing
     S.cand = []; S.threat = [null, null];
+    S.miss.forEach(function (m) { if (G.world.time >= m.at) fileMiss(m); }); // one not there yet went in after all
+    S.miss = [];
     var g = S.group;
     // saves made just before the same side conceded were not enough
     if (g) closeGroup(!(team >= 0 && g.def === 1 - team && G.world.time - g.last < SAVE_CHAIN));
     G.hlw = null;
   }
   function finishHighlights() {
-    if (G.hlw) { closeGroup(true); G.hlw = null; }
+    if (G.hlw) {
+      G.hlw.miss.forEach(function (m) { if (G.world.time >= m.at) fileMiss(m); });
+      closeGroup(true); G.hlw = null;
+    }
     var H = G.hlm;
     G.hlm = null;
     if (!H) return null;
     var singles = H.singles.slice().sort(function (a, b) { return b.danger - a.danger; });
-    var clips = H.clips.concat(singles.slice(0, singles.length ? Math.max(1, Math.round(singles.length / 3)) : 0));
+    var misses = H.misses.slice().sort(function (a, b) { return b.beauty - a.beauty; }); // best miss first
+    var clips = H.clips.concat(singles.slice(0, singles.length ? Math.max(1, Math.round(singles.length / 3)) : 0),
+      misses.slice(0, Math.ceil(misses.length * MISS_SHARE)));
     clips.sort(function (a, b) { return a.round - b.round || a.t - b.t; });
     return clips.length ? clips : null;
   }
@@ -1145,7 +1234,7 @@
     if (soloish(G.mode)) return team === 0 ? nameOf(0) : 'Bot';
     return nameOf(team);
   }
-  function saverNames(by) {
+  function playerNames(by) {
     var out = [];
     by.forEach(function (id) { var n = id >= 0 ? whoName(id) : '🛡️'; if (out.indexOf(n) < 0) out.push(n); });
     return out.join(' + ');
@@ -1270,6 +1359,7 @@
       txt = '🧤 CỨU THUA!'; col = by >= 0 ? G.looks.p[by].col : teamCol(team);
     }
     else if (m.kind === 'zap') { txt = '⚡ SÉT!'; col = ZAP_COL; }
+    else if (m.kind === 'miss') { txt = '😱 SUÝT VÀO!'; col = m.by >= 0 ? G.looks.p[m.by].col : teamCol(m.team); }
     else { txt = FLASH_WORDS[w.arena.type] || 'VÀO!'; col = G.looks.ffa && c.credit >= 0 ? G.looks.p[c.credit].col : teamCol(c.team); }
     burst(b.x, b.y, txt, col, w.arena.P.ballR);
   }
@@ -1297,6 +1387,7 @@
     var icon = E.MAP_BY_ID[c.map] ? E.MAP_BY_ID[c.map].icon + ' ' : '';
     if (c.kind === 'save') return '🧤 ' + (c.n > 1 ? 'Cứu thua liên tiếp ×' + c.n : 'Cứu thua') + (c.name ? ' · ' + c.name : '');
     if (c.kind === 'zap') return icon + '⚡ Không ai được điểm';
+    if (c.kind === 'miss') return '😱 Suýt vào' + (c.name ? ' · ' + c.name : '');
     return icon + (c.name ? c.name + ' · ' : '') + scoreText(c.score, G.hlp.hl.match.mode);
   }
   // white text on a black pill, readable over the film bar
@@ -1799,6 +1890,7 @@
         }
         if (G.state !== 'play') return;
         runPhysics(dt);
+        redropTick();
         // on slow phones fall back to cheaper planners instead of dropping frames
         G.botWin += dt;
         if (G.botWin >= 1) {
@@ -1968,6 +2060,7 @@
     }
     D.structures(c, A, 'front', targetColor);
     D.bolt(c, wv.bolt);
+    drawRedropSpots(c, w);
     for (i = 0; i < 4; i++) {
       p = w.players[i];
       if (p.active && w.fx.big[i] > 0) { c.fillStyle = INK; D.emoji(c, '🍄', p.x, p.y - 170 * p.sc, 30); }
@@ -2043,6 +2136,45 @@
         D.circle(c, sx, by0 + 26, 9); c.fillStyle = '#ffffff'; c.fill(); c.lineWidth = 3; c.strokeStyle = INK; c.stroke();
       }
     }
+  }
+  // ---------- re-drop warning ----------
+  // a ball out of play (3 s) or lying still untouched (15 s) is dropped again in the middle: the last 3 seconds
+  // are announced with a countdown, a beep each second and a dashed ring where it will come down
+  var REDROP_WARN = 3;
+  function redrops() {
+    var w = G.world, out = [];
+    if (!w || G.demo || G.mode === 'tutorial' || G.state !== 'play') return out;
+    for (var i = 0; i < w.balls.length; i++) {
+      var b = w.balls[i], left = Infinity;
+      if (b.outT > 0.25) left = Math.min(left, E.OUT_TIME - b.outT); // a ball just flying over a goal for a moment is no warning
+      if (b.stillT > 0) left = Math.min(left, E.STILL_TIME - b.stillT);
+      if (left <= REDROP_WARN && left > 0) out.push({ left: left, x: W / 2 + (w.balls.length > 1 ? (i === 0 ? -160 : 160) : 0) });
+    }
+    return out;
+  }
+  function redropTick() {
+    var r = redrops(), sec = r.length ? Math.ceil(Math.min.apply(null, r.map(function (x) { return x.left; }))) : 0;
+    if (sec && sec !== G.redropSec) Snd.beep(false);
+    G.redropSec = sec;
+  }
+  function drawRedropSpots(c, w) {
+    var r = redrops();
+    if (!r.length) return;
+    var R = w.arena.P.ballR, pulse = 0.5 + 0.5 * Math.sin(clock * 8);
+    r.forEach(function (d) {
+      c.save(); c.globalAlpha = 0.6 + 0.4 * pulse;
+      c.setLineDash([10, 8]); c.lineWidth = 5; c.strokeStyle = '#ffffff';
+      D.circle(c, d.x, 150, R + 6); c.stroke();
+      c.setLineDash([]); c.lineWidth = 2; c.strokeStyle = INK; D.circle(c, d.x, 150, R + 10); c.stroke();
+      c.restore();
+      D.textOutlined(c, String(Math.ceil(d.left)), d.x, 152, R * 1.1, '#ffd23f', INK);
+    });
+  }
+  function drawRedropWarning(c, u, cx) {
+    var r = redrops();
+    if (!r.length) return;
+    var sec = Math.ceil(Math.min.apply(null, r.map(function (x) { return x.left; })));
+    D.textOutlined(c, '⚠️ Bóng sẽ được phát lại ở giữa sân sau ' + sec + ' giây', cx, view.ch * 0.24, 4.4 * u, '#ffd23f', INK);
   }
   function easeBack(t) { var s = 1.7; t -= 1; return t * t * ((s + 1) * t + s) + 1; }
   function fmtClock(s) { s = Math.ceil(s); return Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2); }
@@ -2132,6 +2264,7 @@
       if (sub) D.textOutlined(c, sub, 0, 12 * u, 5.2 * u, '#ffffff', INK);
       c.restore();
     }
+    drawRedropWarning(c, u, cx);
     if (G.noteT > 0 && G.note && G.state !== 'intro') {
       var s3 = easeBack(Math.min(1, (1.4 - G.noteT) / 0.3));
       c.save(); c.translate(cx, v.ch * (G.state === 'scored' || G.mode === 'tutorial' ? 0.62 : 0.3)); c.scale(Math.max(0, s3), Math.max(0, s3));
@@ -2172,6 +2305,7 @@
     c.setTransform(v.dpr * v.s, 0, 0, v.dpr * v.s, v.dpr * (v.ox + shx), v.dpr * (v.oy + shy));
     var x0 = -v.ox / v.s - 30, x1 = (v.cw - v.ox) / v.s + 30, bottom = (v.ch - v.oy) / v.s + 30;
     D.background(c, m, x0, x1, bottom, clock, G.excite);
+    if (isDark()) { var top = -v.oy / v.s - 30; c.fillStyle = 'rgba(6, 12, 32, 0.38)'; c.fillRect(x0, top, x1 - x0, bottom - top); }
     if (w) {
       drawWorld(c, w, dt);
       for (var i = 0; i < G.parts.length; i++) {
