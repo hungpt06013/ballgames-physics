@@ -3309,7 +3309,7 @@
     G.world = newWorld(id, serve, is4(G.mode) && G.round % 2 === 0, mods);
     var mk = Object.keys(mods)[0];
     G.modName = mk ? E.MODS[mk].icon + ' ' + E.MODS[mk].name : '';
-    G.roundMods = mods; G.clipDone = false; G.hlw = G.hlm ? newWatch() : null; G.psT = [-9, -9, -9, -9];
+    G.roundMods = mods; G.clipDone = false; G.hlw = G.hlm ? newWatch() : null; G.psT = [-9, -9, -9, -9]; G.pressT = [-9, -9, -9, -9];
     if (G.playedMaps && G.playedMaps.indexOf(id) < 0) G.playedMaps.push(id);
     if (G.bot) G.bot.reset();
     G.bots.forEach(function (b) { if (b) b.reset(); });
@@ -3792,17 +3792,19 @@
   }
 
   // ---------- highlights: saves and clips ----------
-  // A save: the ball on its own would score for one side within SAVE_LOOK seconds, then a touch by the other side
-  // (foot, head or body) or that side's shield turns it away, and SAVE_CONFIRM seconds later it is still not going in.
+  // A save: the ball on its own would score for one side within SAVE_LOOK seconds, then a player of the other side
+  // turns it away with foot, head or body, SAVE_CONFIRM seconds later it is still not going in, and
+  //  - that player did something: his button was pressed (jump, kick, header, dive) at most SAVE_ACTIVE seconds before
+  //    the touch; a ball that just hits someone standing still, or a shield, is no save,
+  //  - it happened in his own half.
   // Saves by the same side less than SAVE_CHAIN seconds apart make one bigger save, which is always kept; of the
   // single saves the most dangerous third is kept. Every point, and every round stopped by lightning, is kept too.
-  var SAVE_LOOK = 1, SAVE_CONFIRM = 0.25, SAVE_CHAIN = 3, CLIP_PRE = 3, CLIP_POST = 1.5;
+  var SAVE_LOOK = 1, SAVE_CONFIRM = 0.25, SAVE_CHAIN = 3, SAVE_ACTIVE = 0.6, CLIP_PRE = 3, CLIP_POST = 1.5;
   var ZAP_COL = { main: '#ffd23f', dark: '#c4a612' };
-  function newWatch() { return { tick: 0, threat: [null, null], cand: [], group: null, shieldT: [-9, -9] }; }
+  function newWatch() { return { tick: 0, threat: [null, null], cand: [], group: null }; }
   function watchSaves(w) {
-    var S = G.hlw, A = w.arena, ev = w.events, i;
+    var S = G.hlw, A = w.arena, i;
     if (A.type === 'bomb') return;
-    for (i = 0; i < ev.length; i++) if (ev[i].t === 'shield') S.shieldT[ev[i].x < W / 2 ? 0 : 1] = w.time;
     if (++S.tick % 2) return; // 60 looks a second are plenty
     for (var bi = 0; bi < w.balls.length && bi < 2; bi++) {
       var b = w.balls[bi], th = S.threat[bi], fut = E.ballFuture(A, b, SAVE_LOOK);
@@ -3820,11 +3822,11 @@
       }
       if (!th) continue;
       S.threat[bi] = null;
-      var def = 1 - th.att, from = Math.max(th.since, th.seen - 0.1);
-      var touch = b.touchT[def] >= from, shield = S.shieldT[def] >= from;
-      if (!touch && !shield) continue;
-      S.cand.push({ bi: bi, att: th.att, def: def, t: touch ? b.touchT[def] : S.shieldT[def], by: touch && b.lastTeam === def ? b.lastPid : -1,
-        shot: th.shot >= th.since - 3 ? th.shot : th.since, danger: th.danger, th: th });
+      var def = 1 - th.att, t = b.touchT[def], by = b.lastTeam === def ? b.lastPid : -1;
+      if (by < 0 || t < Math.max(th.since, th.seen - 0.1)) continue; // not turned away by a defender
+      if (G.pressT[by] < t - SAVE_ACTIVE) continue; // he was just standing there
+      if (def === 0 ? b.lastX > W / 2 : b.lastX < W / 2) continue; // not in his own half
+      S.cand.push({ bi: bi, att: th.att, def: def, t: t, by: by, shot: th.shot >= th.since - 3 ? th.shot : th.since, danger: th.danger, th: th });
     }
     for (i = S.cand.length - 1; i >= 0; i--) if (w.time - S.cand[i].t >= SAVE_CONFIRM) addSave(S.cand.splice(i, 1)[0]);
     if (S.group && w.time - S.group.last > SAVE_CHAIN) closeGroup(true);
@@ -3842,25 +3844,44 @@
     if (!g) return;
     S.group = null;
     if (!keep || !G.hlm) return;
-    var rec = G.rec, r = recRange(), first = g.saves[0], last = g.saves[g.saves.length - 1], by = [], danger = 0;
-    g.saves.forEach(function (s) { if (by.indexOf(s.by) < 0) by.push(s.by); danger += s.danger; });
+    var rec = G.rec, r = recRange(), first = g.saves[0], last = g.saves[g.saves.length - 1], danger = 0;
+    g.saves.forEach(function (s) { danger += s.danger; });
     var from = rec.frameAt(Math.max(first.shot, first.t - 3) - CLIP_PRE, r.oldest, r.newest);
     var clip = makeClip(from, rec.frameAt(last.t + CLIP_POST, from, r.newest),
-      g.saves.map(function (s) { return { t: s.t, kind: 'save', bi: s.bi }; }),
+      g.saves.map(function (s) { return { t: s.t, kind: 'save', bi: s.bi, by: s.by, team: s.def }; }),
       g.saves.map(function (s) { return [Math.max(Math.max(s.shot, s.t - 3) - 0.35, s.t - 1), s.t + 0.6]; }),
-      { kind: 'save', n: g.saves.length, team: g.def, by: by, name: saverNames(by), danger: danger });
-    if (clip) (g.saves.length > 1 ? G.hlm.clips : G.hlm.singles).push(clip);
+      { kind: 'save', team: g.def, danger: danger });
+    if (!clip) return;
+    // the clip may have taken in an earlier save clip it overlapped
+    var saves = clip.marks.filter(function (m) { return m.kind === 'save'; }), by = [];
+    saves.forEach(function (m) { if (by.indexOf(m.by) < 0) by.push(m.by); });
+    clip.n = saves.length; clip.by = by; clip.name = saverNames(by);
+    (clip.n > 1 ? G.hlm.clips : G.hlm.singles).push(clip);
   }
   function recRange() { var n = G.rec.n; return { oldest: Math.max(n - RB + 1, 0), newest: n - 1 }; }
-  // recorded frames [from, to] as a clip; marks and slow-motion spans are given in world time
+  function clipLen(c) { return c.frames.length / FS / HL.RATE; }
+  // recorded frames [from, to] as a clip; marks and slow-motion spans are given in world time.
+  // Earlier clips of this round that reach into it (a save, then the counter-attack goal) are merged into it,
+  // so the same moment never shows up twice in a highlight.
   function makeClip(from, to, marks, slow, meta) {
-    var rec = G.rec;
+    var rec = G.rec, oldest = recRange().oldest;
     if (to - from < 60) return null;
+    [G.hlm.clips, G.hlm.singles].forEach(function (list) {
+      for (var i = list.length - 1; i >= 0; i--) {
+        var c = list[i];
+        if (c.round !== G.round || c.t + clipLen(c) < rec.timeAt(from) - 0.3) continue;
+        list.splice(i, 1);
+        c.marks.forEach(function (m) { marks.push(Object.assign({}, m, { t: c.t + m.t })); });
+        c.slow.forEach(function (q) { slow.push([c.t + q[0], c.t + q[1]]); });
+        if (c.t < rec.timeAt(from)) from = rec.frameAt(c.t, oldest, from);
+      }
+    });
+    marks.sort(function (a, b) { return a.t - b.t; });
     var base = rec.timeAt(from), rel = function (t) { return Math.round((t - base) * 1000) / 1000; };
     return Object.assign({
       frames: HL.encode(rec.buf, RB, from, to), map: G.world.arena.map.id, mods: G.roundMods || {}, swap: is4(G.mode) && G.round % 2 === 0,
       round: G.round, t: base,
-      marks: marks.map(function (m) { return { t: rel(m.t), kind: m.kind, bi: m.bi }; }),
+      marks: marks.map(function (m) { return { t: rel(m.t), kind: m.kind, bi: m.bi, by: m.by, team: m.team }; }),
       slow: slow.map(function (q) { return [rel(q[0]), rel(q[1])]; })
     }, meta);
   }
@@ -3927,18 +3948,27 @@
       G.psT[e.id] = w.time;
     }
   }
-  // 6.0 for an ordinary match; up towards 10 with goals, saves, shots on target and touches, down for own goals and a loss
-  function rate(st, result) {
-    var raw = 1 * st.goals + 0.6 * st.saves + 0.2 * st.shots + 0.02 * Math.min(st.touches, 60) - 0.8 * st.own + (result > 0 ? 0.6 : (result < 0 ? -0.4 : 0));
-    var r = raw >= 0 ? 6 + 4 * Math.tanh(raw / 5) : 6 + 3 * Math.tanh(raw / 3);
-    return Math.round(r * 10) / 10;
+  // 6.0 for an ordinary match. The result and the score margin weigh most (losing 1–6 ends far under 6),
+  // then goals, saves, shots on target and touches; own goals cost a lot. Range 3.0–10.0.
+  function rate(st, result, margin) {
+    var d = 0.6 * st.goals + 0.3 * st.saves + 0.08 * st.shots + 0.01 * Math.min(st.touches, 40) - 0.6 * st.own +
+      (result > 0 ? 0.6 : (result < 0 ? -1.2 : 0)) + Math.max(-1.8, Math.min(1.8, 0.3 * margin));
+    var r = d >= 0 ? 6 + 4 * Math.tanh(d / 4) : 6 + 3 * Math.tanh(d / 2.5);
+    return Math.round(Math.max(3, Math.min(10, r)) * 10) / 10;
+  }
+  // own (side's) score minus the opponent's; with 4 separate players, minus the best of the others
+  function marginOf(i) {
+    var s = G.score;
+    if (G.mode === 'ffa') { var best = -1e9; for (var j = 0; j < 4; j++) if (j !== i) best = Math.max(best, s[j]); return s[i] - best; }
+    if (G.mode === 'team4') return slotTeam(i) === 0 ? s[0] - s[2] : s[2] - s[0];
+    return i === 0 ? s[0] - s[1] : s[1] - s[0];
   }
   // winner: as matchWinner() gives it (side, or slot with 4 players)
   function matchStats(winner, draw) {
     if (!G.ps) return null;
     var list = G.ps.map(function (st, i) {
       var won = G.mode === 'team4' ? slotTeam(i) === slotTeam(winner) : i === winner;
-      return { n: personName(i), g: st.goals, s: st.saves, sh: st.shots, t: st.touches, o: st.own, r: rate(st, draw ? 0 : (won ? 1 : -1)), win: !draw && won };
+      return { n: personName(i), g: st.goals, s: st.saves, sh: st.shots, t: st.touches, o: st.own, r: rate(st, draw ? 0 : (won ? 1 : -1), marginOf(i)), win: !draw && won };
     });
     var mvp = 0;
     list.forEach(function (x, i) {
@@ -4012,7 +4042,11 @@
   }
   function hlFlash(m) {
     var w = G.world, c = G.hlp.c, b = w.balls[m.bi] || w.ball, col, txt;
-    if (m.kind === 'save') { txt = '🧤 CỨU THUA!'; col = c.by[0] >= 0 ? G.looks.p[c.by[0]].col : teamCol(c.team); }
+    if (m.kind === 'save') {
+      // each save in the colours of whoever made it (highlights kept by v2.5 only know the clip's first saver)
+      var by = m.by !== undefined ? m.by : (c.by ? c.by[0] : -1), team = m.team !== undefined ? m.team : c.team;
+      txt = '🧤 CỨU THUA!'; col = by >= 0 ? G.looks.p[by].col : teamCol(team);
+    }
     else if (m.kind === 'zap') { txt = '⚡ SÉT!'; col = ZAP_COL; }
     else { txt = FLASH_WORDS[w.arena.type] || 'VÀO!'; col = G.looks.ffa && c.credit >= 0 ? G.looks.p[c.credit].col : teamCol(c.team); }
     burst(b.x, b.y, txt, col, w.arena.P.ballR);
@@ -4462,6 +4496,7 @@
         pr[0] = pr[1] = r; pr[2] = pr[3] = bl;
       }
       if (celebrate) for (k = 0; k < 4; k++) pr[k] = w.players[k].team === G.scorer ? ((w.time * 1.5 + k * 0.37) % 1) < 0.12 : false;
+      else if (G.hlw) for (k = 0; k < 4; k++) if (pr[k]) G.pressT[k] = w.time; // when each player last did something (saves)
       var sc = E.stepPlayers(w, pr);
       handleEvents(w);
       if (!G.demo) weatherStep(w);
@@ -4648,10 +4683,11 @@
   }
   var DEMO_LOOK = { hat: 'none', hair: 'default', shirt: 'plain' };
   // the side cheering right now (scored, replay or highlight after the ball went in), or -1
+  function goalMark(c) { for (var i = 0; i < c.marks.length; i++) if (c.marks[i].kind === 'goal') return c.marks[i]; return c.marks[0]; }
   function celebrating() {
     if (G.state === 'scored' || (G.state === 'replay' && G.replay && G.replay.k > G.rec.goal)) return G.scorer;
     var h = G.hlp;
-    if (G.state === 'highlight' && h && h.c.kind === 'goal' && h.k / HL.RATE >= h.c.marks[0].t) return h.c.team;
+    if (G.state === 'highlight' && h && h.c.kind === 'goal' && h.k / HL.RATE >= goalMark(h.c).t) return h.c.team;
     return -1;
   }
   function lookFor(i, p, w) {

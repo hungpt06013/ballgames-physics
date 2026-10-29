@@ -189,11 +189,13 @@ const want = k => !ONLY || ONLY.split(',').includes(k);
   }
 
   if (want('export')) {
-    await ev(() => __api.startMatch({ mode: 'bot', level: 'hard', fmt: 'p2', maps: ['soccer'], mods: false, items: false, weather: false }));
+    // bots on both sides (an idle human can leave the ball lying where the bot never goes for it)
+    await ev(() => __api.startMatch({ mode: 'team4', slots: ['b', 'b', 'b', 'b'], level: 'hard', fmt: 'p2', maps: ['soccer'], mods: false, items: false, weather: false }));
     console.log('export match', await playOut(600), await ev(() => __game.score.join('-')), 'clips', await ev(() => __game.lastHL && __game.lastHL.clips.length));
     await page.waitForTimeout(600);
     const est = await ev(() => { const hl = __game.lastHL; let t = 0; return hl.clips.reduce((a, c) => a + c.frames.length / 90 / 30, 0); });
     console.log('clip seconds', est.toFixed(1));
+    if (await ev(() => !document.getElementById('dialog').classList.contains('hidden'))) { await page.tap('#dlgBtns .btn'); await page.waitForTimeout(300); } // first match of a fresh page
     const dlP = page.waitForEvent('download', { timeout: 180000 });
     await page.tap('#overTools [data-act="hlExport"]');
     await page.waitForTimeout(1500);
