@@ -27,6 +27,8 @@
   var GETUP_DELAY = 0.3, RISE_TIME = 2;
   var BICYCLE_ANG = 2.0; // about 115°: the head is clearly below the hips
   var BOMB_TIME = 12, BIG_SCALE = 1.4, OUT_TIME = 3;
+  // a ball lying still for STILL_TIME seconds with nobody touching it is dropped again in the middle (not the bomb)
+  var STILL_TIME = 15, STILL_SPEED = 30;
   // weather / disasters (scheduled by the game, simulated here)
   var TOR_R = 170, TOR_TOP = 300, STUN_TIME = 5, CRATER_TIME = 5, CRATER_R = 80, CRATER_D = 55;
 
@@ -208,8 +210,9 @@
   }
 
   function makeBall() {
-    // outT: how long the ball has been out of play; touchT: world time of each team's last touch
-    return { x: W / 2, y: 200, vx: 0, vy: 0, ang: 0, spin: 0, outT: 0, lastBy: [-1, -1], touchT: [-1, -1],
+    // outT: how long the ball has been out of play; stillT: how long it has been lying still untouched;
+    // touchT: world time of each team's last touch
+    return { x: W / 2, y: 200, vx: 0, vy: 0, ang: 0, spin: 0, outT: 0, stillT: 0, lastBy: [-1, -1], touchT: [-1, -1],
       prevX: W / 2, prevY: 200, touchGround: false, lastTeam: -1,
       lastKind: '', lastAng: 0, lastX: 0, lastPid: -1, lastAir: false, lastLeg: 0 };
   }
@@ -240,7 +243,7 @@
   }
 
   function placeBall(b, x, y) {
-    b.x = b.prevX = x; b.y = b.prevY = y; b.vx = 0; b.vy = 0; b.spin = 0; b.outT = 0;
+    b.x = b.prevX = x; b.y = b.prevY = y; b.vx = 0; b.vy = 0; b.spin = 0; b.outT = 0; b.stillT = 0;
     b.lastBy[0] = b.lastBy[1] = -1; b.touchT[0] = b.touchT[1] = -1; b.lastTeam = -1; b.lastKind = ''; b.lastPid = -1; b.lastAir = false; b.lastLeg = 0;
     b.touchGround = false;
   }
@@ -618,7 +621,7 @@
 
   // the last touch: who, with what, in which posture (airborne = no contact with the ground or anyone for a moment)
   function touched(w, b, p, kind) {
-    b.lastTeam = p.team; b.lastBy[p.team] = p.id; b.lastPid = p.id; b.touchT[p.team] = w.time;
+    b.lastTeam = p.team; b.lastBy[p.team] = p.id; b.lastPid = p.id; b.touchT[p.team] = w.time; b.stillT = 0;
     b.lastKind = kind; b.lastAng = p.a; b.lastX = b.x;
     b.lastAir = p.cT > 0.06 && p.gT > 0.06; b.lastLeg = p.leg;
   }
@@ -908,7 +911,8 @@
       if (b.spin > 40) b.spin = 40; else if (b.spin < -40) b.spin = -40;
       if (qk > 0 && b.touchGround && rand(w) < qk * 0.03) b.vy -= 120 + 220 * rand(w); // the shaking ground makes the ball hop
       if (outOfPlay(A, b)) b.outT += dt; else b.outT = 0;
-      if (b.outT > OUT_TIME || !(Math.abs(b.x) < 1e6 && Math.abs(b.y) < 1e6)) {
+      if (A.type !== 'bomb' && b.vx * b.vx + b.vy * b.vy < STILL_SPEED * STILL_SPEED) b.stillT += dt; else b.stillT = 0;
+      if (b.outT > OUT_TIME || b.stillT > STILL_TIME || !(Math.abs(b.x) < 1e6 && Math.abs(b.y) < 1e6)) {
         var rx = W / 2 + (nb > 1 ? (bi === 0 ? -160 : 160) : 0);
         placeBall(b, rx, 150);
         if (w.events) w.events.push({ t: 'respawn', x: rx, y: 150 });
@@ -925,7 +929,8 @@
   }
 
   // the ball is out of play on top of a goal, behind a backboard or behind a goal post (e.g. stuck behind a
-  // basketball pole); anywhere else, including half over the goal line, it stays where it is however long it lies still
+  // basketball pole); anywhere else, including half over the goal line, only lying still untouched for STILL_TIME
+  // seconds brings it back to the middle
   function outOfPlay(A, b) {
     var edge;
     if (A.type === 'goal') return (b.x < A.goalD || b.x > W - A.goalD) && b.y < A.goalTop;
@@ -965,7 +970,7 @@
     if (d.sc !== s.sc) setScale(d, s.sc);
   }
   function copyBall(a, b) {
-    a.x = b.x; a.y = b.y; a.vx = b.vx; a.vy = b.vy; a.ang = b.ang; a.spin = b.spin; a.outT = b.outT;
+    a.x = b.x; a.y = b.y; a.vx = b.vx; a.vy = b.vy; a.ang = b.ang; a.spin = b.spin; a.outT = b.outT; a.stillT = b.stillT;
     a.lastBy[0] = b.lastBy[0]; a.lastBy[1] = b.lastBy[1]; a.touchT[0] = b.touchT[0]; a.touchT[1] = b.touchT[1];
     a.prevX = b.prevX; a.prevY = b.prevY; a.touchGround = b.touchGround; a.lastTeam = b.lastTeam;
     a.lastKind = b.lastKind; a.lastAng = b.lastAng; a.lastX = b.lastX; a.lastPid = b.lastPid; a.lastAir = b.lastAir; a.lastLeg = b.lastLeg;
@@ -1196,7 +1201,7 @@
     BODY: BODY, LEG: LEG, NB: NB, NS: NS, RAD: RAD, LEG_REST: LEG_REST, LEG_KICK: LEG_KICK, BOMB_TIME: BOMB_TIME,
     MAPS: MAPS, MAP_BY_ID: MAP_BY_ID, DEFAULT_SETTINGS: DEFAULT_SETTINGS, LEVELS: LEVELS,
     MODS: MODS, modsFor: modsFor, ITEMS: ITEMS, itemsFor: itemsFor,
-    TOR_R: TOR_R, TOR_TOP: TOR_TOP, STUN_TIME: STUN_TIME, CRATER_TIME: CRATER_TIME,
+    TOR_R: TOR_R, TOR_TOP: TOR_TOP, STUN_TIME: STUN_TIME, CRATER_TIME: CRATER_TIME, STILL_TIME: STILL_TIME,
     startQuake: startQuake, startTornado: startTornado, strike: strike, quakeLevel: quakeLevel, torPull: torPull,
     groundAt: groundAt, craterDepth: craterDepth, isBicycle: isBicycle,
     buildArena: buildArena, createWorld: createWorld, resetRound: resetRound, step: step, stepPlayers: stepPlayers,
