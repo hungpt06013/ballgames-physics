@@ -463,7 +463,7 @@
   var POP_TIME = 0.16, POP_REACH = 6, POP_SIN = Math.sin(1.3), POP_COS = Math.cos(1.3);
   var GETUP_DELAY = 0.3, RISE_TIME = 2;
   var BICYCLE_ANG = 2.0; // about 115°: the head is clearly below the hips
-  var BOMB_TIME = 12, BIG_SCALE = 1.4, OUT_TIME = 3;
+  var BOMB_TIME = 12, BIG_SCALE = 1.4, OUT_TIME = 3, FRONT_X = 680;
   // a ball lying still for STILL_TIME seconds with nobody touching it is dropped again in the middle (not the bomb)
   var STILL_TIME = 15, STILL_SPEED = 30;
   // weather / disasters (scheduled by the game, simulated here)
@@ -680,18 +680,23 @@
   }
 
   function placeBall(b, x, y) {
-    b.x = b.prevX = x; b.y = b.prevY = y; b.vx = 0; b.vy = 0; b.spin = 0; b.outT = 0; b.stillT = 0;
+    b.x = b.prevX = x; b.y = b.prevY = y; b.vx = 0; b.vy = 0; b.spin = 0; b.ang = 0; b.outT = 0; b.stillT = 0;
     b.lastBy[0] = b.lastBy[1] = -1; b.touchT[0] = b.touchT[1] = -1; b.lastTeam = -1; b.lastKind = ''; b.lastPid = -1; b.lastAir = false; b.lastLeg = 0;
     b.touchGround = false;
   }
 
   function resetRound(w, serveTeam) {
     var A = w.arena, pl = w.players, i, p;
+    // [back, front] distance from the own end of the pitch. The front players start FRONT_X from it (120 from the
+    // middle, 240 apart): close to the ball dropped in the middle, so both reach it as it lands and fight for it.
+    // Volleyball starts with a serve instead.
     var pos;
-    if (A.type === 'hoop') pos = [300, 640];
+    if (A.type === 'hoop') pos = [300, FRONT_X];
     else if (A.type === 'volley') pos = [300, 600];
-    else if (A.type === 'bomb') pos = [250, 560];
-    else pos = [Math.max(215, (A.goalD || 0) + 55), 560]; // the back player stands just in front of a deep goal
+    else if (A.type === 'bomb') pos = [250, FRONT_X];
+    else pos = [Math.max(215, (A.goalD || 0) + 55), FRONT_X]; // the back player stands just in front of a deep goal
+    // both sides start swaying in step (mirrored), so neither front player is better placed when the ball drops
+    var sway = [rand(w) * 0.6, rand(w) * 0.6];
     for (i = 0; i < 4; i++) {
       p = pl[i];
       setScale(p, p.baseSc);
@@ -701,7 +706,7 @@
       p.vx = p.vy = 0; p.a = 0; p.w = 0;
       p.leg = LEG_REST; p.legW = 0; p.prev = p.press = false;
       p.gT = p.cT = 0; p.jumpCd = 0; p.jumpT = 0; p.popT = 0; p.downT = 0; p.riseT = 0; p.air = false; p.slide = 0;
-      p.phase = (p.role === 0 ? 0 : 1.9) + (p.team === 0 ? 0 : 0.8) + rand(w) * 0.6;
+      p.phase = (p.role === 0 ? 0 : 1.9) + sway[p.role];
       if (!p.active) { p.x = -2000 - i * 300; p.y = GROUND - COM_H; }
       shapes(p);
     }
@@ -845,9 +850,11 @@
     var lw = (tgt - p.leg) * 30, ls = P.legSpd;
     if (lw > ls) lw = ls; else if (lw < -ls) lw = -ls;
     p.legW = lw;
-    var target = f * 0.07 + 0.2 * Math.sin(w.time * 2.1 + p.phase);
+    // standing sway, mirrored for the side facing left (with the same phase both sides lean forward together:
+    // the lean decides where a jump goes, so neither side is better placed when the ball is dropped)
+    var target = f * (0.07 + 0.2 * Math.sin(w.time * 2.1 + p.phase));
     var qk = quakeLevel(w.hz);
-    if (qk > 0) target += qk * 0.45 * Math.sin(w.time * 10 + p.phase * 3); // earthquake: everybody wobbles
+    if (qk > 0) target += f * qk * 0.45 * Math.sin(w.time * 10 + p.phase * 3); // earthquake: everybody wobbles
     var err = wrap(target - p.a);
     if (p.gT < 0.07 && Math.abs(p.a) < 1.0) {
       // standing: rotate around the planted foot (inverted pendulum), so the feet don't slide
@@ -1023,7 +1030,9 @@
         if (ev && vin > 120) ev.push({ t: 'bounce', x: b.x, y: GROUND, v: vin });
         b.vy = -vin * P.ballE;
         if (b.vy > -45) b.vy = 0;
-        if (P.oval) { b.vx += Math.sin(2 * b.ang) * vin * 0.35; b.spin += Math.cos(2 * b.ang) * vin * 0.02; }
+        // an oval bounces off at an angle and picks up spin in the direction it is travelling (mirrored for both
+        // directions: dropped straight down it does not drift to one side)
+        if (P.oval) { b.vx += Math.sin(2 * b.ang) * vin * 0.35; b.spin += Math.cos(2 * b.ang) * vin * 0.02 * (b.vx > 0 ? 1 : (b.vx < 0 ? -1 : 0)); }
       }
       b.touchGround = true;
       if (first) {
