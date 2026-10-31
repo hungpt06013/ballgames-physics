@@ -1262,7 +1262,7 @@
   // 6.0 for an ordinary match. The result and the score margin weigh most (losing 1–6 ends far under 6),
   // then goals, saves, shots on target and touches; own goals cost a lot. Range 3.0–10.0.
   function rate(st, result, margin) {
-    var d = 0.6 * st.goals + 0.3 * st.saves + 0.08 * st.shots + 0.01 * Math.min(st.touches, 40) - 0.6 * st.own +
+    var d = 0.6 * st.goals + 0.4 * st.saves + 0.08 * st.shots + 0.01 * Math.min(st.touches, 40) - 0.45 * st.own +
       (result > 0 ? 0.6 : (result < 0 ? -1.2 : 0)) + Math.max(-1.8, Math.min(1.8, 0.3 * margin));
     var r = d >= 0 ? 6 + 4 * Math.tanh(d / 4) : 6 + 3 * Math.tanh(d / 2.5);
     return Math.round(Math.max(3, Math.min(10, r)) * 10) / 10;
@@ -1825,15 +1825,21 @@
     if (n >= 10) G.acc = 0;
   }
 
+  // the screen has gone fully white: what comes next depends on the state the fade was started from
+  function fadedOut() {
+    if (G.state === 'scored' || G.state === 'replay') nextRound();
+    else if (G.state === 'highlight') hlAdvance();
+    else G.fadeDir = -1; // nothing to switch to: the picture just comes back
+  }
   function update(dt) {
-    if (G.fadeDir) {
-      G.fade += G.fadeDir * dt / 0.3;
-      if (G.fade <= 0) { G.fade = 0; G.fadeDir = 0; }
-      else if (G.fade >= 1) {
-        G.fade = 1; G.fadeDir = 0;
-        if (G.state === 'scored' || G.state === 'replay') nextRound();
-        else if (G.state === 'highlight') hlAdvance();
-      }
+    // Fades stand still while the game is paused. Pausing (X button, Android back, leaving the app) during the fade
+    // after a point used to let it reach white while paused, so the next round never started: a white screen.
+    if (G.state !== 'paused') {
+      if (G.fadeDir) {
+        G.fade += G.fadeDir * dt / 0.3;
+        if (G.fade <= 0) { G.fade = 0; G.fadeDir = 0; }
+        else if (G.fade >= 1) { G.fade = 1; G.fadeDir = 0; fadedOut(); }
+      } else if (G.fade >= 1) fadedOut(); // never stay on a white screen
     }
     G.shake = Math.max(0, G.shake - dt * 2.5);
     G.excite = Math.max(0, G.excite - dt * 0.45);
