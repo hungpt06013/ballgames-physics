@@ -25,9 +25,8 @@
   var LEG_REST = -0.12, LEG_KICK = 1.95, KICK_REACH = 12;
   var POP_TIME = 0.16, POP_REACH = 6, POP_SIN = Math.sin(1.3), POP_COS = Math.cos(1.3);
   var GETUP_DELAY = 0.3, RISE_TIME = 2;
-  var ORDER_LR = [0, 1, 2, 3], ORDER_RL = [3, 2, 1, 0];
   var BICYCLE_ANG = 2.0; // about 115°: the head is clearly below the hips
-  var BOMB_TIME = 12, BIG_SCALE = 1.4, OUT_TIME = 3, FRONT_X = 680, KICKOFF_DROP = 160;
+  var BOMB_TIME = 12, BIG_SCALE = 1.4, OUT_TIME = 3;
   // a ball lying still for STILL_TIME seconds with nobody touching it is dropped again in the middle (not the bomb)
   var STILL_TIME = 15, STILL_SPEED = 30;
   // weather / disasters (scheduled by the game, simulated here)
@@ -244,25 +243,18 @@
   }
 
   function placeBall(b, x, y) {
-    b.x = b.prevX = x; b.y = b.prevY = y; b.vx = 0; b.vy = 0; b.spin = 0; b.ang = 0; b.outT = 0; b.stillT = 0;
+    b.x = b.prevX = x; b.y = b.prevY = y; b.vx = 0; b.vy = 0; b.spin = 0; b.outT = 0; b.stillT = 0;
     b.lastBy[0] = b.lastBy[1] = -1; b.touchT[0] = b.touchT[1] = -1; b.lastTeam = -1; b.lastKind = ''; b.lastPid = -1; b.lastAir = false; b.lastLeg = 0;
     b.touchGround = false;
   }
 
   function resetRound(w, serveTeam) {
     var A = w.arena, pl = w.players, i, p;
-    // [back, front] distance from the own end of the pitch. The front players start FRONT_X from it (120 from the
-    // middle, 240 apart): close to the ball dropped in the middle, so both reach it as it lands and fight for it.
-    // In American football they stay further back (a ball volleyed at the start sails over the posts at once).
-    // Volleyball starts with a serve instead.
     var pos;
-    if (A.type === 'hoop') pos = [300, FRONT_X];
+    if (A.type === 'hoop') pos = [300, 640];
     else if (A.type === 'volley') pos = [300, 600];
-    else if (A.type === 'bomb') pos = [250, FRONT_X];
-    else if (A.type === 'posts') pos = [Math.max(215, (A.goalD || 0) + 55), 560];
-    else pos = [Math.max(215, (A.goalD || 0) + 55), FRONT_X]; // the back player stands just in front of a deep goal
-    // both sides start swaying in step (mirrored), so neither front player is better placed when the ball drops
-    var sway = [rand(w) * 0.6, rand(w) * 0.6];
+    else if (A.type === 'bomb') pos = [250, 560];
+    else pos = [Math.max(215, (A.goalD || 0) + 55), 560]; // the back player stands just in front of a deep goal
     for (i = 0; i < 4; i++) {
       p = pl[i];
       setScale(p, p.baseSc);
@@ -272,7 +264,7 @@
       p.vx = p.vy = 0; p.a = 0; p.w = 0;
       p.leg = LEG_REST; p.legW = 0; p.prev = p.press = false;
       p.gT = p.cT = 0; p.jumpCd = 0; p.jumpT = 0; p.popT = 0; p.downT = 0; p.riseT = 0; p.air = false; p.slide = 0;
-      p.phase = (p.role === 0 ? 0 : 1.9) + sway[p.role];
+      p.phase = (p.role === 0 ? 0 : 1.9) + (p.team === 0 ? 0 : 0.8) + rand(w) * 0.6;
       if (!p.active) { p.x = -2000 - i * 300; p.y = GROUND - COM_H; }
       shapes(p);
     }
@@ -282,9 +274,7 @@
       // volleyball-like serves start high so the receiving side has time to react
       placeBall(b0, sx, A.map.serveY || 45);
     } else {
-      // dropped low, so it bounces low: a front player can fight for it at once, but cannot volley it over the
-      // keeper's head straight from the kickoff (dropped from high, half the kickoffs ended in a goal at once)
-      placeBall(b0, W / 2, A.type === 'bomb' ? 150 : (A.type === 'posts' ? 200 : GROUND - A.P.ballR - KICKOFF_DROP));
+      placeBall(b0, W / 2, A.type === 'bomb' ? 150 : 200);
       b0.vx = (rand(w) - 0.5) * 60;
     }
     if (w.balls.length > 1) {
@@ -418,11 +408,9 @@
     var lw = (tgt - p.leg) * 30, ls = P.legSpd;
     if (lw > ls) lw = ls; else if (lw < -ls) lw = -ls;
     p.legW = lw;
-    // standing sway, mirrored for the side facing left (with the same phase both sides lean forward together:
-    // the lean decides where a jump goes, so neither side is better placed when the ball is dropped)
-    var target = f * (0.07 + 0.2 * Math.sin(w.time * 2.1 + p.phase));
+    var target = f * 0.07 + 0.2 * Math.sin(w.time * 2.1 + p.phase);
     var qk = quakeLevel(w.hz);
-    if (qk > 0) target += f * qk * 0.45 * Math.sin(w.time * 10 + p.phase * 3); // earthquake: everybody wobbles
+    if (qk > 0) target += qk * 0.45 * Math.sin(w.time * 10 + p.phase * 3); // earthquake: everybody wobbles
     var err = wrap(target - p.a);
     if (p.gT < 0.07 && Math.abs(p.a) < 1.0) {
       // standing: rotate around the planted foot (inverted pendulum), so the feet don't slide
@@ -598,9 +586,7 @@
         if (ev && vin > 120) ev.push({ t: 'bounce', x: b.x, y: GROUND, v: vin });
         b.vy = -vin * P.ballE;
         if (b.vy > -45) b.vy = 0;
-        // an oval bounces off at an angle and picks up spin in the direction it is travelling (mirrored for both
-        // directions: dropped straight down it does not drift to one side)
-        if (P.oval) { b.vx += Math.sin(2 * b.ang) * vin * 0.35; b.spin += Math.cos(2 * b.ang) * vin * 0.02 * (b.vx > 0 ? 1 : (b.vx < 0 ? -1 : 0)); }
+        if (P.oval) { b.vx += Math.sin(2 * b.ang) * vin * 0.35; b.spin += Math.cos(2 * b.ang) * vin * 0.02; }
       }
       b.touchGround = true;
       if (first) {
@@ -698,63 +684,6 @@
         shiftPlayer(p, -sx * pen * 0.2, -sy * pen * 0.2);
       }
     }
-  }
-
-  // The ball within reach of both sides at once (a kickoff, a scramble): its contacts are solved in both orders
-  // (left side first, then right side first) and the two results averaged, so a mirrored situation ends mirrored
-  // instead of favouring whichever side is solved last. Who touched it last alternates between the two orders.
-  function bothSidesAt(b, pl, R) {
-    var near0 = false, near1 = false;
-    for (var i = 0; i < 4; i++) {
-      var p = pl[i];
-      if (!p.active || (p.team === 0 ? near0 : near1)) continue;
-      var dx = b.x - p.x, dy = b.y - p.y, lim = 125 * p.sc + R;
-      if (dx * dx + dy * dy > lim * lim) continue;
-      // close enough for one of its parts (or a swinging leg) to touch the ball now
-      for (var j = 0; j < NS; j++) {
-        var ex = b.x - p.sx[j], ey = b.y - p.sy[j], rr = R + p.rad[j] + KICK_REACH + 4;
-        if (ex * ex + ey * ey < rr * rr) { if (p.team === 0) near0 = true; else near1 = true; break; }
-      }
-    }
-    return near0 && near1;
-  }
-  var SYM_START = new Float64Array(25), SYM_LR = new Float64Array(25);
-  function saveDyn(b, pl, o) {
-    o[0] = b.x; o[1] = b.y; o[2] = b.vx; o[3] = b.vy; o[4] = b.spin;
-    for (var i = 0; i < 4; i++) { var p = pl[i], k = 5 + i * 5; o[k] = p.x; o[k + 1] = p.y; o[k + 2] = p.vx; o[k + 3] = p.vy; o[k + 4] = p.w; }
-  }
-  // the state o (or, with mix, the average of o and the current state) put back into the ball and the players
-  function loadDyn(b, pl, o, mix) {
-    var u = mix ? 0.5 : 1, v = 1 - u;
-    b.x = o[0] * u + b.x * v; b.y = o[1] * u + b.y * v; b.vx = o[2] * u + b.vx * v; b.vy = o[3] * u + b.vy * v; b.spin = o[4] * u + b.spin * v;
-    for (var i = 0; i < 4; i++) {
-      var p = pl[i], k = 5 + i * 5;
-      p.x = o[k] * u + p.x * v; p.y = o[k + 1] * u + p.y * v; p.vx = o[k + 2] * u + p.vx * v; p.vy = o[k + 3] * u + p.vy * v; p.w = o[k + 4] * u + p.w * v;
-      if (p.active) shapes(p);
-    }
-  }
-  function touchInfo(b) {
-    return [b.lastTeam, b.lastBy[0], b.lastBy[1], b.lastPid, b.touchT[0], b.touchT[1], b.lastKind, b.lastAng, b.lastX, b.lastAir, b.lastLeg, b.stillT];
-  }
-  function setTouch(b, t) {
-    b.lastTeam = t[0]; b.lastBy[0] = t[1]; b.lastBy[1] = t[2]; b.lastPid = t[3]; b.touchT[0] = t[4]; b.touchT[1] = t[5];
-    b.lastKind = t[6]; b.lastAng = t[7]; b.lastX = t[8]; b.lastAir = t[9]; b.lastLeg = t[10]; b.stillT = t[11];
-  }
-  function ballPlayersBoth(w, b, bi, pl, P, pass) {
-    var i, ev = w.events, before = touchInfo(b);
-    saveDyn(b, pl, SYM_START);
-    for (i = 0; i < 4; i++) if (pl[i].active) ballPlayer(w, b, bi, pl[i], P);
-    saveDyn(b, pl, SYM_LR);
-    var lr = touchInfo(b);
-    loadDyn(b, pl, SYM_START, false); setTouch(b, before);
-    w.events = null; // the events of the contacts were sent by the first order already
-    for (i = 3; i >= 0; i--) if (pl[i].active) ballPlayer(w, b, bi, pl[i], P);
-    w.events = ev;
-    var rl = touchInfo(b);
-    loadDyn(b, pl, SYM_LR, true);
-    var keep = pass & 1 ? lr : rl, other = pass & 1 ? rl : lr;
-    for (var k = 0; k < 2; k++) if (other[4 + k] > keep[4 + k]) { keep[4 + k] = other[4 + k]; keep[1 + k] = other[1 + k]; }
-    setTouch(b, keep);
   }
 
   // The swinging leg is checked as a whole capsule (hip -> foot) so a ball anywhere along
@@ -962,22 +891,16 @@
       b.ang += b.spin * dt;
       b.touchGround = false;
     }
-    var stepN = Math.round(w.time / dt);
     for (var it = 0; it < nIt; it++) {
-      // contacts are solved one after another, and the order matters when both sides hit the ball (or each other)
-      // at the same moment, as at a kickoff: the order flips every pass, so neither side always comes out better
-      var order = (stepN + it) & 1 ? ORDER_RL : ORDER_LR;
       for (i = 0; i < 4; i++) if (pl[i].active) { shapes(pl[i]); playerStatic(A, pl[i], hz.craters); }
-      for (var oi = 0; oi < 4; oi++) {
-        i = order[oi];
+      for (i = 0; i < 4; i++) {
         if (!pl[i].active) continue;
-        for (var oj = oi + 1; oj < 4; oj++) { j = order[oj]; if (pl[j].active) playerPlayer(pl[i], pl[j]); }
+        for (j = i + 1; j < 4; j++) if (pl[j].active) playerPlayer(pl[i], pl[j]);
       }
       for (bi = 0; bi < nb; bi++) {
         b = balls[bi];
         ballStatic(A, b, it === 0 ? w.events : null, it === 0, w);
-        if (bothSidesAt(b, pl, P.ballR)) ballPlayersBoth(w, b, bi, pl, P, stepN + it);
-        else for (oi = 0; oi < 4; oi++) { i = order[oi]; if (pl[i].active) ballPlayer(w, b, bi, pl[i], P); }
+        for (i = 0; i < 4; i++) if (pl[i].active) ballPlayer(w, b, bi, pl[i], P);
       }
       if (nb > 1) ballBall(balls[0], balls[1], P.ballR);
     }

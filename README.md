@@ -1,4 +1,4 @@
-# Ballgames Physics (bản tự làm) – v3.1
+# Ballgames Physics (bản tự làm) – v2.9
 
 Game 2 đội × 2 cầu thủ ragdoll, mỗi đội **1 nút** (bấm = nhảy + vung chân sút, giữ khi đang bay = xoay người).
 Khi vào trận, tích chọn các môn muốn chơi; chọn nhiều môn thì sau mỗi điểm đổi sang môn khác.
@@ -23,8 +23,6 @@ Các môn có khung thành (bóng đá, Mặt Trăng, sân băng, bóng khổng 
 Bóng rổ, bóng bầu dục: cầu thủ không đi ra sau cột rổ / cột dọc được, tối đa là đứng trên đỉnh cột.
 Bóng được thả lại giữa sân khi nằm **ngoài biên** (trên nóc khung thành, sau cột rổ, sau cột bầu dục) đủ 3 giây, hoặc khi **nằm im 15 giây mà không ai chạm** (kể cả nằm vắt trên vạch vôi), ở mọi chế độ (người với người, đấu bot, 4 người, 2 vs 2); riêng bóng bom thì không, vì bom tự nổ.
 3 giây trước khi thả lại, game báo "⚠️ Bóng sẽ được phát lại ở giữa sân sau 3… 2… 1 giây" (kèm tiếng bíp) và đánh dấu chỗ bóng sẽ rơi xuống.
-Đầu mỗi ván, hai tiền đạo đứng cách giữa sân 120 (cách nhau 240) và bóng được thả thấp ở giữa (cao 160 so với mặt đất, nảy thấp): hai bên lao vào tranh bóng ngay (khoảng 0,5 giây) nhưng không vô-lê thẳng qua đầu thủ môn được, nên hiếm khi có bàn "chớp nhoáng" ngay đầu ván (thủ môn phản ứng kịp thì chỉ khoảng 4% ván bị thủng lưới trong 2 giây đầu). Riêng bóng bầu dục giữ cách giao bóng cũ (tiền đạo cách giữa 240, bóng thả cao) vì ghi điểm qua cột quá dễ nếu vô-lê sớm.
-Vật lý của hai bên đối xứng như soi gương (tư thế đung đưa, bóng bầu dục nảy, và khi cầu thủ hai đội chạm bóng cùng lúc), nên giao bóng công bằng tuyệt đối cho cả hai đội.
 Cầu thủ ngã (kể cả lộn ngược) tự bật dậy sau khoảng 0,3 giây và xoay vừa đủ để tiếp đất bằng chân; chạm nút lúc đang nằm cũng bật dậy ngay.
 
 ## Chế độ
@@ -91,7 +89,7 @@ Dữ liệu (xu, đồ, thống kê, cài đặt, lịch sử) lưu trong máy (
 - `android/` – vỏ Android (WebView toàn màn hình, khoá màn hình ngang, nút Back, cầu nối `BGNative` để lưu highlight và video).
 - `build_apk.sh` – build APK không cần Gradle (aapt2 → javac → d8 → zipalign → apksigner).
 - `build_html.py` – gộp thành 1 file HTML chơi trên trình duyệt.
-- `test/` – kiểm tra vật lý (`sanity2.cjs`), bot đấu nhau (`match2.cjs`), kiểm tra giao diện bằng Playwright (`v21.cjs`, `v22.cjs`, `v23.cjs`, `flow2.cjs`, `tut.cjs`, `migrate.cjs`), thời gian đứng dậy sau khi ngã (`getup.cjs`), thiên tai (`hazards.cjs`), bóng mọi cỡ đều vào được khung thành (`goalfit.cjs`), quay chậm liền mạch (`slowmo.cjs`), lời bình xe đạp chổng ngược (`bicycle.cjs`), highlight / lịch sử / thống kê / bình chọn / xuất video (`v25.cjs`), luật cứu thua, gộp pha trùng, cách tính điểm (`v26.cjs`), bóng nằm im 15 giây được thả lại (`stillball.cjs`), báo trước khi thả lại bóng, pha suýt vào, giao diện tối (`v28.cjs`), giao bóng đầu ván (`kickoff.cjs`), bàn chớp nhoáng đầu ván (`instagoal.cjs`), tạm dừng giữa lúc màn hình mờ và cách tính điểm mới (`v31.cjs`), đường đi của bản Android với cầu nối giả lập (`native.cjs`), dung lượng highlight (`hlsize.cjs`).
+- `test/` – kiểm tra vật lý (`sanity2.cjs`), bot đấu nhau (`match2.cjs`), kiểm tra giao diện bằng Playwright (`v21.cjs`, `v22.cjs`, `v23.cjs`, `flow2.cjs`, `tut.cjs`, `migrate.cjs`), thời gian đứng dậy sau khi ngã (`getup.cjs`), thiên tai (`hazards.cjs`), bóng mọi cỡ đều vào được khung thành (`goalfit.cjs`), quay chậm liền mạch (`slowmo.cjs`), lời bình xe đạp chổng ngược (`bicycle.cjs`), highlight / lịch sử / thống kê / bình chọn / xuất video (`v25.cjs`), luật cứu thua, gộp pha trùng, cách tính điểm (`v26.cjs`), bóng nằm im 15 giây được thả lại (`stillball.cjs`), báo trước khi thả lại bóng, pha suýt vào, giao diện tối (`v28.cjs`), đường đi của bản Android với cầu nối giả lập (`native.cjs`), dung lượng highlight (`hlsize.cjs`).
 
 ## Tuỳ chỉnh vật lý
 Trong game: Menu → ⚙️ Cài đặt.
@@ -100,7 +98,7 @@ Trong code: sửa từng môn ở `MAPS` trong `www/engine.js` (`g`, `gBall`, `j
 ## Build
 Cần JDK 17+ và Android SDK (build-tools 36.1.0, platforms;android-34):
 ```
-ANDROID_HOME=/đường/dẫn/sdk VERSION_CODE=18 VERSION_NAME=3.1 ./build_apk.sh
+ANDROID_HOME=/đường/dẫn/sdk VERSION_CODE=16 VERSION_NAME=2.9 ./build_apk.sh
 python3 build_html.py BallgamesPhysics.html
 ```
 Chạy kiểm tra: `node test/sanity2.cjs` (engine), các file Playwright như `node test/v25.cjs` (cần `npm i -g playwright` và Chromium).
