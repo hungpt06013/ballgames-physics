@@ -1825,17 +1825,21 @@
     if (n >= 10) G.acc = 0;
   }
 
+  // the screen has gone fully white: what comes next depends on the state the fade was started from
+  function fadedOut() {
+    if (G.state === 'scored' || G.state === 'replay') nextRound();
+    else if (G.state === 'highlight') hlAdvance();
+    else G.fadeDir = -1; // nothing to switch to: the picture just comes back
+  }
   function update(dt) {
-    // a fade stands still while the game is paused: the next round must start when it reaches white, which only
-    // happens in the state it was started from (pausing during the fade after a point used to leave a white screen)
-    if (G.fadeDir && G.state !== 'paused') {
-      G.fade += G.fadeDir * dt / 0.3;
-      if (G.fade <= 0) { G.fade = 0; G.fadeDir = 0; }
-      else if (G.fade >= 1) {
-        G.fade = 1; G.fadeDir = 0;
-        if (G.state === 'scored' || G.state === 'replay') nextRound();
-        else if (G.state === 'highlight') hlAdvance();
-      }
+    // Fades stand still while the game is paused. Pausing (X button, Android back, leaving the app) during the fade
+    // after a point used to let it reach white while paused, so the next round never started: a white screen.
+    if (G.state !== 'paused') {
+      if (G.fadeDir) {
+        G.fade += G.fadeDir * dt / 0.3;
+        if (G.fade <= 0) { G.fade = 0; G.fadeDir = 0; }
+        else if (G.fade >= 1) { G.fade = 1; G.fadeDir = 0; fadedOut(); }
+      } else if (G.fade >= 1) fadedOut(); // never stay on a white screen
     }
     G.shake = Math.max(0, G.shake - dt * 2.5);
     G.excite = Math.max(0, G.excite - dt * 0.45);

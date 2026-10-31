@@ -90,8 +90,8 @@ const path = require('path');
     }, { mode, score, ps, draw: !!draw });
   }
   r = await rating('bot', [1, 6], [[1, 8, 8, 24, 3], [3, 3, 12, 19, 0]]);
-  // (v3.1: saves count 0.4 each; 8 real saves in a 1–6 loss keep a keeper around 6.5, still far below the winner)
-  check('lost 1–6 with 3 own goals but 8 saves: under 7, far below the winner', r[0] < 7 && r[1] > 9 && r[1] - r[0] > 2.5, 'P1 ' + r[0] + ', Bot ' + r[1] + ', MVP ' + r[2]);
+  // (8 real saves count for something since v2.9.1, but a 1–6 loss stays far below the winner)
+  check('lost 1–6 with 3 own goals and 8 saves: well below the winner', r[0] < 7 && r[1] > 9, 'P1 ' + r[0] + ', Bot ' + r[1] + ', MVP ' + r[2]);
   r = await rating('bot', [1, 6], [[1, 1, 8, 24, 3], [3, 3, 12, 19, 0]]);
   check('same match with the real saves only', r[0] < 4.5, 'P1 ' + r[0] + ', Bot ' + r[1]);
   r = await rating('bot', [0, 5], [[0, 0, 1, 10, 0], [5, 0, 9, 20, 0]]);
@@ -100,6 +100,15 @@ const path = require('path');
   check('close 5–4 in 2 vs 2: winners above losers, all near 6–8', r[0] > r[2] && r[1] > 6 && r[2] > 5 && r[0] < 9, r.slice(0, 4).join(' / ') + ', MVP ' + r[4]);
   r = await rating('2p', [3, 3], [[3, 2, 6, 20, 0], [3, 1, 5, 18, 1]], true);
   check('3–3 draw with a hat-trick: good but not 10, own goal costs', r[0] > 7 && r[0] < 9.2 && r[1] < r[0], r.slice(0, 2).join(' / '));
+
+  // v2.9.1: a save adds more and an own goal takes less than before (save 0.3 -> 0.4, own goal 0.6 -> 0.45)
+  const old = (g, s, sh, t, o, res, m) => { const d = 0.6 * g + 0.3 * s + 0.08 * sh + 0.01 * Math.min(t, 40) - 0.6 * o + (res > 0 ? 0.6 : res < 0 ? -1.2 : 0) + Math.max(-1.8, Math.min(1.8, 0.3 * m)); return Math.round((d >= 0 ? 6 + 4 * Math.tanh(d / 4) : 6 + 3 * Math.tanh(d / 2.5)) * 10) / 10; };
+  const base = await rating('2p', [2, 2], [[1, 0, 3, 15, 0], [1, 0, 3, 15, 0]], true);
+  const saves = await rating('2p', [2, 2], [[1, 2, 3, 15, 0], [1, 0, 3, 15, 0]], true);
+  const owns = await rating('2p', [2, 2], [[1, 0, 3, 15, 1], [1, 0, 3, 15, 0]], true);
+  const oldSave = old(1, 2, 3, 15, 0, 0, 0) - old(1, 0, 3, 15, 0, 0, 0), oldOwn = old(1, 0, 3, 15, 1, 0, 0) - old(1, 0, 3, 15, 0, 0, 0);
+  check('2 saves add more than before', saves[0] - base[0] > oldSave + 0.05, 'now +' + (saves[0] - base[0]).toFixed(1) + ', was +' + oldSave.toFixed(1));
+  check('an own goal takes less than before', owns[0] - base[0] > oldOwn + 0.05, 'now ' + (owns[0] - base[0]).toFixed(1) + ', was ' + oldOwn.toFixed(1));
 
   // a bot match where the human never touches the button: no saves for him, whatever hits his players
   await ev(() => __api.startMatch({ mode: 'bot', level: 'normal', fmt: 't60', maps: ['soccer'], mods: false, items: false, weather: false }));
