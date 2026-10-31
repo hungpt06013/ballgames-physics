@@ -28,4 +28,19 @@ for (const map of ['soccer', 'basket', 'football', 'moon', 'ice', 'giant', 'bomb
   out[map] = { fronts: fronts.join('/'), firstTouch: n ? (t / n).toFixed(2) + ' s' : '-', first: first.join(':'), bothTouchIn2_5s: contested + '/' + ROUNDS };
 }
 console.table(out);
+// fairness: the same round with the ball pushed right or left at the start must end mirrored (both sides pressing alike)
+let worst = 0;
+for (const map of ['soccer', 'basket', 'football', 'moon', 'ice', 'giant', 'bomb']) {
+  for (let r = 0; r < 20; r++) {
+    const xs = [];
+    for (const sgn of [1, -1]) {
+      const w = E.createWorld(map, null, 500 + r, {}); E.resetRound(w, -1); w.events.length = 0;
+      w.ball.vx = Math.abs(w.ball.vx) * sgn;
+      for (let i = 0; i < 180; i++) { const p = w.time >= 0.1 && w.time < 0.35; E.stepPlayers(w, [p, p, p, p]); w.events.length = 0; }
+      xs.push(w.ball.x);
+    }
+    worst = Math.max(worst, Math.abs(xs[0] - 800 + xs[1] - 800));
+  }
+}
+console.log((worst < 0.5 ? 'ok   ' : 'FAIL ') + 'kickoff mirrored for both sides (largest difference ' + worst.toFixed(2) + ' px)');
 module.exports = out;

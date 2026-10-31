@@ -90,7 +90,8 @@ const path = require('path');
     }, { mode, score, ps, draw: !!draw });
   }
   r = await rating('bot', [1, 6], [[1, 8, 8, 24, 3], [3, 3, 12, 19, 0]]);
-  check('the screenshot (lost 1–6, 3 own goals, 8 "saves"): far under 6', r[0] < 5.6 && r[1] > 9, 'P1 ' + r[0] + ', Bot ' + r[1] + ', MVP ' + r[2]);
+  // (v3.1: saves count 0.4 each; 8 real saves in a 1–6 loss keep a keeper around 6.5, still far below the winner)
+  check('lost 1–6 with 3 own goals but 8 saves: under 7, far below the winner', r[0] < 7 && r[1] > 9 && r[1] - r[0] > 2.5, 'P1 ' + r[0] + ', Bot ' + r[1] + ', MVP ' + r[2]);
   r = await rating('bot', [1, 6], [[1, 1, 8, 24, 3], [3, 3, 12, 19, 0]]);
   check('same match with the real saves only', r[0] < 4.5, 'P1 ' + r[0] + ', Bot ' + r[1]);
   r = await rating('bot', [0, 5], [[0, 0, 1, 10, 0], [5, 0, 9, 20, 0]]);
