@@ -597,6 +597,7 @@
     if (G.mode === 'tutorial') return;
     hlScored(team);
     var human = !soloish(G.mode) || team === 0;
+    G.scoreBefore = G.score.slice();
     if (G.mode === 'ffa') {
       if (G.credit >= 0) { G.score[G.credit]++; col = Meta.color(G.credit); }
     } else if (G.mode === 'team4') {
@@ -666,7 +667,7 @@
     // the match goes into the history, with its highlight (kept or not as the player chose)
     var clips = finishHighlights(), rec = matchRecord(w, draw);
     if (ms) { rec.ps = ms.list; rec.mvp = ms.mvp; }
-    var hl = clips ? { match: { id: rec.id, date: rec.date, mode: mode, settings: G.hlSettings, looks: G.looks,
+    var hl = clips ? { match: { id: rec.id, date: rec.date, mode: mode, fmt: G.cfg.fmt, settings: G.hlSettings, looks: G.looks,
       mvp: ms ? { n: ms.list[ms.mvp].n, r: ms.list[ms.mvp].r } : null }, clips: clips } : null;
     G.lastHL = hl;
     var tools = [['☰ Menu', 'toMenu']];
@@ -818,7 +819,10 @@
   // every power-up timer (fire, shield, freeze, big, magnet), the bomb fuse and all the weather.
   // Highlights keep the same frames (see highlights.js, which must use the same layout).
   var FS = 90, RB = Math.round(16 / DT), REPLAY_LEAD = 5, REPLAY_SLOW = 0.4;
-  function Recorder() { this.buf = new Float32Array(RB * FS); this.n = 0; this.goal = -1; this.shotT = -1; this.lead = 0; }
+  // Next to the frames: the match clock of each frame (clk) and the engine events of each step (evs: [frame, event]),
+  // so a highlight shows the time left and plays the sounds.
+  var SOUND_EVENTS = { kick: 1, head: 1, body: 1, bounce: 1, wall: 1, post: 1, shield: 1, jump: 1, explode: 1, pickup: 1, respawn: 1, thunder: 1, rumble: 1, whoosh: 1 };
+  function Recorder() { this.buf = new Float32Array(RB * FS); this.clk = new Float32Array(RB); this.evs = []; this.n = 0; this.goal = -1; this.shotT = -1; this.lead = 0; }
   Recorder.prototype.push = function (w) {
     var f = this.buf, o = (this.n % RB) * FS, i, p, b, fx = w.fx, hz = w.hz, it = w.item, v = G.wxv;
     f[o++] = w.time;
@@ -841,6 +845,12 @@
     f[o++] = v.fog; f[o++] = v.bolt ? v.bolt.x : 0; f[o++] = v.bolt ? v.bolt.y : 0; f[o++] = v.bolt ? v.bolt.age : -1;
     f[o++] = v.warn ? v.warn.x : -1; f[o++] = v.zap; f[o++] = v.zapBall === undefined ? -1 : v.zapBall; f[o++] = v.bombGone ? 1 : 0;
     f[o++] = w.ball.lastBy[0]; f[o++] = w.ball.lastBy[1];
+    this.clk[this.n % RB] = G.clock;
+    for (i = 0; i < w.events.length; i++) {
+      var e = w.events[i];
+      if (SOUND_EVENTS[e.t]) this.evs.push([this.n, e.t, Math.round(e.v || 0), e.boost ? 1 : 0, Math.round(e.x || 0), Math.round(e.y || 0), e.type || '']);
+    }
+    if (this.evs.length > 4000) this.evs = this.evs.filter(function (x) { return x[0] > this.n - RB; }, this);
     this.n++;
   };
   Recorder.prototype.apply = function (w, k) { applyFrame(w, this.buf, (k % RB) * FS); };
@@ -921,7 +931,7 @@
     G.flash = { x: x, y: y, t: 0, txt: txt, col: col };
     for (var i = 0; i < 3; i++) addPart(x, y, 0, 0, 0.6 + i * 0.3, i === 1 ? col.main : '#ffffff', R + 4, 0, 'ring');
     sparks(x, y, 14, '#ffd23f');
-    if (!G.silent) Snd.star(0);
+    sfx('star', 0);
   }
   function skipReplay() { if (G.state === 'replay') endReplay(); }
   function endReplay() {
@@ -950,8 +960,8 @@
   function startPhenomenon(w, id) {
     var wx = G.wx;
     wx.active[id] = WX[id].dur;
-    if (id === 'quake') { E.startQuake(w, WX.quake.dur); Snd.rumble(); wx.rumbleT = 1.4; }
-    else if (id === 'tornado') { E.startTornado(w, Math.floor(Math.random() * 4) * W / 4 + W / 8, WX.tornado.dur); Snd.whoosh(); }
+    if (id === 'quake') { E.startQuake(w, WX.quake.dur); Snd.rumble(); wx.rumbleT = 1.4; w.events.push({ t: 'rumble' }); }
+    else if (id === 'tornado') { E.startTornado(w, Math.floor(Math.random() * 4) * W / 4 + W / 8, WX.tornado.dur); Snd.whoosh(); w.events.push({ t: 'whoosh' }); }
     else if (id === 'lightning') {
       // aimed at the ball or a player now and then, otherwise anywhere; it hits whatever is there when it comes down
       var r = Math.random(), x;
@@ -966,7 +976,7 @@
     wx.bolt = { x: hit.x, y: hit.y, age: 0 };
     wx.strikeK = G.rec ? G.rec.n : -1; wx.strikeT = w.time;
     G.screenFlash = 0.7; G.shake = Math.max(G.shake, 0.6);
-    Snd.thunder();
+    Snd.thunder(); w.events.push({ t: 'thunder' }); // (for the highlights)
     sparks(hit.x, hit.y, 16, '#fff6a0');
     if (hit.kind === 'ground') {
       for (i = 0; i < 18; i++) addPart(x + (Math.random() - 0.5) * 90, GROUND - 4, (Math.random() - 0.5) * 500, -200 - Math.random() * 500, 0.7 + Math.random() * 0.4, w.arena.map.ground2, 5 + Math.random() * 7, 1500, 'dust');
@@ -975,7 +985,7 @@
     } else if (w.arena.type === 'bomb') {
       // the bomb goes off at once and nobody scores
       var b = w.balls[hit.id];
-      Snd.explode(); explosion(b.x, b.y); G.shake = 1.4;
+      Snd.explode(); explosion(b.x, b.y); G.shake = 1.4; w.events.push({ t: 'explode', x: b.x, y: b.y });
       w.bombT = 1e9; wx.bombGone = true; G.goalBall = hit.id;
       noPointEnd('bomb');
     } else {
@@ -1192,9 +1202,15 @@
     var base = rec.timeAt(from);
     marks = marks.filter(function (m) { return m.t >= base; }); // (a merged clip older than the recording keeps what is left)
     var rel = function (t) { return Math.round((t - base) * 1000) / 1000; };
+    // the sounds of these frames, and the match clock at each kept frame (time mode)
+    var sounds = rec.evs.filter(function (e) { return e[0] >= from && e[0] <= to; }).map(function (e) {
+      return [Math.round((e[0] - from) * DT * 1000) / 1000].concat(e.slice(1));
+    });
+    var clk = null;
+    if (G.cfg && G.cfg.fmt[0] === 't') { clk = []; for (var k = from; k <= to; k += HL.STEP) clk.push(Math.round(rec.clk[k % RB] * 10) / 10); }
     return Object.assign({
       frames: HL.encode(rec.buf, RB, from, to), map: G.world.arena.map.id, mods: G.roundMods || {}, swap: is4(G.mode) && G.round % 2 === 0,
-      round: G.round, t: base,
+      round: G.round, t: base, sounds: sounds, clk: clk, sc0: G.score.slice(), sc: G.score.slice(),
       marks: marks.map(function (m) { return { t: rel(m.t), kind: m.kind, bi: m.bi, by: m.by, team: m.team, danger: m.danger, beauty: m.beauty }; }),
       slow: slow.map(function (q) { return [rel(q[0]), rel(q[1])]; })
     }, meta);
@@ -1207,7 +1223,8 @@
     if (!r) return;
     var kind = G.noPoint ? 'zap' : 'goal';
     var clip = makeClip(r.from, r.to, [{ t: rec.timeAt(r.goal), kind: kind, bi: G.goalBall || 0 }], [[rec.timeAt(r.slowFrom), rec.timeAt(r.to) + 1]], {
-      kind: kind, team: G.scorer, credit: G.credit, word: G.word, sub: G.sub, score: G.score.slice(), name: G.noPoint ? '' : scorerName(G.scorer, G.credit) });
+      kind: kind, team: G.scorer, credit: G.credit, word: G.word, sub: G.sub, score: G.score.slice(), sc0: G.noPoint ? G.score.slice() : (G.scoreBefore || G.score).slice(),
+      name: G.noPoint ? '' : scorerName(G.scorer, G.credit) });
     if (clip) G.hlm.clips.push(clip);
   }
   // a point was scored (team) or the round was stopped (-1): saves are settled and the round's watching ends
@@ -1325,18 +1342,25 @@
     G.hlp = { hl: hl, from: from, exporting: !!exporting, ci: -1, k: 0, n: 0, speed: 1, hold: 0, c: null, f: new Float32Array(FS),
       back: { world: G.world, looks: G.looks }, elapsed: 0, total: hlDuration(hl) };
     G.looks = hl.match.looks; G.demo = false; G.shake = 0; G.excite = 0; G.noteT = 0;
+    G.hlp.quiet = Snd.quiet; Snd.quiet = false; // the menu behind the history keeps the effects quiet; a highlight is heard
     Snd.setCrowd(false);
     G.state = 'highlight';
     loadClip(0);
     G.fade = 1; G.fadeDir = -1;
     show(null);
   }
+  // the crowd of the stands during a clip (for a video: written down as on / off times)
+  function hlCrowd(on) {
+    if (G.silent) { if (G.audioLog) G.audioLog.push({ t: G.audioClock, crowd: !!on }); return; }
+    Snd.setCrowd(on);
+  }
   function loadClip(ci) {
     var h = G.hlp, c = h.hl.clips[ci], w = E.createWorld(c.map, h.hl.match.settings, 1, c.mods || {});
     if (c.swap) for (var i = 0; i < 4; i++) w.players[i].role = 1 - w.players[i].role;
-    h.ci = ci; h.c = c; h.k = 0; h.n = c.frames.length / FS; h.speed = inSlow(c, 0) ? REPLAY_SLOW : 1; h.hold = 0;
+    h.ci = ci; h.c = c; h.k = 0; h.n = c.frames.length / FS; h.speed = inSlow(c, 0) ? REPLAY_SLOW : 1; h.hold = 0; h.si = 0;
     G.world = w; G.trails = [[], []]; G.flash = null; G.rwxv = null; G.parts.length = 0;
     HL.frameAt(c.frames, 0, h.f); applyFrame(w, h.f, 0);
+    hlCrowd(!!(E.MAP_BY_ID[c.map] && E.MAP_BY_ID[c.map].crowd));
   }
   function inSlow(c, t) { for (var i = 0; i < c.slow.length; i++) if (t >= c.slow[i][0] && t <= c.slow[i][1]) return true; return false; }
   // seconds the whole highlight takes to play (for the export's progress)
@@ -1355,7 +1379,12 @@
     h.speed += ((inSlow(c, t0) ? REPLAY_SLOW : 1) - h.speed) * Math.min(1, dt * 8);
     h.k = Math.min(h.n - 1, h.k + dt * h.speed * HL.RATE);
     HL.frameAt(c.frames, h.k, h.f); applyFrame(G.world, h.f, 0);
-    var t1 = h.k / HL.RATE;
+    var t1 = h.k / HL.RATE, snd = c.sounds || [];
+    // the sounds of the match (with their sparks and dust) as the clip reaches them
+    for (; h.si < snd.length && snd[h.si][0] <= t1; h.si++) {
+      var e = snd[h.si];
+      eventFx({ t: e[1], v: e[2], boost: !!e[3], x: e[4], y: e[5], type: e[6] });
+    }
     c.marks.forEach(function (m) { if (t0 < m.t && t1 >= m.t) hlFlash(m); });
     for (var bi = 0; bi < G.world.balls.length && bi < 2; bi++) { var tr = G.trails[bi]; tr.push(G.world.balls[bi].x, G.world.balls[bi].y); if (tr.length > 20) tr.splice(0, 2); }
     if (h.k >= h.n - 1) { h.hold += dt; if (h.hold > 0.5) hlNext(); }
@@ -1370,7 +1399,10 @@
     }
     else if (m.kind === 'zap') { txt = '⚡ SÉT!'; col = ZAP_COL; }
     else if (m.kind === 'miss') { txt = '😱 SUÝT VÀO!'; col = m.by >= 0 ? G.looks.p[m.by].col : teamCol(m.team); }
-    else { txt = FLASH_WORDS[w.arena.type] || 'VÀO!'; col = G.looks.ffa && c.credit >= 0 ? G.looks.p[c.credit].col : teamCol(c.team); }
+    else {
+      txt = FLASH_WORDS[w.arena.type] || 'VÀO!'; col = G.looks.ffa && c.credit >= 0 ? G.looks.p[c.credit].col : teamCol(c.team);
+      sfx('whistle'); sfx('cheer'); // as when it went in
+    }
     burst(b.x, b.y, txt, col, w.arena.P.ballR);
   }
   function hlNext() { if (G.state === 'highlight' && !G.fadeDir) G.fadeDir = 1; }
@@ -1383,7 +1415,9 @@
   function endHighlight() {
     var h = G.hlp;
     if (!h) return;
+    hlCrowd(false);
     if (h.bg) { G.hlp = null; G.state = 'done'; return; } // a video made in the background: nothing on screen to restore
+    Snd.quiet = h.quiet;
     G.hlp = null; G.flash = null; G.rwxv = null; G.parts.length = 0; G.trails = [[], []]; G.fadeBlack = true;
     if (h.from === 'over') { G.world = h.back.world; G.looks = h.back.looks; G.demo = false; G.state = 'over'; show('over'); }
     else { G.state = 'menu'; startDemo(); buildHistory(); show('history'); }
@@ -1394,29 +1428,67 @@
   function closeHighlight() {
     if (G.hlp && G.hlp.exporting && G.exportJob) G.exportJob.cancel(); else endHighlight();
   }
-  function scoreText(s, mode) { return mode === 'ffa' ? s.join(' · ') : (mode === 'team4' ? s[0] + ' – ' + s[2] : s[0] + ' – ' + s[1]); }
   function clipTitle(c) {
     var icon = E.MAP_BY_ID[c.map] ? E.MAP_BY_ID[c.map].icon + ' ' : '';
     if (c.kind === 'save') return '🧤 ' + (c.mixed ? 'Cứu thua cả hai bên ×' + c.n : (c.n > 1 ? 'Cứu thua liên tiếp ×' + c.n : 'Cứu thua')) + (c.name ? ' · ' + c.name : '');
     if (c.kind === 'zap') return icon + '⚡ Không ai được điểm';
     if (c.kind === 'miss') return '😱 Suýt vào' + (c.name ? ' · ' + c.name : '');
-    return icon + (c.name ? c.name + ' · ' : '') + scoreText(c.score, G.hlp.hl.match.mode);
+    return icon + (c.name || '');
+  }
+  // the bottom line of a clip: what it is, with the commentary of a goal
+  function clipLine(c) {
+    if (c.kind === 'goal') return clipTitle(c) + ' · ' + (c.sub || c.word);
+    if (c.kind === 'zap') return (c.word || '⚡') + ' · Không ai được điểm';
+    return clipTitle(c);
+  }
+  // the score at second t of a clip (the point counts once the ball is in), or null for highlights older than v2.9.4
+  function hlScoreAt(c, t) {
+    var gm = c.kind === 'goal' ? goalMark(c) : null;
+    if (c.sc0 && !(gm && t >= gm.t)) return c.sc0;
+    return c.sc || c.score || null;
+  }
+  // "Chạm 5", or the time left of the match ("⭐ BÀN VÀNG" once it has run out)
+  function hlInfoAt(c, t) {
+    var fmt = G.hlp.hl.match.fmt;
+    if (!fmt) return '';
+    if (fmt[0] === 'p') return 'Chạm ' + fmt.slice(1);
+    if (!c.clk || !c.clk.length) return '';
+    var left = c.clk[Math.max(0, Math.min(c.clk.length - 1, Math.round(t * HL.RATE)))];
+    return left <= 0 ? '⭐ BÀN VÀNG' : '⏱ ' + fmtClock(left);
+  }
+  // the small scoreboard in the top bar: coloured scores (the sport between two sides) and the time / target
+  function drawHlScoreboard(c, u, cx, y, cl, t) {
+    var mode = G.hlp.hl.match.mode, sc = hlScoreAt(cl, t), info = hlInfoAt(cl, t), pills = [], i;
+    if (sc) {
+      if (mode === 'ffa') for (i = 0; i < 4; i++) pills.push({ col: G.looks.p[i].col, v: sc[i] });
+      else pills = [{ col: teamCol(0), v: sc[0] }, { col: teamCol(1), v: mode === 'team4' ? sc[2] : sc[1] }];
+    }
+    var ph = 6 * u, pw = (pills.length > 2 ? 6.5 : 8) * u, gap = u, fs = 3.4 * u, icon = pills.length === 2 && E.MAP_BY_ID[cl.map] ? E.MAP_BY_ID[cl.map].icon : '';
+    var iconW = icon ? 5 * u : 0, infoW = info ? textW(info, fs) + 2 * u : 0;
+    var x = cx - (pills.length * (pw + gap) + iconW + infoW) / 2;
+    pills.forEach(function (p, k) {
+      if (k === 1 && icon) { c.fillStyle = '#ffffff'; D.emoji(c, icon, x + iconW / 2 - gap / 2, y, 4 * u); x += iconW; }
+      D.rrect(c, x, y - ph / 2, pw, ph, 1.6 * u); c.fillStyle = p.col.main; c.fill(); c.lineWidth = Math.max(2, 0.45 * u); c.strokeStyle = '#000000'; c.stroke();
+      D.textOutlined(c, String(p.v), x + pw / 2, y + 0.2 * u, 4.3 * u, '#ffffff', INK);
+      x += pw + gap;
+    });
+    if (info) barText(c, info, x + u, y, fs, info.indexOf('⭐') === 0 ? '#ffd23f' : '#ffffff', 'left');
   }
   function drawHighlightHUD(c, u, cx) {
     var v = view, h = G.hlp, cl = h.c, N = h.hl.clips.length, pad = 3 * u;
     replayBars(c, u);
     var ty = barTextY(u), by = v.ch - ty;
-    // top bar: which clip, what it is, the match's MVP (the ✖ button sits at its right end)
-    var lw = barText(c, '🎬 HIGHLIGHT ' + (h.ci + 1) + '/' + N, pad, ty, 3.8 * u, '#ff5050', 'left');
+    // top bar: which clip, the score and the time left (or the target) at this moment, the match's MVP
+    // (the ✖ button sits at its right end)
+    barText(c, '🎬 HIGHLIGHT ' + (h.ci + 1) + '/' + N, pad, ty, 3.8 * u, '#ff5050', 'left');
     var right = v.cw - pad - (h.exporting ? 0 : Math.max(30, 8 * u) + 2 * u), mvp = h.hl.match.mvp;
-    var rw = mvp ? barText(c, '🏅 MVP: ' + mvp.n + ' · ⭐ ' + fmtRating(mvp.r), right, ty, 3.2 * u, '#ffd23f', 'right') : 0;
-    barText(c, clipTitle(cl), cx, ty, 3.8 * u, '#ffffff', 'center', v.cw - 2 * Math.max(pad + lw, v.cw - right + rw) - 4 * u);
-    // bottom bar: slow motion, the moment or the commentary, what a tap does
+    if (mvp) barText(c, '🏅 MVP: ' + mvp.n + ' · ⭐ ' + fmtRating(mvp.r), right, ty, 3.2 * u, '#ffd23f', 'right');
+    drawHlScoreboard(c, u, cx, ty, cl, h.k / HL.RATE);
+    // bottom bar: slow motion, what the clip is (the moment itself while it flashes), what a tap does
     var tip = h.exporting ? 'BALLGAMES PHYSICS' : (h.ci + 1 < N ? 'Chạm để xem pha tiếp ⏭' : 'Chạm để kết thúc ⏹');
     var tw = barText(c, tip, v.cw - pad, by, 3.2 * u, '#ffffff', 'right');
     if (h.speed < 0.7) barText(c, SLOW_TXT, pad, by, 3.4 * u, '#ffd23f', 'left');
-    var head = cl.kind === 'goal' ? (cl.sub || cl.word) : (cl.kind === 'zap' ? cl.word : '');
-    barMiddle(c, u, by, head, v.cw - 2 * (Math.max(textW(SLOW_TXT, 3.4 * u), tw) + pad) - 4 * u);
+    barMiddle(c, u, by, clipLine(cl), v.cw - 2 * (Math.max(textW(SLOW_TXT, 3.4 * u), tw) + pad) - 4 * u);
   }
 
   // ---------- time up with the score level: draw, or golden goal? ----------
@@ -1826,7 +1898,7 @@
   // The video's own canvas, view and copy of everything the highlight player draws from. To draw a frame the game's
   // state is swapped for the video's, the frame is drawn, and the game's state comes back (all within one go).
   var SCENE_KEYS = ['state', 'hlp', 'world', 'parts', 'flash', 'trails', 'rwxv', 'looks', 'demo', 'fade', 'fadeDir', 'fadeBlack',
-    'shake', 'excite', 'noteT', 'note', 'armT', 'screenFlash', 'silent'];
+    'shake', 'excite', 'noteT', 'note', 'armT', 'screenFlash', 'silent', 'audioLog', 'audioClock'];
   function VideoScene(w, h) {
     this.canvas = document.createElement('canvas'); this.canvas.width = w; this.canvas.height = h;
     this.ctx = this.canvas.getContext('2d');
@@ -1834,7 +1906,7 @@
     this.view = { s: s, ox: (w - W * s) / 2, oy: (h - E.H * s) / 2, cw: w, ch: h, dpr: 1 };
     this.clock = 0;
     this.g = { state: 'done', hlp: null, world: null, parts: [], flash: null, trails: [[], []], rwxv: null, looks: null, demo: false, fade: 0,
-      fadeDir: 0, fadeBlack: false, shake: 0, excite: 0, noteT: 0, note: '', armT: [0, 0, 0, 0], screenFlash: 0, silent: true };
+      fadeDir: 0, fadeBlack: false, shake: 0, excite: 0, noteT: 0, note: '', armT: [0, 0, 0, 0], screenFlash: 0, silent: true, audioLog: [], audioClock: 0 };
   }
   VideoScene.prototype.run = function (fn) {
     var live = {}, i, k, lv = view, lc = ctx, lk = clock;
@@ -1879,7 +1951,7 @@
     function slice() {
       var t0 = performance.now(), budget = inGame() ? 6 : 25;
       while (!finished && !cancelled && !failed && performance.now() - t0 < budget && encoder.encodeQueueSize < 6) {
-        var drawn = scene.run(function () { update(dt); if (!G.hlp) return false; render(dt); return true; });
+        var drawn = scene.run(function () { G.audioClock = n / VIDEO_FPS; update(dt); if (!G.hlp) return false; render(dt); return true; });
         if (!drawn) { finished = true; break; } // the last clip is over
         var vf = new VideoFrame(scene.canvas, { timestamp: Math.round(n * 1e6 / VIDEO_FPS), duration: Math.round(1e6 / VIDEO_FPS) });
         encoder.encode(vf, { keyFrame: n % (VIDEO_FPS * 2) === 0 });
@@ -1897,11 +1969,65 @@
         var mux = new BGMP4.Muxer({ width: pick.cfg.width, height: pick.cfg.height, fps: VIDEO_FPS, codec: pick.kind, description: desc });
         chunks.forEach(function (c) { mux.add(c.data, c.key); });
         chunks = null;
-        sink.push(new Blob(mux.parts(), { type: 'video/mp4' }));
-        exportDone(sink, false, false);
+        exportProgress(0.98);
+        // the sounds written down while the frames were drawn become the video's sound track
+        return soundtrack(scene.g.audioLog, n / VIDEO_FPS).then(function (a) {
+          if (a) { mux.setAudio(a); a.frames.forEach(function (f) { mux.addAudio(f.data, f.n); }); }
+          sink.push(new Blob(mux.parts(), { type: 'video/mp4' }));
+          exportDone(sink, false, false);
+        });
       }).catch(function () { exportDone(sink, false, true); });
     }
     slice();
+  }
+  // ---------- the video's sound ----------
+  // The game's own sound effects are played into an offline audio context at the times written down (audio.js render),
+  // then encoded: AAC where the phone has it, Opus otherwise. Without either the video is saved without sound.
+  var AUDIO_RATE = 48000, AUDIO_BPS = 128000, AUDIO_CODECS = [['mp4a.40.2', 'aac'], ['opus', 'opus']];
+  function pickAudio() {
+    if (typeof AudioEncoder === 'undefined' || typeof AudioData === 'undefined') return Promise.resolve(null);
+    var i = 0;
+    function next() {
+      if (i >= AUDIO_CODECS.length) return Promise.resolve(null);
+      var c = AUDIO_CODECS[i++], cfg = { codec: c[0], sampleRate: AUDIO_RATE, numberOfChannels: 2, bitrate: AUDIO_BPS };
+      if (c[1] === 'aac') cfg.aac = { format: 'aac' };
+      return AudioEncoder.isConfigSupported(cfg).then(function (r) { return r.supported ? { cfg: cfg, kind: c[1] } : next(); }, next);
+    }
+    return next();
+  }
+  // resolves to { codec, sampleRate, channels, description, bitrate, frames: [{ data, n }] }, or null (no sound)
+  function soundtrack(log, seconds) {
+    return pickAudio().then(function (pick) {
+      if (!pick || !log || !log.length) return null;
+      return Snd.render(log, seconds).then(function (buf) {
+        if (!buf) return null;
+        return new Promise(function (res, rej) {
+          var frames = [], desc = null, per = pick.kind === 'aac' ? 1024 : 960;
+          var enc = new AudioEncoder({
+            output: function (chunk, meta) {
+              var d = meta && meta.decoderConfig && meta.decoderConfig.description;
+              if (d && !desc) desc = new Uint8Array(d.buffer ? d.buffer.slice(d.byteOffset, d.byteOffset + d.byteLength) : d);
+              var data = new Uint8Array(chunk.byteLength); chunk.copyTo(data);
+              frames.push({ data: data, n: chunk.duration ? Math.round(chunk.duration * AUDIO_RATE / 1e6) : per });
+            },
+            error: rej
+          });
+          enc.configure(pick.cfg);
+          var L = buf.getChannelData(0), R = buf.getChannelData(1), step = 4800;
+          for (var o = 0; o < buf.length; o += step) {
+            var k = Math.min(step, buf.length - o), planar = new Float32Array(k * 2);
+            planar.set(L.subarray(o, o + k), 0); planar.set(R.subarray(o, o + k), k);
+            var ad = new AudioData({ format: 'f32-planar', sampleRate: AUDIO_RATE, numberOfFrames: k, numberOfChannels: 2, timestamp: Math.round(o / AUDIO_RATE * 1e6), data: planar });
+            enc.encode(ad); ad.close();
+          }
+          enc.flush().then(function () {
+            enc.close();
+            if (!frames.length || (pick.kind === 'aac' && !desc)) { res(null); return; }
+            res({ codec: pick.kind, sampleRate: AUDIO_RATE, channels: 2, description: desc, bitrate: AUDIO_BPS, frames: frames });
+          }, rej);
+        });
+      });
+    }).catch(function () { return null; }); // no sound rather than no video
   }
   // the old way, for phones without WebCodecs: film the screen while the highlight plays at normal speed
   function filmScreen(hl, from, mime, sink) {
@@ -2076,33 +2202,41 @@
       if (p.y > GROUND + 40) p.y = GROUND + 40;
     }
   }
+  // a sound effect: played, or written down with its time when a video's soundtrack is being made (G.audioLog)
+  function sfx(fn) {
+    var args = Array.prototype.slice.call(arguments, 1);
+    if (G.silent) { if (G.audioLog) G.audioLog.push({ t: G.audioClock, fn: fn, args: args }); return; }
+    Snd[fn].apply(Snd, args);
+  }
+  // sound and particles of one engine event (in the match, and again when a highlight is played)
+  function eventFx(e) {
+    switch (e.t) {
+      case 'kick': case 'head':
+        sfx('kick', e.v, e.boost); sparks(e.x, e.y, Math.min(9, 2 + (e.v / 250) | 0), e.boost ? '#ffb02e' : null);
+        if (e.v > 1100) { G.shake = Math.max(G.shake, 0.3); G.excite = Math.max(G.excite, 0.35); }
+        break;
+      case 'body': sfx('bounce', e.v * 0.6); break;
+      case 'bounce': sfx('bounce', e.v); if (e.v > 380) dust(e.x, e.y, 4); break;
+      case 'wall': sfx('bounce', e.v * 0.8); break;
+      case 'post': sfx('post'); sparks(e.x, e.y, 4); break;
+      case 'shield': sfx('shield'); sparks(e.x, e.y, 6, '#7fe3ff'); break;
+      case 'jump': sfx('jump'); dust(e.x, e.y, 3); break;
+      case 'explode': sfx('explode'); explosion(e.x, e.y); G.shake = 1.4; break;
+      case 'pickup': sfx(e.type === 'freeze' ? 'freeze' : 'pickup'); sparks(e.x, e.y, 12, '#ffd23f'); break;
+      case 'respawn': sparks(e.x, e.y, 8); break;
+      // written down by the weather (its sounds are played where it happens): heard again in highlights
+      case 'thunder': sfx('thunder'); break;
+      case 'rumble': sfx('rumble'); break;
+      case 'whoosh': sfx('whoosh'); break;
+    }
+  }
   function handleEvents(w) {
     var ev = w.events;
     for (var i = 0; i < ev.length; i++) {
       var e = ev[i];
-      switch (e.t) {
-        case 'kick': case 'head':
-          Snd.kick(e.v, e.boost); sparks(e.x, e.y, Math.min(9, 2 + (e.v / 250) | 0), e.boost ? '#ffb02e' : null);
-          if (e.v > 1100) { G.shake = Math.max(G.shake, 0.3); G.excite = Math.max(G.excite, 0.35); }
-          break;
-        case 'body': Snd.bounce(e.v * 0.6); break;
-        case 'bounce': Snd.bounce(e.v); if (e.v > 380) dust(e.x, e.y, 4); break;
-        case 'wall': Snd.bounce(e.v * 0.8); break;
-        case 'post': Snd.post(); sparks(e.x, e.y, 4); break;
-        case 'shield': Snd.shield(); sparks(e.x, e.y, 6, '#7fe3ff'); break;
-        case 'jump': Snd.jump(); dust(e.x, e.y, 3); break;
-        case 'explode': Snd.explode(); explosion(e.x, e.y); G.shake = 1.4; break;
-        case 'pickup':
-          var info = E.ITEMS[e.type];
-          if (e.type === 'freeze') Snd.freeze(); else Snd.pickup();
-          sparks(e.x, e.y, 12, '#ffd23f');
-          if (!G.demo) { G.note = info.icon + ' ' + whoName(e.id) + ': ' + info.name + '!'; G.noteT = 1.4; }
-          break;
-        case 'respawn':
-          sparks(e.x, e.y, 8);
-          if (!G.demo && G.state === 'play') { G.note = 'TUNG BÓNG!'; G.noteT = 1.2; Snd.whistle(); }
-          break;
-      }
+      eventFx(e);
+      if (e.t === 'pickup' && !G.demo) { var info = E.ITEMS[e.type]; G.note = info.icon + ' ' + whoName(e.id) + ': ' + info.name + '!'; G.noteT = 1.4; }
+      if (e.t === 'respawn' && !G.demo && G.state === 'play') { G.note = 'TUNG BÓNG!'; G.noteT = 1.2; sfx('whistle'); }
     }
   }
   function whoName(id) {
@@ -2506,5 +2640,7 @@
   // for the automated tests: step the game without waiting for the screen
   window.__api = { startMatch: startMatch, startTutorial: startTutorial, toMenu: toMenu, endMatch: endMatch, onScore: onScore,
     step: function (dt, n) { for (var i = 0; i < (n || 1); i++) update(dt); },
+    // the score and the time / target the highlight shows right now
+    hlInfo: function () { var h = G.hlp; return h ? { score: hlScoreAt(h.c, h.k / HL.RATE), info: hlInfoAt(h.c, h.k / HL.RATE), t: h.k / HL.RATE } : null; },
     weather: { trigger: triggerWeather, start: startPhenomenon, strike: doStrike } };
 })();

@@ -54,5 +54,51 @@ s = p.streams[0];
 check('VP9 in MP4: ffprobe reads it', s.codec_name === 'vp9' && s.width === W && +s.nb_read_frames === FPS * SECS, JSON.stringify(s));
 err = sh(`ffmpeg -v error -i ${dir}/b.mp4 -f null - 2>&1 || true`);
 check('VP9 in MP4: decodes without errors', err.trim() === '', err.slice(0, 200));
+// sound: video + AAC (ADTS frames from ffmpeg -> raw frames + AudioSpecificConfig, what AudioEncoder gives)
+function videoMuxer() {
+  const m = new Muxer({ width: W, height: H, fps: FPS, codec: 'avc', description: new Uint8Array(avcC) });
+  aus.forEach(au => { const parts = []; au.forEach(n => { const l = Buffer.alloc(4); l.writeUInt32BE(n.length); parts.push(l, n); }); m.add(new Uint8Array(Buffer.concat(parts)), au.some(n => (n[0] & 31) === 5)); });
+  return m;
+}
+sh(`ffmpeg -v error -y -f lavfi -i "sine=frequency=440:duration=${SECS}:sample_rate=48000" -ac 2 -c:a aac -b:a 128k -f adts ${dir}/s.aac`);
+const adts = fs.readFileSync(`${dir}/s.aac`);
+m = videoMuxer();
+let asc = null;
+for (let o = 0; o + 7 <= adts.length;) {
+  const prof = (adts[o + 2] >> 6) + 1, fi = (adts[o + 2] >> 2) & 15, ch = ((adts[o + 2] & 1) << 2) | (adts[o + 3] >> 6);
+  const len = ((adts[o + 3] & 3) << 11) | (adts[o + 4] << 3) | (adts[o + 5] >> 5), hl = (adts[o + 1] & 1) ? 7 : 9;
+  if (!asc) { asc = new Uint8Array([(prof << 3) | (fi >> 1), ((fi & 1) << 7) | (ch << 3)]); m.setAudio({ codec: 'aac', sampleRate: 48000, channels: ch, description: asc }); }
+  m.addAudio(new Uint8Array(adts.subarray(o + hl, o + len)), 1024);
+  o += len;
+}
+fs.writeFileSync(`${dir}/c.mp4`, m.finish());
+p = JSON.parse(sh(`ffprobe -v error -show_entries stream=codec_type,codec_name,sample_rate,channels:format=duration -of json ${dir}/c.mp4`));
+check('video + AAC sound: both tracks there', p.streams.length === 2 && p.streams[0].codec_name === 'h264' && p.streams[1].codec_name === 'aac' && p.streams[1].sample_rate === '48000' && p.streams[1].channels === 2,
+  p.streams.map(x => x.codec_name + '/' + (x.sample_rate || '')).join(' ') + ' ' + p.format.duration);
+err = sh(`ffmpeg -v error -i ${dir}/c.mp4 -f null - 2>&1 || true`);
+check('video + AAC: everything decodes', err.trim() === '', err.slice(0, 200));
+let vol = sh(`ffmpeg -v info -i ${dir}/c.mp4 -map 0:a -af volumedetect -f null - 2>&1 | grep mean_volume || true`);
+check('AAC sound is the 440 Hz tone (not silence)', /mean_volume: (-?[\d.]+)/.test(vol) && +RegExp.$1 > -30, vol.trim());
+
+// video + Opus (packets taken out of an Ogg file made by libopus)
+sh(`ffmpeg -v error -y -f lavfi -i "sine=frequency=660:duration=${SECS}:sample_rate=48000" -ac 2 -c:a libopus -b:a 96k -f ogg ${dir}/s.ogg`);
+const ogg = fs.readFileSync(`${dir}/s.ogg`), packets = [];
+for (let o = 0, cur = []; o + 27 <= ogg.length;) {
+  const segs = ogg[o + 26], table = ogg.subarray(o + 27, o + 27 + segs);
+  let d = o + 27 + segs;
+  for (let i = 0; i < segs; i++) { cur.push(ogg.subarray(d, d + table[i])); d += table[i]; if (table[i] < 255) { packets.push(Buffer.concat(cur)); cur = []; } }
+  o = d;
+}
+const opusHead = packets[0]; // OpusHead, then OpusTags, then audio
+m = videoMuxer();
+m.setAudio({ codec: 'opus', sampleRate: 48000, channels: opusHead[9], description: new Uint8Array(opusHead) });
+packets.slice(2).forEach(pk => m.addAudio(new Uint8Array(pk), 960));
+fs.writeFileSync(`${dir}/d.mp4`, m.finish());
+p = JSON.parse(sh(`ffprobe -v error -show_entries stream=codec_type,codec_name,sample_rate,channels:format=duration -of json ${dir}/d.mp4`));
+check('video + Opus sound: both tracks there', p.streams.length === 2 && p.streams[1].codec_name === 'opus', p.streams.map(x => x.codec_name).join(' ') + ' ' + p.format.duration);
+err = sh(`ffmpeg -v error -i ${dir}/d.mp4 -f null - 2>&1 || true`);
+check('video + Opus: everything decodes', err.trim() === '', err.slice(0, 200));
+vol = sh(`ffmpeg -v info -i ${dir}/d.mp4 -map 0:a -af volumedetect -f null - 2>&1 | grep mean_volume || true`);
+check('Opus sound is the 660 Hz tone', /mean_volume: (-?[\d.]+)/.test(vol) && +RegExp.$1 > -30, vol.trim());
 fs.rmSync(dir, { recursive: true, force: true });
 console.log(fails ? fails + ' FAILED' : 'all checks passed');
