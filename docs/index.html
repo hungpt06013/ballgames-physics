@@ -4080,8 +4080,6 @@
   // recorded frames [from, to] as a clip; marks and slow-motion spans are given in world time.
   // Earlier clips of this round that reach into it (a save, then the counter-attack goal) are merged into it,
   // so the same moment never shows up twice in a highlight.
-  // a clip (merged or not) shows at most CLIP_MAX seconds of play: of a long run of saves only the end is kept
-  var CLIP_MAX = 10, GOAL_LEAD = 3;
   function makeClip(from, to, marks, slow, meta) {
     var rec = G.rec, oldest = recRange().oldest;
     if (to - from < 60) return null;
@@ -4095,10 +4093,9 @@
         if (c.t < rec.timeAt(from)) from = rec.frameAt(c.t, oldest, from);
       }
     });
-    from = Math.max(from, rec.frameAt(rec.timeAt(to) - CLIP_MAX, from, to));
     marks.sort(function (a, b) { return a.t - b.t; });
     var base = rec.timeAt(from);
-    marks = marks.filter(function (m) { return m.t >= base; });
+    marks = marks.filter(function (m) { return m.t >= base; }); // (a merged clip older than the recording keeps what is left)
     var rel = function (t) { return Math.round((t - base) * 1000) / 1000; };
     return Object.assign({
       frames: HL.encode(rec.buf, RB, from, to), map: G.world.arena.map.id, mods: G.roundMods || {}, swap: is4(G.mode) && G.round % 2 === 0,
@@ -4114,9 +4111,7 @@
     var r = replayWindow(), rec = G.rec;
     if (!r) return;
     var kind = G.noPoint ? 'zap' : 'goal';
-    // the replay shows 5 s before the shot; the highlight keeps it shorter
-    var from = Math.max(r.from, rec.frameAt(rec.timeAt(r.shot) - GOAL_LEAD, r.from, r.shot));
-    var clip = makeClip(from, r.to, [{ t: rec.timeAt(r.goal), kind: kind, bi: G.goalBall || 0 }], [[rec.timeAt(r.slowFrom), rec.timeAt(r.to) + 1]], {
+    var clip = makeClip(r.from, r.to, [{ t: rec.timeAt(r.goal), kind: kind, bi: G.goalBall || 0 }], [[rec.timeAt(r.slowFrom), rec.timeAt(r.to) + 1]], {
       kind: kind, team: G.scorer, credit: G.credit, word: G.word, sub: G.sub, score: G.score.slice(), name: G.noPoint ? '' : scorerName(G.scorer, G.credit) });
     if (clip) G.hlm.clips.push(clip);
   }
