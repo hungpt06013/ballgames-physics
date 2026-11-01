@@ -140,6 +140,7 @@ public class MainActivity extends Activity implements ValueCallback<String> {
         private OutputStream video;
         private Uri videoUri;
         private File videoFile;
+        private String videoMime = "video/mp4";
 
         private File highlightFile(String id) {
             File dir = new File(getFilesDir(), "highlights");
@@ -204,19 +205,20 @@ public class MainActivity extends Activity implements ValueCallback<String> {
         }
 
         /**
-         * Starts a video file; returns where it goes (shown to the player) or "" on failure.
+         * Starts a video file of the given type (video/mp4 or video/webm); returns where it goes (shown to the player)
+         * or "" on failure.
          * Android 10+: Movies/Ballgames through the media store, no permission needed. Older: the same
          * folder with the storage permission, otherwise the app's own Movies folder.
          */
         @JavascriptInterface
-        public String videoBegin(String name, boolean publicDir) {
+        public String videoBegin(String name, boolean publicDir, String mime) {
             videoAbort();
             name = name.replaceAll("[^A-Za-z0-9_.-]", "_");
             try {
                 if (Build.VERSION.SDK_INT >= 29) {
                     ContentValues cv = new ContentValues();
                     cv.put(MediaStore.MediaColumns.DISPLAY_NAME, name);
-                    cv.put(MediaStore.MediaColumns.MIME_TYPE, "video/webm");
+                    cv.put(MediaStore.MediaColumns.MIME_TYPE, mime);
                     cv.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_MOVIES + "/Ballgames");
                     cv.put(MediaStore.MediaColumns.IS_PENDING, 1);
                     videoUri = getContentResolver().insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, cv);
@@ -237,6 +239,7 @@ public class MainActivity extends Activity implements ValueCallback<String> {
                 if (!dir.exists()) dir.mkdirs();
                 videoFile = new File(dir, name);
                 video = new FileOutputStream(videoFile);
+                videoMime = mime;
                 return label + name;
             } catch (Exception e) {
                 videoAbort();
@@ -268,7 +271,7 @@ public class MainActivity extends Activity implements ValueCallback<String> {
                     videoUri = null;
                 } else if (videoFile != null) {
                     MediaScannerConnection.scanFile(MainActivity.this, new String[] { videoFile.getAbsolutePath() },
-                            new String[] { "video/webm" }, null);
+                            new String[] { videoMime }, null);
                     videoFile = null;
                 }
                 return true;

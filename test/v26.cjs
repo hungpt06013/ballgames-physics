@@ -16,10 +16,13 @@ const path = require('path');
   const check = (name, ok, info) => { if (!ok) fails++; console.log((ok ? 'ok   ' : 'FAIL ') + name + (info ? '  ' + info : '')); };
 
   // a shot from the right at the left goal (team 1 attacks, team 0 defends); one team-0 player stands in the way
-  // the defender's random sway can let the ball fly past him: only a run where he touched it says anything
+  // A shot from the right at the left goal (team 1 attacks, team 0 defends); one team-0 player stands in the way.
+  // How he touches the ball is set right after the engine records the touch (kick / header / body, in the air or not),
+  // so each rule can be checked on its own. The defender's sway can let the ball fly past him: only a run where he
+  // touched it says anything.
   async function shot(o) {
     let r;
-    for (let i = 0; i < 6; i++) { r = await shot1(o); if (r.touched) break; }
+    for (let i = 0; i < 12; i++) { r = await shot1(o); if (r.touched) break; }
     return r;
   }
   async function shot1(o) {
@@ -30,24 +33,46 @@ const path = require('path');
       const w = __game.world, P = w.players, park = [o.defX, 1560, 1480, 1560];
       P.forEach((p, i) => { p.x = park[i]; p.y = E.GROUND - E.COM_H * p.sc; p.vx = p.vy = p.a = p.w = 0; E.shapes(p); });
       const b = w.ball;
-      b.x = b.prevX = o.ballX; b.y = b.prevY = E.GROUND - 95; b.vx = o.vx; b.vy = -150; b.spin = 0;
+      b.x = b.prevX = o.ballX; b.y = b.prevY = E.GROUND - (o.high || 95); b.vx = o.vx; b.vy = -150; b.spin = 0;
       b.lastTeam = 1; b.lastBy[1] = 2; b.lastPid = 2; b.touchT[1] = w.time; b.lastX = b.x;
       const t0 = w.time; b.touchT[0] = -1;
-      for (let i = 0; i < 260 && __game.state === 'play'; i++) { // 4 s: a save's clip is made 3 s after it
-        if (o.pressed) __game.pressT[0] = __game.world.time; // the defender is doing something
-        __api.step(1 / 60);
-      }
+      const step = E.stepPlayers;
+      E.stepPlayers = function (w2, pr) {
+        const before = w2.ball.touchT[0], r = step.apply(this, arguments);
+        if (w2.ball.touchT[0] !== before && w2.ball.lastTeam === 0) { w2.ball.lastKind = o.kind || 'kick'; w2.ball.lastAir = !!o.air; }
+        return r;
+      };
+      try {
+        for (let i = 0; i < 260 && __game.state === 'play'; i++) { // 4 s: a save's clip is made 3 s after it
+          if (o.pressed) __game.pressT[0] = __game.world.time; // the defender pressed his button
+          if (o.scramble && __game.world.ball.touchT[0] < 0) __game.world.ball.touchT[1] = __game.world.time; // the attacker still on it
+          __api.step(1 / 60);
+        }
+      } finally { E.stepPlayers = step; }
       return { saves: __game.ps[0].saves, touched: b.touchT[0] >= t0, score: __game.score.join('-'), clips: __game.hlm.singles.length + __game.hlm.clips.length };
     }, o);
   }
-  let r = await shot({ defX: 240, ballX: 700, vx: -1500, pressed: false });
-  check('idle defender, ball hits him in his own half: no save', r.touched && r.saves === 0 && r.clips === 0, JSON.stringify(r));
-  r = await shot({ defX: 240, ballX: 700, vx: -1500, pressed: true });
-  check('defender who pressed, own half: save', r.touched && r.saves === 1 && r.clips === 1, JSON.stringify(r));
-  r = await shot({ defX: 600, ballX: 900, vx: -1700, pressed: true });
-  check('defender who pressed, own half near the middle: save', r.saves === 1, JSON.stringify(r));
-  r = await shot({ defX: 1000, ballX: 1300, vx: -2300, pressed: true });
-  check('defender who pressed, but in the attacker\'s half: no save', r.touched && r.saves === 0 && r.clips === 0, JSON.stringify(r));
+  const own = { defX: 240, ballX: 700, vx: -1500 };
+  let r = await shot(Object.assign({ kind: 'body', pressed: false }, own));
+  check('idle defender, the ball hits him: no save', r.touched && r.saves === 0 && r.clips === 0, JSON.stringify(r));
+  r = await shot(Object.assign({ kind: 'body', pressed: true }, own));
+  check('button pressed but the ball just hits him standing: no save', r.touched && r.saves === 0, JSON.stringify(r));
+  r = await shot(Object.assign({ kind: 'kick', pressed: true }, own));
+  check('a kick that turns it away, own half: save', r.touched && r.saves === 1 && r.clips === 1, JSON.stringify(r));
+  r = await shot(Object.assign({ kind: 'head', pressed: true }, own));
+  check('a header that turns it away: save', r.touched && r.saves === 1, JSON.stringify(r));
+  r = await shot(Object.assign({ kind: 'body', air: true, pressed: true }, own));
+  check('a dive (body, in the air): save', r.touched && r.saves === 1, JSON.stringify(r));
+  r = await shot(Object.assign({ kind: 'kick', pressed: false }, own));
+  check('leg in the way without pressing: no save', r.touched && r.saves === 0, JSON.stringify(r));
+  r = await shot({ defX: 240, ballX: 520, vx: -420, kind: 'kick', pressed: true });
+  check('a slow ball (no real shot): no save', r.touched && r.saves === 0, JSON.stringify(r));
+  r = await shot(Object.assign({ kind: 'kick', pressed: true, scramble: true }, own));
+  check('a scramble (the attacker touched it just before): no save', r.touched && r.saves === 0, JSON.stringify(r));
+  r = await shot({ defX: 600, ballX: 900, vx: -1700, kind: 'kick', pressed: true });
+  check('kick near the middle, own half: save', r.saves === 1, JSON.stringify(r));
+  r = await shot({ defX: 1000, ballX: 1300, vx: -2300, high: 70, kind: 'kick', pressed: true });
+  check('kick in the attacker\'s half: no save', r.touched && r.saves === 0 && r.clips === 0, JSON.stringify(r));
 
   // whole matches by bots: no two clips of a round overlap, saves that led to a goal sit inside the goal's clip
   let merged = 0, total = 0, overlaps = 0, saveStats = 0, saveMarks = 0;

@@ -14,7 +14,7 @@ const path = require('path');
       hlDel(id) { log.push('del ' + id); delete files[id]; },
       needsStoragePermission() { return !perm; },
       requestStoragePermission() { log.push('ask permission'); setTimeout(() => window.__perm && window.__perm(window.__grant), 50); },
-      videoBegin(name, pub) { log.push('videoBegin ' + name + ' public=' + pub); video = { name, bytes: 0, chunks: 0 }; return (pub ? 'Movies/Ballgames/' : 'Android/data/com.ballgames.physics/files/Movies/') + name; },
+      videoBegin(name, pub, mime) { log.push('videoBegin ' + name + ' public=' + pub + ' ' + mime); video = { name, bytes: 0, chunks: 0 }; return (pub ? 'Movies/Ballgames/' : 'Android/data/com.ballgames.physics/files/Movies/') + name; },
       videoChunk(b64) { video.chunks++; video.bytes += atob(b64).length; return true; },
       videoEnd() { log.push('videoEnd ' + video.bytes + ' bytes in ' + video.chunks + ' chunks'); return true; },
       videoAbort() { log.push('videoAbort'); video = null; }
@@ -55,7 +55,8 @@ const path = require('path');
   console.log('cancelled ->', await ev(() => __native.log.slice(-1)[0] + ' | ' + __game.state + ' / ' + __game.screen + ' | toast ' + document.getElementById('toast').textContent));
   await ev(() => { window.__grant = true; });
   await page.tap('.hcard .hacts .chip:nth-child(2)');
-  for (let i = 0; i < 120; i++) { await page.waitForTimeout(1000); if (await ev(() => __game.state !== 'highlight')) break; }
+  // the video is made in the background: wait for Android to be handed the end of the file
+  for (let i = 0; i < 180; i++) { await page.waitForTimeout(1000); if (await ev(() => __native.log.some(l => l.indexOf('videoEnd') === 0))) break; }
   await page.waitForTimeout(1500);
   console.log('export done ->', await ev(() => __native.log.slice(-3).join(' | ') + ' | toast: ' + document.getElementById('toast').textContent));
   // delete from history removes the file

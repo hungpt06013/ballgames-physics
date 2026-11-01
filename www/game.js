@@ -900,7 +900,7 @@
     // real speed for the build-up; once the slow motion starts (just before the shot, or at most 2.5 s before
     // the ball goes in when the shot travelled for a long time) it stays slow until the end of the replay
     var slowFrom = Math.max(shot - Math.round(0.35 / DT), goal - Math.round(2.5 / DT));
-    return { from: from, to: to, goal: goal, slowFrom: slowFrom };
+    return { from: from, to: to, goal: goal, shot: shot, slowFrom: slowFrom };
   }
   function startReplay() {
     var r = replayWindow();
@@ -921,7 +921,7 @@
     G.flash = { x: x, y: y, t: 0, txt: txt, col: col };
     for (var i = 0; i < 3; i++) addPart(x, y, 0, 0, 0.6 + i * 0.3, i === 1 ? col.main : '#ffffff', R + 4, 0, 'ring');
     sparks(x, y, 14, '#ffd23f');
-    Snd.star(0);
+    if (!G.silent) Snd.star(0);
   }
   function skipReplay() { if (G.state === 'replay') endReplay(); }
   function endReplay() {
@@ -1038,14 +1038,16 @@
   }
 
   // ---------- highlights: saves and clips ----------
-  // A save: the ball on its own would score for one side within SAVE_LOOK seconds, then a player of the other side
-  // turns it away with foot, head or body, SAVE_CONFIRM seconds later it is still not going in, and
-  //  - that player did something: his button was pressed (jump, kick, header, dive) at most SAVE_ACTIVE seconds before
-  //    the touch; a ball that just hits someone standing still, or a shield, is no save,
+  // A save: a real shot (the ball going at least SAVE_PACE, shot at least SAVE_GAP seconds before) would score for one
+  // side within SAVE_LOOK seconds on its own, then a player of the other side turns it away, SAVE_CONFIRM seconds later
+  // it is still not going in, and
+  //  - that player did something: a kick, a header or a dive (a body hit while in the air), with his button pressed at
+  //    most SAVE_ACTIVE seconds before; a ball bouncing off someone standing there, or off a shield, is no save,
   //  - it happened in his own half.
+  // A scramble in front of goal (the ball crawling between players touching it all the time) has no saves.
   // Saves by the same side less than SAVE_CHAIN seconds apart make one bigger save, which is always kept; of the
   // single saves the most dangerous third is kept. Every point, and every round stopped by lightning, is kept too.
-  var SAVE_LOOK = 1, SAVE_CONFIRM = 0.25, SAVE_CHAIN = 3, SAVE_ACTIVE = 0.6, CLIP_PRE = 3, CLIP_POST = 1.5;
+  var SAVE_LOOK = 1, SAVE_CONFIRM = 0.25, SAVE_CHAIN = 3, SAVE_ACTIVE = 0.35, SAVE_PACE = 550, SAVE_GAP = 0.15, CLIP_PRE = 3, CLIP_POST = 1.5;
   var ZAP_COL = { main: '#ffd23f', dark: '#c4a612' };
   function newWatch() { return { tick: 0, threat: [null, null], cand: [], group: null, seen: [[-1, -1], [-1, -1]], miss: [] }; }
   function watchSaves(w) {
@@ -1064,6 +1066,8 @@
         if (!th && back) th = S.threat[bi] = back;
         if (!th || th.att !== att) th = S.threat[bi] = { att: att, since: w.time, shot: b.touchT[att], danger: 0 };
         th.seen = w.time; th.danger = Math.max(th.danger, 1 - fut.t / SAVE_LOOK);
+        // pace of the shot: towards the goal for goals and posts (a ball just dropping is no shot), any way for hoops and nets
+        th.pace = Math.max(th.pace || 0, A.type === 'goal' || A.type === 'posts' ? Math.abs(b.vx) : Math.sqrt(b.vx * b.vx + b.vy * b.vy));
         if (b.touchT[att] > th.shot) th.shot = b.touchT[att];
         // a shot on target: the attacking side's touch just now sent it goalwards (one per touch, dribbling counts once)
         if (b.lastTeam === att && b.touchT[att] >= w.time - 0.5 && b.touchT[att] - (th.counted || -9) > 0.5) { th.counted = b.touchT[att]; statAdd(b.lastBy[att], 'shots'); }
@@ -1073,9 +1077,12 @@
       S.threat[bi] = null;
       var def = 1 - th.att, t = b.touchT[def], by = b.lastTeam === def ? b.lastPid : -1;
       if (by < 0 || t < Math.max(th.since, th.seen - 0.1)) continue; // not turned away by a defender
+      var shot = th.shot >= th.since - 3 ? th.shot : th.since;
+      if ((th.pace || 0) < SAVE_PACE || t - shot < SAVE_GAP) continue; // no real shot: a scramble
       if (G.pressT[by] < t - SAVE_ACTIVE) continue; // he was just standing there
+      if (b.lastKind === 'body' && !b.lastAir) continue; // it hit him: no kick, no header, no dive
       if (def === 0 ? b.lastX > W / 2 : b.lastX < W / 2) continue; // not in his own half
-      S.cand.push({ bi: bi, att: th.att, def: def, t: t, by: by, shot: th.shot >= th.since - 3 ? th.shot : th.since, danger: th.danger, th: th });
+      S.cand.push({ bi: bi, att: th.att, def: def, t: t, by: by, shot: shot, danger: th.danger, th: th });
     }
     for (i = S.cand.length - 1; i >= 0; i--) if (w.time - S.cand[i].t >= SAVE_CONFIRM) addSave(S.cand.splice(i, 1)[0]);
     if (S.group && w.time - S.group.last > SAVE_CHAIN) closeGroup(true);
@@ -1134,6 +1141,7 @@
     clip.by = by; clip.name = playerNames(by); clip.team = list[list.length - 1].team;
     if (saves.length) {
       clip.kind = 'save'; clip.n = saves.length;
+      clip.mixed = saves.some(function (m) { return m.team !== saves[0].team; }); // saves by both sides
       clip.danger = saves.reduce(function (a, m) { return a + (m.danger || 0.5); }, 0);
       (clip.n > 1 ? G.hlm.clips : G.hlm.singles).push(clip);
     } else {
@@ -1167,6 +1175,8 @@
   // recorded frames [from, to] as a clip; marks and slow-motion spans are given in world time.
   // Earlier clips of this round that reach into it (a save, then the counter-attack goal) are merged into it,
   // so the same moment never shows up twice in a highlight.
+  // a clip (merged or not) shows at most CLIP_MAX seconds of play: of a long run of saves only the end is kept
+  var CLIP_MAX = 10, GOAL_LEAD = 3;
   function makeClip(from, to, marks, slow, meta) {
     var rec = G.rec, oldest = recRange().oldest;
     if (to - from < 60) return null;
@@ -1180,8 +1190,11 @@
         if (c.t < rec.timeAt(from)) from = rec.frameAt(c.t, oldest, from);
       }
     });
+    from = Math.max(from, rec.frameAt(rec.timeAt(to) - CLIP_MAX, from, to));
     marks.sort(function (a, b) { return a.t - b.t; });
-    var base = rec.timeAt(from), rel = function (t) { return Math.round((t - base) * 1000) / 1000; };
+    var base = rec.timeAt(from);
+    marks = marks.filter(function (m) { return m.t >= base; });
+    var rel = function (t) { return Math.round((t - base) * 1000) / 1000; };
     return Object.assign({
       frames: HL.encode(rec.buf, RB, from, to), map: G.world.arena.map.id, mods: G.roundMods || {}, swap: is4(G.mode) && G.round % 2 === 0,
       round: G.round, t: base,
@@ -1196,7 +1209,9 @@
     var r = replayWindow(), rec = G.rec;
     if (!r) return;
     var kind = G.noPoint ? 'zap' : 'goal';
-    var clip = makeClip(r.from, r.to, [{ t: rec.timeAt(r.goal), kind: kind, bi: G.goalBall || 0 }], [[rec.timeAt(r.slowFrom), rec.timeAt(r.to) + 1]], {
+    // the replay shows 5 s before the shot; the highlight keeps it shorter
+    var from = Math.max(r.from, rec.frameAt(rec.timeAt(r.shot) - GOAL_LEAD, r.from, r.shot));
+    var clip = makeClip(from, r.to, [{ t: rec.timeAt(r.goal), kind: kind, bi: G.goalBall || 0 }], [[rec.timeAt(r.slowFrom), rec.timeAt(r.to) + 1]], {
       kind: kind, team: G.scorer, credit: G.credit, word: G.word, sub: G.sub, score: G.score.slice(), name: G.noPoint ? '' : scorerName(G.scorer, G.credit) });
     if (clip) G.hlm.clips.push(clip);
   }
@@ -1349,7 +1364,7 @@
     c.marks.forEach(function (m) { if (t0 < m.t && t1 >= m.t) hlFlash(m); });
     for (var bi = 0; bi < G.world.balls.length && bi < 2; bi++) { var tr = G.trails[bi]; tr.push(G.world.balls[bi].x, G.world.balls[bi].y); if (tr.length > 20) tr.splice(0, 2); }
     if (h.k >= h.n - 1) { h.hold += dt; if (h.hold > 0.5) hlNext(); }
-    if (h.exporting) exportProgress(h.elapsed / h.total);
+    if (h.exporting && !h.bg) exportProgress(h.elapsed / h.total);
   }
   function hlFlash(m) {
     var w = G.world, c = G.hlp.c, b = w.balls[m.bi] || w.ball, col, txt;
@@ -1373,19 +1388,21 @@
   function endHighlight() {
     var h = G.hlp;
     if (!h) return;
-    G.hlp = null; G.flash = null; G.rwxv = null; G.parts.length = 0; G.trails = [[], []];
+    if (h.bg) { G.hlp = null; G.state = 'done'; return; } // a video made in the background: nothing on screen to restore
+    G.hlp = null; G.flash = null; G.rwxv = null; G.parts.length = 0; G.trails = [[], []]; G.fadeBlack = true;
     if (h.from === 'over') { G.world = h.back.world; G.looks = h.back.looks; G.demo = false; G.state = 'over'; show('over'); }
     else { G.state = 'menu'; startDemo(); buildHistory(); show('history'); }
     G.fade = 1; G.fadeDir = -1;
     if (h.onEnd) h.onEnd();
   }
+  // ✖ / back: a highlight being filmed for a video (phones without WebCodecs) stops the video too
   function closeHighlight() {
-    if (G.exportJob) G.exportJob.cancel(); else endHighlight();
+    if (G.hlp && G.hlp.exporting && G.exportJob) G.exportJob.cancel(); else endHighlight();
   }
   function scoreText(s, mode) { return mode === 'ffa' ? s.join(' · ') : (mode === 'team4' ? s[0] + ' – ' + s[2] : s[0] + ' – ' + s[1]); }
   function clipTitle(c) {
     var icon = E.MAP_BY_ID[c.map] ? E.MAP_BY_ID[c.map].icon + ' ' : '';
-    if (c.kind === 'save') return '🧤 ' + (c.n > 1 ? 'Cứu thua liên tiếp ×' + c.n : 'Cứu thua') + (c.name ? ' · ' + c.name : '');
+    if (c.kind === 'save') return '🧤 ' + (c.mixed ? 'Cứu thua cả hai bên ×' + c.n : (c.n > 1 ? 'Cứu thua liên tiếp ×' + c.n : 'Cứu thua')) + (c.name ? ' · ' + c.name : '');
     if (c.kind === 'zap') return icon + '⚡ Không ai được điểm';
     if (c.kind === 'miss') return '😱 Suýt vào' + (c.name ? ' · ' + c.name : '');
     return icon + (c.name ? c.name + ' · ' : '') + scoreText(c.score, G.hlp.hl.match.mode);
@@ -1710,11 +1727,34 @@
     });
   })();
 
-  // ---------- highlight video (WebM, recorded from the canvas while the highlight plays) ----------
-  var EXPORT_W = 1280;
-  function videoMime() {
+  // ---------- highlight video (MP4) ----------
+  // The video is made frame by frame instead of being filmed off the screen: every frame is drawn exactly 1/30 s of
+  // highlight after the previous one and handed to the phone's video encoder (WebCodecs: H.264, or VP9 when there is
+  // no H.264), then written into an MP4 file (mp4.js). However slow the phone, the video plays smoothly.
+  // It is made in the background, on a canvas of its own (VideoScene): the game goes on meanwhile.
+  // Without WebCodecs it falls back to filming the screen while the highlight plays (MediaRecorder; MP4 if it can).
+  var EXPORT_W = 1280, VIDEO_FPS = 30;
+  // the first of these the phone's encoder takes: Full HD first (H.264 High, Main, Baseline; then VP9), else 720p,
+  // with a generous bit rate so the lines and the text stay sharp
+  var VIDEO_SETUPS = [
+    [1920, 1080, 6000000, [['avc1.640028', 'avc'], ['avc1.4d0028', 'avc'], ['avc1.420028', 'avc'], ['vp09.00.40.08', 'vp9']]],
+    [1280, 720, 4000000, [['avc1.64001f', 'avc'], ['avc1.4d001f', 'avc'], ['avc1.42001f', 'avc'], ['vp09.00.31.08', 'vp9']]]];
+  function pickEncoder() {
+    if (typeof VideoEncoder === 'undefined' || typeof VideoFrame === 'undefined' || !window.BGMP4) return Promise.resolve(null);
+    var list = [];
+    VIDEO_SETUPS.forEach(function (s) { s[3].forEach(function (c) { list.push({ codec: c[0], kind: c[1], width: s[0], height: s[1], bitrate: s[2] }); }); });
+    var i = 0;
+    function next() {
+      if (i >= list.length) return Promise.resolve(null);
+      var c = list[i++], cfg = { codec: c.codec, width: c.width, height: c.height, bitrate: c.bitrate, framerate: VIDEO_FPS };
+      if (c.kind === 'avc') cfg.avc = { format: 'avc' };
+      return VideoEncoder.isConfigSupported(cfg).then(function (r) { return r.supported ? { cfg: cfg, kind: c.kind } : next(); }, next);
+    }
+    return next();
+  }
+  function recorderMime() {
     if (!window.MediaRecorder || !MediaRecorder.isTypeSupported || !canvas.captureStream) return '';
-    var l = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+    var l = ['video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
     for (var i = 0; i < l.length; i++) if (MediaRecorder.isTypeSupported(l[i])) return l[i];
     return '';
   }
@@ -1724,25 +1764,33 @@
     return new Promise(function (res) { var r = new FileReader(); r.onload = function () { res(new Uint8Array(r.result)); }; r.readAsArrayBuffer(b); });
   }
   // browser: collect the pieces and download them as one file
-  function blobSink(name) {
+  function blobSink(name, type) {
     var parts = [];
     return {
       push: function (b) { parts.push(b); },
       abort: function () { parts = []; },
       done: function () {
-        var url = URL.createObjectURL(new Blob(parts, { type: 'video/webm' })), a = document.createElement('a');
+        var url = URL.createObjectURL(new Blob(parts, { type: type })), a = document.createElement('a');
         a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
         setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
         return Promise.resolve(name);
       }
     };
   }
-  // app: hand the pieces to Android, which writes them into Movies/Ballgames
-  function nativeSink(N, name, publicDir) {
-    var where = N.videoBegin(name, !!publicDir), q = Promise.resolve(), ok = true;
+  // app: hand the pieces to Android (at most 384 KB at a time), which writes them into Movies/Ballgames
+  function nativeSink(N, name, publicDir, type) {
+    var where = N.videoBegin(name, !!publicDir, type), q = Promise.resolve(), ok = true;
     if (!where) return null;
     return {
-      push: function (b) { q = q.then(function () { return blobBytes(b); }).then(function (u8) { if (ok && !N.videoChunk(HL.toB64(u8))) ok = false; }); },
+      push: function (b) {
+        var o = 0;
+        function piece() {
+          if (o >= b.size || !ok) return null;
+          var part = b.slice(o, o + 393216); o += 393216;
+          return blobBytes(part).then(function (u8) { if (!N.videoChunk(HL.toB64(u8))) ok = false; return piece(); });
+        }
+        q = q.then(piece);
+      },
       abort: function () { q = q.then(function () { N.videoAbort(); }); },
       done: function () { return q.then(function () { if (!ok) { N.videoAbort(); return ''; } return N.videoEnd() ? where : ''; }); }
     };
@@ -1755,36 +1803,122 @@
       N.requestStoragePermission();
     });
   }
+  function exportFailed(msg) { dialog('Không tạo được video', msg, [['OK', 1, 'green']], 1); }
   function exportHighlight(hl, from) {
-    var N = window.BGNative && typeof window.BGNative.videoBegin === 'function' ? window.BGNative : null, mime = videoMime();
-    if (!mime) { dialog('Không tạo được video', 'Trình duyệt / điện thoại này chưa hỗ trợ ghi video từ game.', [['OK', 1, 'green']], 1); return; }
-    var name = 'ballgames-highlight-' + stamp(hl.match.date) + '.webm';
-    (N ? storageAllowed(N) : Promise.resolve(true)).then(function (pub) {
-      var sink = N ? nativeSink(N, name, pub) : blobSink(name);
-      if (!sink) { dialog('Không lưu được video', 'Không mở được thư mục để lưu video.', [['OK', 1, 'green']], 1); return; }
-      G.exporting = true; resize();
-      var stream = canvas.captureStream(30), rec, cancelled = false;
-      try { rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 3000000 }); } catch (e) { rec = null; }
-      if (!rec) {
-        stream.getTracks().forEach(function (t) { t.stop(); }); G.exporting = false; resize(); sink.abort();
-        dialog('Không tạo được video', 'Không bắt đầu ghi video được.', [['OK', 1, 'green']], 1);
+    var N = window.BGNative && typeof window.BGNative.videoBegin === 'function' ? window.BGNative : null;
+    if (G.exportJob) { toast('Đang tạo một video khác, đợi xong nhé'); return; }
+    G.exportJob = { cancel: function () { } }; // taken: one video at a time
+    pickEncoder().then(function (enc) {
+      var mime = enc ? 'video/mp4' : recorderMime();
+      if (!mime) { G.exportJob = null; exportFailed('Trình duyệt / điện thoại này chưa hỗ trợ tạo video từ game.'); return; }
+      var name = 'ballgames-highlight-' + stamp(hl.match.date) + (mime.indexOf('mp4') >= 0 ? '.mp4' : '.webm'), type = mime.split(';')[0];
+      return (N ? storageAllowed(N) : Promise.resolve(true)).then(function (pub) {
+        var sink = N ? nativeSink(N, name, pub, type) : blobSink(name, type);
+        if (!sink) { G.exportJob = null; exportFailed('Không mở được thư mục để lưu video.'); return; }
+        $('exportBar').classList.remove('hidden'); exportProgress(0);
+        if (enc) { encodeInBackground(hl, enc, sink); toast('⬇️ Đang tạo video, bạn cứ chơi tiếp nhé'); }
+        else { G.exporting = true; resize(); filmScreen(hl, from, mime, sink); }
+      });
+    });
+  }
+  function exportDone(sink, cancelled, failed) {
+    if (G.exporting) { G.exporting = false; resize(); }
+    G.exportJob = null;
+    $('exportBar').classList.add('hidden');
+    if (cancelled || failed) { sink.abort(); toast(cancelled ? 'Đã huỷ tạo video' : '⚠️ Không tạo được video'); return; }
+    sink.done().then(function (where) { toast(where ? '✅ Đã lưu video: ' + where : '⚠️ Không lưu được video'); });
+  }
+  // The video's own canvas, view and copy of everything the highlight player draws from. To draw a frame the game's
+  // state is swapped for the video's, the frame is drawn, and the game's state comes back (all within one go).
+  var SCENE_KEYS = ['state', 'hlp', 'world', 'parts', 'flash', 'trails', 'rwxv', 'looks', 'demo', 'fade', 'fadeDir', 'fadeBlack',
+    'shake', 'excite', 'noteT', 'note', 'armT', 'screenFlash', 'silent'];
+  function VideoScene(w, h) {
+    this.canvas = document.createElement('canvas'); this.canvas.width = w; this.canvas.height = h;
+    this.ctx = this.canvas.getContext('2d');
+    var s = Math.min(w / W, h / E.H);
+    this.view = { s: s, ox: (w - W * s) / 2, oy: (h - E.H * s) / 2, cw: w, ch: h, dpr: 1 };
+    this.clock = 0;
+    this.g = { state: 'done', hlp: null, world: null, parts: [], flash: null, trails: [[], []], rwxv: null, looks: null, demo: false, fade: 0,
+      fadeDir: 0, fadeBlack: false, shake: 0, excite: 0, noteT: 0, note: '', armT: [0, 0, 0, 0], screenFlash: 0, silent: true };
+  }
+  VideoScene.prototype.run = function (fn) {
+    var live = {}, i, k, lv = view, lc = ctx, lk = clock;
+    for (i = 0; i < SCENE_KEYS.length; i++) { k = SCENE_KEYS[i]; live[k] = G[k]; G[k] = this.g[k]; }
+    view = this.view; ctx = this.ctx; clock = this.clock;
+    try { return fn(); } finally {
+      for (i = 0; i < SCENE_KEYS.length; i++) { k = SCENE_KEYS[i]; this.g[k] = G[k]; G[k] = live[k]; }
+      this.clock = clock; view = lv; ctx = lc; clock = lk;
+    }
+  };
+  // the highlight player started inside a scene (no screens)
+  function sceneHighlight(hl) {
+    G.hlp = { hl: hl, from: 'video', exporting: true, bg: true, ci: -1, k: 0, n: 0, speed: 1, hold: 0, c: null, f: new Float32Array(FS),
+      back: null, elapsed: 0, total: hlDuration(hl) };
+    G.looks = hl.match.looks; G.demo = false; G.state = 'highlight';
+    loadClip(0);
+    G.fade = 1; G.fadeDir = -1;
+  }
+  // next slice of work soon, without the long waits browsers give timers of pages in the background
+  var slicePort = typeof MessageChannel !== 'undefined' ? new MessageChannel() : null, sliceQ = [];
+  if (slicePort) slicePort.port1.onmessage = function () { var f = sliceQ.shift(); if (f) f(); };
+  function soon(f) { if (slicePort) { sliceQ.push(f); slicePort.port2.postMessage(0); } else setTimeout(f, 0); }
+  // frame by frame in the background, in short slices between the game's own frames (shorter while a match is on)
+  function encodeInBackground(hl, pick, sink) {
+    var chunks = [], desc = null, failed = null, cancelled = false, n = 0, dt = 1 / VIDEO_FPS, encoder, finished = false;
+    var scene = new VideoScene(pick.cfg.width, pick.cfg.height);
+    try {
+      encoder = new VideoEncoder({
+        output: function (chunk, meta) {
+          var d = meta && meta.decoderConfig && meta.decoderConfig.description;
+          if (d && !desc) desc = new Uint8Array(d.buffer ? d.buffer.slice(d.byteOffset, d.byteOffset + d.byteLength) : d);
+          var data = new Uint8Array(chunk.byteLength); chunk.copyTo(data);
+          chunks.push({ data: data, key: chunk.type === 'key' });
+        },
+        error: function (e) { failed = e || new Error('encoder'); }
+      });
+      encoder.configure(pick.cfg);
+    } catch (e) { exportDone(sink, false, true); return; }
+    G.exportJob = { cancel: function () { cancelled = true; } };
+    scene.run(function () { sceneHighlight(hl); });
+    var total = Math.max(1, Math.ceil(scene.g.hlp.total * VIDEO_FPS));
+    function slice() {
+      var t0 = performance.now(), budget = inGame() ? 6 : 25;
+      while (!finished && !cancelled && !failed && performance.now() - t0 < budget && encoder.encodeQueueSize < 6) {
+        var drawn = scene.run(function () { update(dt); if (!G.hlp) return false; render(dt); return true; });
+        if (!drawn) { finished = true; break; } // the last clip is over
+        var vf = new VideoFrame(scene.canvas, { timestamp: Math.round(n * 1e6 / VIDEO_FPS), duration: Math.round(1e6 / VIDEO_FPS) });
+        encoder.encode(vf, { keyFrame: n % (VIDEO_FPS * 2) === 0 });
+        vf.close(); n++;
+      }
+      exportProgress(Math.min(0.97, n / total));
+      if (!finished && !cancelled && !failed) {
+        if (encoder.encodeQueueSize >= 6) setTimeout(slice, 4); else soon(slice); // let the encoder catch up
         return;
       }
-      rec.ondataavailable = function (e) { if (e.data && e.data.size) sink.push(e.data); };
-      rec.onstop = function () {
-        stream.getTracks().forEach(function (t) { t.stop(); });
-        G.exporting = false; resize();
-        $('exportBar').classList.add('hidden');
-        if (cancelled) { sink.abort(); toast('Đã huỷ tạo video'); return; }
-        sink.done().then(function (where) { toast(where ? '✅ Đã lưu video: ' + where : '⚠️ Không lưu được video'); });
-      };
-      G.exportJob = { cancel: function () { cancelled = true; endHighlight(); } };
-      playHighlight(hl, from, true);
-      G.hlp.onEnd = function () { G.exportJob = null; if (rec.state !== 'inactive') rec.stop(); };
-      rec.start(1000);
-      exportProgress(0);
-      $('exportBar').classList.remove('hidden');
-    });
+      if (cancelled || failed) { try { encoder.close(); } catch (e) { /* already closed */ } exportDone(sink, cancelled, true); return; }
+      encoder.flush().then(function () {
+        encoder.close();
+        if (!chunks.length || (pick.kind === 'avc' && !desc)) throw new Error('no video');
+        var mux = new BGMP4.Muxer({ width: pick.cfg.width, height: pick.cfg.height, fps: VIDEO_FPS, codec: pick.kind, description: desc });
+        chunks.forEach(function (c) { mux.add(c.data, c.key); });
+        chunks = null;
+        sink.push(new Blob(mux.parts(), { type: 'video/mp4' }));
+        exportDone(sink, false, false);
+      }).catch(function () { exportDone(sink, false, true); });
+    }
+    slice();
+  }
+  // the old way, for phones without WebCodecs: film the screen while the highlight plays at normal speed
+  function filmScreen(hl, from, mime, sink) {
+    var stream = canvas.captureStream(VIDEO_FPS), rec, cancelled = false;
+    try { rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 3000000 }); } catch (e) { rec = null; }
+    if (!rec) { stream.getTracks().forEach(function (t) { t.stop(); }); exportDone(sink, false, true); return; }
+    rec.ondataavailable = function (e) { if (e.data && e.data.size) sink.push(e.data); };
+    rec.onstop = function () { stream.getTracks().forEach(function (t) { t.stop(); }); exportDone(sink, cancelled, false); };
+    G.exportJob = { cancel: function () { cancelled = true; endHighlight(); } };
+    playHighlight(hl, from, true);
+    G.hlp.onEnd = function () { if (rec.state !== 'inactive') rec.stop(); };
+    rec.start(1000);
   }
   function exportProgress(f) { $('exportPct').textContent = Math.max(0, Math.min(99, Math.floor(f * 100))) + '%'; }
   $('exportCancel').addEventListener('click', function () { if (G.exportJob) G.exportJob.cancel(); });
@@ -1837,7 +1971,7 @@
     if (G.state !== 'paused') {
       if (G.fadeDir) {
         G.fade += G.fadeDir * dt / 0.3;
-        if (G.fade <= 0) { G.fade = 0; G.fadeDir = 0; }
+        if (G.fade <= 0) { G.fade = 0; G.fadeDir = 0; G.fadeBlack = false; }
         else if (G.fade >= 1) { G.fade = 1; G.fadeDir = 0; fadedOut(); }
       } else if (G.fade >= 1) fadedOut(); // never stay on a white screen
     }
@@ -2352,7 +2486,8 @@
       if (sf > 0) { c.fillStyle = 'rgba(255,255,240,' + Math.min(0.85, sf) + ')'; c.fillRect(0, 0, v.cw, v.ch); }
     }
     drawHUD(c, A, w);
-    if (G.fade > 0) { c.fillStyle = 'rgba(255,255,255,' + G.fade + ')'; c.fillRect(0, 0, v.cw, v.ch); }
+    // the game fades through white; a highlight (and the way back from it) through black, like a video
+    if (G.fade > 0) { c.fillStyle = (G.state === 'highlight' || G.fadeBlack ? 'rgba(8,10,14,' : 'rgba(255,255,255,') + G.fade + ')'; c.fillRect(0, 0, v.cw, v.ch); }
   }
 
   function frame(now) {

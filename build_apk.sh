@@ -9,7 +9,7 @@ VERSION_CODE="${VERSION_CODE:-1}"
 VERSION_NAME="${VERSION_NAME:-1.0}"
 OUT=build
 rm -rf "$OUT"; mkdir -p "$OUT/classes" "$OUT/assets/www"
-cp www/index.html www/engine.js www/audio.js www/meta.js www/draw.js www/highlights.js www/game.js "$OUT/assets/www/"
+cp www/index.html www/engine.js www/audio.js www/meta.js www/draw.js www/highlights.js www/mp4.js www/game.js "$OUT/assets/www/"
 
 "$BT/aapt2" compile --dir android/res -o "$OUT/res.zip"
 "$BT/aapt2" link -o "$OUT/unsigned.apk" -I "$JAR" \

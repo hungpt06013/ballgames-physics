@@ -177,7 +177,9 @@
   .center { text-align: center; }
   /* highlight player */
   /* inside the top film bar of the highlight, off the pitch */
-  #hlClose, #exportBar { position: fixed; right: max(12px, env(safe-area-inset-right)); top: calc(1 * var(--u)); z-index: 10; }
+  #hlClose { position: fixed; right: max(12px, env(safe-area-inset-right)); top: calc(1 * var(--u)); z-index: 10; }
+  /* a video being made in the background: a small pill next to the pause button, over every screen */
+  #exportBar { position: fixed; left: calc(50% + max(26px, 6.5 * var(--u))); bottom: max(8px, env(safe-area-inset-bottom)); z-index: 25; }
   #hlClose { width: calc(8 * var(--u)); height: calc(8 * var(--u)); min-width: 30px; min-height: 30px; border-radius: 50%; border: calc(0.5 * var(--u)) solid var(--ink);
     background: var(--btn); color: var(--text); font-size: calc(3.8 * var(--u)); font-weight: 900; cursor: pointer; padding: 0; line-height: 1; }
   #exportBar { display: flex; align-items: center; gap: calc(1.4 * var(--u)); background: var(--paper); border: calc(0.5 * var(--u)) solid var(--ink); border-radius: 99px;
@@ -418,7 +420,7 @@
 </div>
 
 <button id="hlClose" class="hidden" aria-label="Đóng highlight">✖</button>
-<div id="exportBar" class="hidden"><span>⬇️ Đang tạo video… <span id="exportPct">0%</span></span><button class="chip" id="exportCancel">✖ Huỷ</button></div>
+<div id="exportBar" class="hidden"><span>⬇️ Đang tạo video <span id="exportPct">0%</span></span><button class="chip" id="exportCancel" aria-label="Huỷ tạo video">✖</button></div>
 
 <div id="dialog" class="overlay dim hidden">
   <div class="panel">
@@ -439,6 +441,7 @@
 <script src="meta.js"></script>
 <script src="draw.js"></script>
 <script src="highlights.js"></script>
+<script src="mp4.js"></script>
 <script src="game.js"></script>
 </body>
 </html>
