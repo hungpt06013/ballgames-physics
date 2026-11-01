@@ -103,6 +103,55 @@
         setTimeout(function () { try { c.s.stop(); } catch (e) { /* already stopped */ } }, 800);
       }
     },
+    // ---- soundtrack of a highlight video ----
+    // log: [{ t, fn, args }] (sound effect fn played at t seconds) and [{ t, crowd: true / false }] (crowd noise on /
+    // off); played into an offline context of `seconds`, whatever the sound settings. Resolves to an AudioBuffer
+    // (48 kHz stereo), or null where offline audio is missing.
+    render: function (log, seconds) {
+      var OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+      if (!OAC || !log) return Promise.resolve(null);
+      var rate = 48000, oac;
+      try { oac = new OAC(2, Math.max(1, Math.ceil(seconds * rate)), rate); } catch (e) { return Promise.resolve(null); }
+      var keep = { ac: this.ac, sfx: this.sfx, nbuf: this.nbuf, last: this.last, quiet: this.quiet, sfxOn: this.sfxOn }, now = 0;
+      // the effects read the time from ac.currentTime: here it is the time of the sound being placed
+      var clockAc = {
+        sampleRate: rate,
+        createOscillator: function () { return oac.createOscillator(); },
+        createGain: function () { return oac.createGain(); },
+        createBufferSource: function () { return oac.createBufferSource(); },
+        createBiquadFilter: function () { return oac.createBiquadFilter(); },
+        createBuffer: function (c, n, r) { return oac.createBuffer(c, n, r); }
+      };
+      Object.defineProperty(clockAc, 'currentTime', { get: function () { return now; } });
+      var out = oac.createGain(); out.gain.value = 0.68; out.connect(oac.destination);
+      this.ac = clockAc; this.sfx = out; this.nbuf = null; this.last = {}; this.quiet = false; this.sfxOn = true;
+      try {
+        var crowdFrom = -1;
+        for (var i = 0; i <= log.length; i++) {
+          var e = log[i];
+          if (!e || e.crowd !== undefined) {
+            var t = e ? e.t : seconds;
+            if (crowdFrom >= 0 && (!e || !e.crowd)) { this.crowdSpan(oac, out, crowdFrom, t); crowdFrom = -1; }
+            if (e && e.crowd && crowdFrom < 0) crowdFrom = e.t;
+            continue;
+          }
+          now = e.t;
+          if (typeof this[e.fn] === 'function') this[e.fn].apply(this, e.args || []);
+        }
+      } finally {
+        for (var k in keep) this[k] = keep[k];
+      }
+      return oac.startRendering();
+    },
+    // the crowd noise of the stands, from t0 to t1 (fading in and out)
+    crowdSpan: function (oac, dest, t0, t1) {
+      if (t1 - t0 < 0.1) return;
+      var s = oac.createBufferSource(); s.buffer = this.noiseBuf(); s.loop = true;
+      var fl = oac.createBiquadFilter(); fl.type = 'bandpass'; fl.frequency.value = 850; fl.Q.value = 0.5;
+      var g = oac.createGain();
+      g.gain.setValueAtTime(0.0001, t0); g.gain.setTargetAtTime(0.035, t0, 0.3); g.gain.setTargetAtTime(0.0001, Math.max(t0, t1 - 0.3), 0.1);
+      s.connect(fl); fl.connect(g); g.connect(dest); s.start(t0); s.stop(t1 + 0.5);
+    },
     // ---- music ----
     setMusic: function (on) {
       this.musicOn = on;
