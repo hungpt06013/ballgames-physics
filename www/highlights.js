@@ -66,7 +66,8 @@
 
   // ---- packing a match's highlight: header JSON + all clip frames, gzip when the platform has it ----
   function pack(hl) {
-    var head = { v: 2, fs: FS, match: hl.match, clips: hl.clips.map(function (c) { var m = Object.assign({}, c); delete m.frames; m.n = c.frames.length; return m; }) };
+    // len: how many 16-bit values of frames the clip has (v2 kept that in n, the number of saves, which it overwrote)
+    var head = { v: 3, fs: FS, match: hl.match, clips: hl.clips.map(function (c) { var m = Object.assign({}, c); delete m.frames; m.len = c.frames.length; return m; }) };
     var json = new TextEncoder().encode(JSON.stringify(head)), pad = json.length % 2;
     var total = 4 + json.length + pad, i;
     for (i = 0; i < hl.clips.length; i++) total += hl.clips[i].frames.byteLength;
@@ -89,7 +90,13 @@
       var head = JSON.parse(new TextDecoder().decode(copy.subarray(4, 4 + len)));
       if (head.fs !== FS) throw new Error('old highlight format');
       var o = 4 + len + (len % 2);
-      head.clips.forEach(function (c) { c.frames = undelta(new Int16Array(copy.buffer, o, c.n)); o += c.n * 2; });
+      head.clips.forEach(function (c) {
+        var len = head.v >= 3 ? c.len : c.n;
+        c.frames = undelta(new Int16Array(copy.buffer, o, len)); o += len * 2;
+        delete c.len;
+        // highlights kept by v2.5–v2.9.1: count the saves (or misses) again from the clip's moments
+        if (head.v < 3) c.n = c.marks.filter(function (m) { return m.kind === (c.kind === 'miss' ? 'miss' : 'save'); }).length || 1;
+      });
       return { match: head.match, clips: head.clips };
     });
   }

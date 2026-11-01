@@ -2,7 +2,7 @@
 import sys
 www = 'www/'
 html = open(www + 'index.html', encoding='utf-8').read()
-for name in ["engine.js", "audio.js", "meta.js", "draw.js", "highlights.js", "game.js"]:
+for name in ["engine.js", "audio.js", "meta.js", "draw.js", "highlights.js", "mp4.js", "game.js"]:
     js = open(www + name, encoding='utf-8').read().replace('</script>', '<\\/script>')
     tag = '<script src="%s"></script>' % name
     assert tag in html
