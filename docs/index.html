@@ -4174,7 +4174,8 @@
 
   // ---------- highlights: saves and clips ----------
   // A save: a real shot (the ball going at least SAVE_PACE, any direction - a lob dropping in counts -, shot at least
-  // SAVE_GAP seconds before) would score for one side within SAVE_LOOK seconds on its own, then a player of the other
+  // SAVE_GAP seconds before) would score for one side within SAVE_LOOK seconds on its own (a lob that would still
+  // bounce once before rolling in counts too), then a player of the other
   // side turns it away, SAVE_CONFIRM seconds later it is still not going in, and
   //  - that player did something: he is in the air after his own jump or dive (button pressed at most SAVE_JUMP
   //    seconds before - not just knocked up), or kicks or heads it with his button pressed at most SAVE_ACTIVE
@@ -4183,18 +4184,20 @@
   // A scramble in front of goal (the ball crawling between players touching it all the time) has no saves.
   // Saves by the same side less than SAVE_CHAIN seconds apart make one bigger save, which is always kept; of the
   // single saves the most dangerous third is kept. Every point, and every round stopped by lightning, is kept too.
-  var SAVE_LOOK = 1, SAVE_CONFIRM = 0.25, SAVE_CHAIN = 3, SAVE_ACTIVE = 0.35, SAVE_JUMP = 1.5, SAVE_PACE = 400, SAVE_GAP = 0.15, CLIP_PRE = 3, CLIP_POST = 1.5;
+  var SAVE_LOOK = 1.6, SAVE_CONFIRM = 0.25, SAVE_CHAIN = 3, SAVE_ACTIVE = 0.35, SAVE_JUMP = 1.5, SAVE_PACE = 400, SAVE_GAP = 0.15, CLIP_PRE = 3, CLIP_POST = 1.5;
   var ZAP_COL = { main: '#ffd23f', dark: '#c4a612' };
-  function newWatch() { return { tick: 0, threat: [null, null], cand: [], group: null, seen: [[-1, -1], [-1, -1]], miss: [] }; }
+  function newWatch() { return { tick: 0, threat: [null, null], cand: [], group: null, flight: [null, null], miss: [] }; }
   function watchSaves(w) {
     var S = G.hlw, A = w.arena, ev = w.events, i;
     if (A.type === 'bomb') return;
-    // a shot hitting the frame (post, bar, rim, board) makes a better miss
-    for (i = 0; i < ev.length; i++) if (ev[i].t === 'post') S.miss.forEach(function (m) { if (w.time >= m.shot && w.time <= m.at + 0.3) m.post = true; });
-    if (++S.tick % 2) return; // 60 looks a second are plenty
+    // near misses follow the ball's real flight, every step; a shot hitting the frame (post, bar, rim, board) makes
+    // a better one
+    for (i = 0; i < ev.length; i++) if (ev[i].t === 'post') S.flight.forEach(function (f) { if (f) f.post = true; });
+    for (i = 0; i < w.balls.length && i < 2; i++) followFlight(w, S, i, w.balls[i]);
+    for (i = S.miss.length - 1; i >= 0; i--) if (w.time >= S.miss[i].at + CLIP_POST) fileMiss(S.miss.splice(i, 1)[0]);
+    if (++S.tick % 2) return; // 60 looks a second are plenty for the saves
     for (var bi = 0; bi < w.balls.length && bi < 2; bi++) {
       var b = w.balls[bi], th = S.threat[bi], fut = E.ballFuture(A, b, SAVE_LOOK);
-      lookForMiss(w, S, bi, b);
       if (fut) {
         var att = fut.team, back = null;
         // going in again: the touch a moment ago saved nothing
@@ -4223,35 +4226,43 @@
     }
     for (i = S.cand.length - 1; i >= 0; i--) if (w.time - S.cand[i].t >= SAVE_CONFIRM) addSave(S.cand.splice(i, 1)[0]);
     if (S.group && w.time - S.group.last > SAVE_CHAIN) closeGroup(true);
-    for (i = S.miss.length - 1; i >= 0; i--) {
-      var m = S.miss[i], mb = w.balls[m.bi], lastTouch = Math.max(mb.touchT[0], mb.touchT[1]);
-      if (w.time <= m.at + 0.05 && lastTouch > m.shot + 0.1) { if (G.dbg) G.dbg.push({ r: 'miss-x', t: w.time, round: G.round, by: m.by }); S.miss.splice(i, 1); } // blocked, or played on, before it got there
-      else if (w.time >= m.at + CLIP_POST) fileMiss(S.miss.splice(i, 1)[0]);
-    }
   }
 
-  // A near miss: a shot (the shooting side's touch sends the ball off at speed) that on its own flight does not go in
-  // but comes very close: within MISS_NEAR ball radii of counting, measured where a small change would have made it
+  // A near miss: a shot (the shooting side's touch sends the ball off at MISS_SPEED or more) whose REAL flight -
+  // followed step by step, from the last touch until the next touch (by anyone) or MISS_LOOK seconds - comes very
+  // close to counting without going in: within MISS_NEAR ball radii, measured where a small change would have made it
   // count (E.scoreGap): just over the bar where it crosses the goal line, off the crossbar, stopping on the line, on
   // the rim, under the bar of the posts or off a post. A ball dropping onto the roof of the goal, or coming up under
-  // the ring, is nowhere near. Nobody may touch it before it gets there; the moment it is closest is the moment shown.
-  // How good a miss it was: how close, hitting the frame, a long shot, a shot in the air, the power. The best fifth of
-  // a match's misses go into its highlight.
-  var MISS_LOOK = 2, MISS_SPEED = 450, MISS_SHARE = 0.2, MISS_NEAR = { goal: 1.9, hoop: 1.5, posts: 1.5 };
-  function lookForMiss(w, S, bi, b) {
-    var A = w.arena, R = A.P.ballR;
-    for (var team = 0; team < 2; team++) {
-      if (b.touchT[team] <= S.seen[bi][team]) continue;
-      S.seen[bi][team] = b.touchT[team];
-      var sp = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
-      if (b.lastTeam !== team || sp < MISS_SPEED || !MISS_NEAR[A.type]) continue;
-      var path = G.dbg ? [] : null, nr = E.ballNear(A, b, MISS_LOOK, team, path);
-      if (nr.score === team || !(nr.gap <= MISS_NEAR[A.type] * R)) continue; // going in, or nowhere near
-      if (G.dbg) G.dbg.push({ r: 'miss?', t: w.time, round: G.round, by: b.lastPid, gap: +(nr.gap / R).toFixed(2), at: +(w.time + nr.t).toFixed(2), path: path, nx: Math.round(nr.x), ny: Math.round(nr.y) });
-      S.miss = S.miss.filter(function (m) { return m.bi !== bi; }); // a newer shot with the same ball replaces it
-      S.miss.push({ bi: bi, team: team, by: b.lastPid, shot: b.touchT[team], at: w.time + nr.t, close: 1 - nr.gap / (MISS_NEAR[A.type] * R),
-        far: Math.abs((team === 0 ? W : 0) - b.x) > 700, air: b.lastAir, sp: sp, post: false });
+  // the ring, is nowhere near. (Not a guess of the flight at the first moment of the kick: a kick pushes the ball for
+  // several steps, and only the real flight counts.) The moment it is closest is the moment shown. How good a miss it
+  // was: how close, hitting the frame, a long shot, a shot in the air, the power. The best fifth of a match's misses
+  // go into its highlight.
+  var MISS_LOOK = 2, MISS_SPEED = 450, MISS_SHARE = 0.2, MISS_NEAR = { goal: 1.9, hoop: 1.5, posts: 1.5 }, MISS_FROM = 0.1, MISS_CUT = 0.15;
+  function followFlight(w, S, bi, b) {
+    var A = w.arena, f = S.flight[bi], last = Math.max(b.touchT[0], b.touchT[1]);
+    if (!MISS_NEAR[A.type]) return;
+    if (f && last > f.shot) { endFlight(w, S, bi, last); f = null; } // touched again: that flight is over
+    if (!f) {
+      if (b.lastTeam < 0 || last < 0 || w.time - last > 0.03) return; // a flight starts right at a touch
+      f = S.flight[bi] = { bi: bi, team: b.lastTeam, by: b.lastPid, shot: last, x0: b.x, air: b.lastAir, sp: 0, gap: Infinity, at: 0, post: false };
     }
+    var age = w.time - f.shot;
+    if (age <= 0.15) f.sp = Math.max(f.sp, Math.sqrt(b.vx * b.vx + b.vy * b.vy)); // its pace once the kick is done
+    if (age > MISS_LOOK) { endFlight(w, S, bi); return; }
+    var toward = f.team === 1 ? -b.vx : b.vx;
+    var g = age >= MISS_FROM && (A.type === 'hoop' || toward > 100) ? E.scoreGap(A, b, f.team) : Infinity;
+    if (g < f.gap) { f.gap = g; f.at = w.time; }
+  }
+  // a flight is over (touched again at time `touch`, or long enough): it was a near miss if it came close enough -
+  // and was not stopped right there (a ball blocked on the line or under the ring was not missed, it was stopped)
+  function endFlight(w, S, bi, touch) {
+    var f = S.flight[bi], A = w.arena, R = A.P.ballR;
+    S.flight[bi] = null;
+    if (!f || f.sp < MISS_SPEED || !(f.gap <= MISS_NEAR[A.type] * R)) return;
+    if (touch !== undefined && touch - f.at < MISS_CUT) { if (G.dbg) G.dbg.push({ r: 'miss-x', t: f.shot, round: G.round, by: f.by, gap: +(f.gap / R).toFixed(2), at: +f.at.toFixed(2) }); return; }
+    if (G.dbg) G.dbg.push({ r: 'miss?', t: f.shot, round: G.round, by: f.by, gap: +(f.gap / R).toFixed(2), at: +f.at.toFixed(2) });
+    S.miss.push({ bi: bi, team: f.team, by: f.by, shot: f.shot, at: f.at, close: 1 - f.gap / (MISS_NEAR[A.type] * R),
+      far: Math.abs((f.team === 0 ? W : 0) - f.x0) > 700, air: f.air, sp: f.sp, post: f.post });
   }
   function fileMiss(m) {
     if (G.dbg) G.dbg.push({ r: 'miss', t: m.at, round: G.round, by: m.by });
@@ -4356,7 +4367,8 @@
     if (!S) return;
     S.cand.forEach(function (c) { if (c.att !== team) addSave(c); }); // a touch just before the ball went in saved nothing
     S.cand = []; S.threat = [null, null];
-    S.miss.forEach(function (m) { if (G.world.time >= m.at) fileMiss(m); }); // one not there yet went in after all
+    S.flight = [null, null]; // (a flight still going went in)
+    S.miss.forEach(function (m) { fileMiss(m); });
     S.miss = [];
     var g = S.group, lost = !!g && team >= 0 && g.def === 1 - team && G.world.time - g.last < SAVE_CHAIN;
     // saves made just before the same side conceded were not enough; one after which the scorers never touched the
@@ -4370,7 +4382,8 @@
   }
   function finishHighlights() {
     if (G.hlw) {
-      G.hlw.miss.forEach(function (m) { if (G.world.time >= m.at) fileMiss(m); });
+      endFlight(G.world, G.hlw, 0); endFlight(G.world, G.hlw, 1);
+      G.hlw.miss.forEach(function (m) { fileMiss(m); });
       closeGroup(true); G.hlw = null;
     }
     var H = G.hlm;

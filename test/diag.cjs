@@ -42,7 +42,7 @@ const CASES = JSON.parse(process.argv[3] || 'null') || [
         D.lastSc = sc; D.lastR = G.round;
         D.pend = D.pend.filter(p => {
           if (w.time < p.due && G.round === p.e.round) return true;
-          p.e.trace = D.tr.filter(f => f.r === p.e.round && f.t >= p.e.t - 3 && f.t <= p.e.t + 1.5);
+          p.e.trace = D.tr.filter(f => f.r === p.e.round && f.t >= p.e.t - 3 && f.t <= Math.max(p.e.t, p.e.at || 0) + 1.5);
           D.out.push(p.e); return false;
         });
       }
