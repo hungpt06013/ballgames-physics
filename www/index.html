@@ -87,6 +87,9 @@
   .seg button.on, .chip.on { background: var(--on-bg); color: var(--on-text); }
   .tools { display: flex; gap: calc(1.6 * var(--u)); margin-top: calc(2 * var(--u)); }
   .tools .btn { flex: 1; font-size: calc(3.6 * var(--u)); padding: calc(1.4 * var(--u)) calc(1 * var(--u)); }
+  .tools.stickyBar { position: sticky; bottom: calc(-3 * var(--u)); z-index: 2; justify-content: center; margin: calc(1.6 * var(--u)) calc(-3.6 * var(--u)) calc(-3 * var(--u));
+    padding: calc(1.2 * var(--u)) calc(3.6 * var(--u)); background: var(--paper); border-top: calc(0.4 * var(--u)) solid var(--line, rgba(0,0,0,0.15)); }
+  .tools.stickyBar .btn { flex: 0 0 auto; font-size: calc(3.1 * var(--u)); padding: calc(0.8 * var(--u)) calc(4 * var(--u)); }
   .sportHead { display: flex; justify-content: space-between; align-items: center; gap: calc(2 * var(--u)); }
   .sportHead small { font-weight: 700; font-size: calc(2.9 * var(--u)); color: var(--muted); }
   .sportHead .chip { font-size: calc(3 * var(--u)); padding: calc(0.6 * var(--u)) calc(1.8 * var(--u)); flex: none; }
@@ -140,8 +143,13 @@
   .card .price { font-size: calc(3 * var(--u)); color: var(--gold-text); }
   .card.owned { background: var(--ok-soft2); } .card.eq { background: var(--ok-strong); outline: calc(0.6 * var(--u)) solid var(--green-d); }
   .card.locked { opacity: 0.6; }
-  .prof { display: grid; grid-template-columns: calc(34 * var(--u)) 1fr; gap: calc(2.4 * var(--u)); }
-  .prof canvas { position: static; width: calc(34 * var(--u)); height: calc(44 * var(--u)); border: calc(0.5 * var(--u)) solid var(--ink); border-radius: calc(3 * var(--u)); background: linear-gradient(#c9f0fc, #e9fbff); }
+  .profTop { margin-top: 0; }
+  .profCards { display: flex; justify-content: center; gap: calc(2 * var(--u)); flex-wrap: wrap; }
+  .pcard { width: calc(34 * var(--u)); display: flex; flex-direction: column; gap: calc(1 * var(--u)); padding: calc(0.8 * var(--u)); border-radius: calc(3.2 * var(--u)); border: calc(0.5 * var(--u)) solid transparent; cursor: pointer; }
+  .profCards.four .pcard { width: calc(26 * var(--u)); }
+  .pcard.on { border-color: var(--ink); background: var(--ok-soft); }
+  .pcard canvas { position: static; width: 100%; aspect-ratio: 2 / 3; height: auto; border: calc(0.5 * var(--u)) solid var(--ink); border-radius: calc(2.4 * var(--u)); background: linear-gradient(#c9f0fc, #e9fbff); }
+  .pcard input.name { font-size: calc(3.4 * var(--u)); padding: calc(0.8 * var(--u)) calc(1.2 * var(--u)); text-align: center; }
   .swatches { display: flex; flex-wrap: wrap; gap: calc(1 * var(--u)); }
   .swatches button { width: calc(6.4 * var(--u)); height: calc(6.4 * var(--u)); border-radius: 50%; border: calc(0.5 * var(--u)) solid var(--ink); cursor: pointer; padding: 0; }
   .swatches button.on { outline: calc(0.8 * var(--u)) solid var(--ink); outline-offset: 2px; }
@@ -177,7 +185,7 @@
   .center { text-align: center; }
   /* highlight player */
   /* inside the top film bar of the highlight, off the pitch */
-  #hlClose { position: fixed; right: max(12px, env(safe-area-inset-right)); top: calc(1 * var(--u)); z-index: 10; }
+  #hlClose { position: fixed; right: max(12px, env(safe-area-inset-right)); top: calc(3.6 * var(--u)); z-index: 10; }
   /* a video being made in the background: a small pill next to the pause button, over every screen */
   #exportBar { position: fixed; left: calc(50% + max(26px, 6.5 * var(--u))); bottom: max(8px, env(safe-area-inset-bottom)); z-index: 25; }
   #hlClose { width: calc(8 * var(--u)); height: calc(8 * var(--u)); min-width: 30px; min-height: 30px; border-radius: 50%; border: calc(0.5 * var(--u)) solid var(--ink);
@@ -263,6 +271,8 @@
     <h2 id="setupTitle">Thiết lập trận</h2>
     <div class="row" id="rowLevel"><span>Độ khó bot</span>
       <div class="seg" id="lvlSeg"><button data-v="easy">Dễ</button><button data-v="normal">Thường</button><button data-v="hard">Khó</button></div></div>
+    <div class="row" id="rowSide"><span>Bạn chơi bên</span>
+      <div class="seg" id="sideSeg"><button data-v="L">◀ Trái (đỏ)</button><button data-v="R">Phải (xanh) ▶</button></div></div>
     <div class="row" id="rowSlots"><span>Ai điều khiển?</span><div class="slots" id="slotBtns"></div></div>
     <div class="row"><span>Thể thức</span>
       <div class="fmt">
@@ -312,9 +322,9 @@
     <p><b>8 môn</b>: bóng đá, bóng rổ, bóng bầu dục, bóng chuyền, bóng đá Mặt Trăng, sân băng, bóng khổng lồ, <b>bóng bom</b> (bom nổ bên sân ai thì người đó thua). Chọn môn muốn chơi khi vào trận; chọn nhiều môn thì sau mỗi điểm đổi sang môn khác. Bóng kẹt ngoài biên (sau khung thành, sau cột rổ, sau cột bầu dục) 3 giây, hoặc nằm im 15 giây không ai chạm, thì được thả lại giữa sân (game báo trước 3 giây).</p>
     <p><b>Vật phẩm</b> rơi từ trời: 🔥 siêu sút · 🛡️ khiên chắn khung thành · 🧲 nam châm hút bóng · ❄️ đóng băng đối thủ · 🍄 phóng to. <b>Biến thể</b> mỗi ván: 2 quả bóng, người khổng lồ/tí hon, sàn bật nhún, xà ngang di động, bóng siêu nảy, trọng lực thấp, quay chậm. Khi vào trận tích chọn những vật phẩm / biến thể muốn có.</p>
     <p><b>Thời tiết &amp; thiên tai</b>: 🌫️ sương mù (cứ 5–10 giây lại mờ đi) · 🏚️ động đất (8–15 giây một lần, rung 10 giây, mọi người lắc lư) · ⚡ sấm sét (đánh xuống đất thì đất thành hố 5 giây; trúng người thì người đó cháy đen, đứng im 5 giây; trúng bóng thì 5 giây sau dừng ván, không ai được điểm và phát lại cú sét; trúng bom thì bom nổ luôn, không ai được điểm) · 🌪️ lốc xoáy (hút mọi thứ trong ¼ sân lên cao và xoay). Thường mỗi lúc chỉ có một hiện tượng; hiếm khi có 2, 3 hay cả 4 cùng lúc.</p>
-    <p><b>2 người:</b> chạm nửa trái (Đỏ) / nửa phải (Xanh). <b>4 người:</b> mỗi người 1 góc — P1 dưới trái, P2 trên trái, P3 dưới phải, P4 trên phải; chỗ trống có thể để bot. Chế độ <b>4 người</b>: ai ghi bàn người đó +1 (khung thành mang màu người sẽ được điểm). <b>2 vs 2</b>: cả đội +1. Sau mỗi ván người đứng trước/sau đổi chỗ.</p>
+    <p><b>Đấu bot:</b> chạm chỗ nào trên màn hình cũng được; chọn chơi bên trái (Đỏ) hay bên phải (Xanh) khi thiết lập trận. <b>2 người:</b> chạm nửa trái (Đỏ) / nửa phải (Xanh). <b>4 người:</b> mỗi người 1 góc — P1 dưới trái, P2 trên trái, P3 dưới phải, P4 trên phải; chỗ trống có thể để bot. Chế độ <b>4 người</b>: ai ghi bàn người đó +1 (khung thành mang màu người sẽ được điểm). <b>2 vs 2</b>: cả đội +1. Sau mỗi ván người đứng trước/sau đổi chỗ.</p>
     <p><b>Tính giờ:</b> hết giờ mà đang hoà thì mỗi người chơi chọn <b>🤝 hoà</b> hay <b>⭐ bàn thắng vàng</b> (ai ghi trước thắng); số người chọn bàn vàng nhiều hơn hoặc bằng số người chọn hoà thì đá tiếp, không thì trận đấu kết thúc với tỉ số hoà.</p>
-    <p><b>Sau mỗi trận</b>: bảng thống kê từng người (⚽ bàn thắng · 🧤 cứu thua · 🎯 sút trúng đích · 👟 chạm bóng · ⭐ điểm) và <b>🏅 MVP</b>; <b>🎬 highlight</b> gồm mọi bàn thắng, những pha cứu thua hay nhất và những pha suýt vào đẹp nhất (có quay chậm), xem ngay hoặc <b>⬇️ tải về</b> thành video. Mọi trận đã đấu nằm trong <b>📜 Lịch sử</b> (lọc theo chế độ, mức bot, kết quả, môn; xoá highlight để giải phóng bộ nhớ).</p>
+    <p><b>Sau mỗi trận</b>: bảng thống kê từng người (⚽ bàn thắng · 🧤 cứu thua · 🎯 sút trúng đích · 👟 chạm bóng · ⭐ điểm) và <b>🏅 MVP</b>; <b>🎬 highlight</b> gồm mọi bàn thắng, những pha cứu thua hay nhất (chỉ tính khi người chặn thật sự sút, đánh đầu hay bay người ở nửa sân nhà) và những pha suýt vào đẹp nhất (dội xà, sát xà, chạm vành…; có quay chậm); tên hai bên hiện trên tỉ số, xem ngay hoặc <b>⬇️ tải về</b> thành video. Mọi trận đã đấu nằm trong <b>📜 Lịch sử</b> (lọc theo chế độ, mức bot, kết quả, môn; xoá highlight để giải phóng bộ nhớ).</p>
     <p>Máy tính: Đỏ <kbd>A</kbd> <kbd>W</kbd> <kbd>Space</kbd> · Xanh <kbd>L</kbd> <kbd>↑</kbd> <kbd>Enter</kbd> · 4 người: <kbd>A</kbd> / <kbd>G</kbd> / <kbd>K</kbd> / <kbd>↑</kbd> · <kbd>Esc</kbd> tạm dừng.</p>
     <div class="tools"><button class="btn green" data-act="back">✔ Đã hiểu</button></div>
   </div>
@@ -332,19 +342,17 @@
 
 <div id="profiles" class="overlay dim hidden">
   <div class="panel wide">
-    <h2>👤 Người chơi</h2>
-    <div class="tabs" id="profTabs"></div>
-    <div class="prof">
-      <canvas id="profCanvas" width="340" height="440"></canvas>
-      <div>
-        <div class="sub" style="margin-top:0">Tên</div>
-        <input class="name" id="profName" maxlength="10" autocomplete="off">
-        <div class="sub">Màu áo (chế độ 4 người)</div>
-        <div class="swatches" id="profColors"></div>
-        <div class="sub">Mũ · Tóc · Áo (mua thêm ở 🛒)</div>
-        <div class="chips" id="profItems"></div>
-      </div>
+    <h2>👤 Người chơi · Trang phục</h2>
+    <div class="row profTop">
+      <div class="seg" id="profMode"><button data-v="2">👥 Chơi 2 người</button><button data-v="4">🙋 Chơi 4 người</button></div>
+      <div class="seg" id="profFour"><button data-v="team4">🤝 2 vs 2</button><button data-v="ffa">🙋 Mỗi người 1 đội</button></div>
     </div>
+    <!-- one tall card per player: how he looks in a match (kit, number, name), his name under it; tap one to dress him -->
+    <div class="profCards" id="profCards"></div>
+    <div class="sub" id="profFor"></div>
+    <div id="profColorBox"><div class="sub">Màu áo khi mỗi người 1 đội</div><div class="swatches" id="profColors"></div></div>
+    <div class="sub">Mũ · Tóc · Áo (mua thêm ở 🛒)</div>
+    <div class="chips" id="profItems"></div>
     <div class="tools"><button class="btn" data-act="shop">🛒 Cửa hàng</button><button class="btn green" data-act="back">✔ Xong</button></div>
   </div>
 </div>
@@ -405,7 +413,8 @@
       <button class="btn red hidden" id="hDelSel">🗑️ Xoá highlight đã chọn</button>
     </div>
     <div id="hList"></div>
-    <div class="tools"><button class="btn green" data-act="back">✔ Xong</button></div>
+    <!-- always at the bottom of the panel, however long the list -->
+    <div class="tools stickyBar"><button class="btn green" data-act="back">✔ Xong</button></div>
   </div>
 </div>
 

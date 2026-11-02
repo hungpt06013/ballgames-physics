@@ -1028,6 +1028,71 @@
     return null;
   }
 
+  // How far the ball (centre) is from counting as a point for `team` right now, in px (0 = it would count). Measured
+  // where a small change would have made it count, never after it has gone past (a ball dropping onto the roof of
+  // the goal, or rising into the ring from below, is not close):
+  //  goal  - over the bar: its height above the bar where it crosses the goal line (or in front of the line);
+  //          under the bar: how far it is from being all over the line (a ball rolling to a stop on it);
+  //          off the end of the crossbar: one ball radius
+  //  hoop  - coming down at the rim's height: how far in front of the rim (behind the board never counts)
+  //  posts - under the bar: how far under it where it crosses the post line; off a post: from the post
+  // (uses prevX / prevY: the position one step before)
+  function scoreGap(A, b, team) {
+    var R = A.P.ballR, x = team === 1 ? b.x : W - b.x, px = team === 1 ? b.prevX : W - b.prevX, d, pd, top;
+    switch (A.type) {
+      case 'goal':
+        d = x - A.goalD; pd = px - A.goalD; top = A.goalTop + 4; // d > 0: in front of the goal line
+        var cy = b.y - A.goalTop;
+        if (d * d + cy * cy <= (R + 10) * (R + 10)) return R;
+        if (b.y > top) return d > 2 * R || d < -R ? Infinity : Math.max(0, d + R);
+        if (d >= 0) return d > 2 * R ? Infinity : Math.sqrt(d * d + (top - b.y) * (top - b.y));
+        if (pd < 0) return Infinity; // over the roof
+        return Math.max(0, top - (b.prevY + (b.y - b.prevY) * pd / (pd - d)));
+      case 'hoop':
+        if (b.vy <= 0 || x < A.boardX || b.prevY > A.rimY) return Infinity;
+        d = Math.max(0, x - A.rimFront);
+        var up = Math.max(0, A.rimY - b.y);
+        return Math.sqrt(d * d + up * up);
+      case 'posts':
+        d = x - A.postX; pd = px - A.postX; top = A.barY - 4;
+        if (d >= 0) return d > 2 * R ? Infinity : Math.sqrt(d * d + Math.pow(Math.max(0, b.y - top), 2));
+        if (pd < 0) return Infinity; // gone past
+        return Math.max(0, b.prevY + (b.y - b.prevY) * pd / (pd - d) - top);
+    }
+    return Infinity;
+  }
+  // The ball's own flight (as ballFuture) for `seconds`: whether it scores, and how close it comes to scoring for
+  // `team` - { score: team or -1, gap: closest distance in px, t: when, x, y: where }. Not in the first 0.1 s (a ball
+  // touched while it lies against the bar was not shot at the bar); and if the closest moment comes after `seconds`
+  // (the flight is followed a little longer), the ball was still on its way: not known, no gap.
+  var NEAR_MORE = 0.6, NEAR_FROM = 0.1;
+  function ballNear(A, b, seconds, team, path) {
+    var best = { score: -1, gap: Infinity, t: 0, x: b.x, y: b.y };
+    if (A.type === 'bomb' || A.type === 'volley') return best;
+    fb.x = b.x; fb.y = b.y; fb.vx = b.vx; fb.vy = b.vy; fb.ang = b.ang; fb.spin = b.spin;
+    var P = A.P, n = Math.round((seconds + NEAR_MORE) / DT), k0 = Math.round(NEAR_FROM / DT), drag;
+    for (var k = 0; k < n; k++) {
+      fb.prevX = fb.x; fb.prevY = fb.y;
+      fb.vy += P.gBall * DT;
+      drag = 1 - P.ballDrag * DT;
+      fb.vx *= drag; fb.vy *= drag;
+      fb.x += fb.vx * DT; fb.y += fb.vy * DT;
+      fb.ang += fb.spin * DT;
+      fb.touchGround = false;
+      ballStatic(A, fb, null, true, null);
+      var sc = checkScore(A, fb);
+      if (sc >= 0) { best.score = sc; if (sc === team) { best.gap = 0; best.t = k * DT; best.x = fb.x; best.y = fb.y; } return best; }
+      // (goals and posts: only while the ball is still heading for them)
+      var toward = team === 1 ? -fb.vx : fb.vx;
+      var g = k >= k0 && (A.type === 'hoop' || toward > 100) ? scoreGap(A, fb, team) : Infinity;
+      if (path && k % 4 === 0) path.push(Math.round(fb.x), Math.round(fb.y)); // (for the tests: where it would fly)
+      if (g < best.gap) { best.gap = g; best.t = k * DT; best.x = fb.x; best.y = fb.y; }
+      if (fb.touchGround && Math.abs(fb.vy) < 1 && Math.abs(fb.vx) < 20) break;
+    }
+    if (best.t > seconds) best.gap = Infinity;
+    return best;
+  }
+
   // ---- bot ----
   // candidates: [delay, duration] of a button press relative to now; [-1, 0] = don't press
   var LEVELS = {
@@ -1205,7 +1270,7 @@
     startQuake: startQuake, startTornado: startTornado, strike: strike, quakeLevel: quakeLevel, torPull: torPull,
     groundAt: groundAt, craterDepth: craterDepth, isBicycle: isBicycle,
     buildArena: buildArena, createWorld: createWorld, resetRound: resetRound, step: step, stepPlayers: stepPlayers,
-    shapes: shapes, setScale: setScale, copyWorld: copyWorld, emptyWorld: emptyWorld, ballFuture: ballFuture,
+    shapes: shapes, setScale: setScale, copyWorld: copyWorld, emptyWorld: emptyWorld, ballFuture: ballFuture, ballNear: ballNear, scoreGap: scoreGap,
     Bot: Bot
   };
 });

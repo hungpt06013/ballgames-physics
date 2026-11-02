@@ -87,6 +87,9 @@
   .seg button.on, .chip.on { background: var(--on-bg); color: var(--on-text); }
   .tools { display: flex; gap: calc(1.6 * var(--u)); margin-top: calc(2 * var(--u)); }
   .tools .btn { flex: 1; font-size: calc(3.6 * var(--u)); padding: calc(1.4 * var(--u)) calc(1 * var(--u)); }
+  .tools.stickyBar { position: sticky; bottom: calc(-3 * var(--u)); z-index: 2; justify-content: center; margin: calc(1.6 * var(--u)) calc(-3.6 * var(--u)) calc(-3 * var(--u));
+    padding: calc(1.2 * var(--u)) calc(3.6 * var(--u)); background: var(--paper); border-top: calc(0.4 * var(--u)) solid var(--line, rgba(0,0,0,0.15)); }
+  .tools.stickyBar .btn { flex: 0 0 auto; font-size: calc(3.1 * var(--u)); padding: calc(0.8 * var(--u)) calc(4 * var(--u)); }
   .sportHead { display: flex; justify-content: space-between; align-items: center; gap: calc(2 * var(--u)); }
   .sportHead small { font-weight: 700; font-size: calc(2.9 * var(--u)); color: var(--muted); }
   .sportHead .chip { font-size: calc(3 * var(--u)); padding: calc(0.6 * var(--u)) calc(1.8 * var(--u)); flex: none; }
@@ -140,8 +143,13 @@
   .card .price { font-size: calc(3 * var(--u)); color: var(--gold-text); }
   .card.owned { background: var(--ok-soft2); } .card.eq { background: var(--ok-strong); outline: calc(0.6 * var(--u)) solid var(--green-d); }
   .card.locked { opacity: 0.6; }
-  .prof { display: grid; grid-template-columns: calc(34 * var(--u)) 1fr; gap: calc(2.4 * var(--u)); }
-  .prof canvas { position: static; width: calc(34 * var(--u)); height: calc(44 * var(--u)); border: calc(0.5 * var(--u)) solid var(--ink); border-radius: calc(3 * var(--u)); background: linear-gradient(#c9f0fc, #e9fbff); }
+  .profTop { margin-top: 0; }
+  .profCards { display: flex; justify-content: center; gap: calc(2 * var(--u)); flex-wrap: wrap; }
+  .pcard { width: calc(34 * var(--u)); display: flex; flex-direction: column; gap: calc(1 * var(--u)); padding: calc(0.8 * var(--u)); border-radius: calc(3.2 * var(--u)); border: calc(0.5 * var(--u)) solid transparent; cursor: pointer; }
+  .profCards.four .pcard { width: calc(26 * var(--u)); }
+  .pcard.on { border-color: var(--ink); background: var(--ok-soft); }
+  .pcard canvas { position: static; width: 100%; aspect-ratio: 2 / 3; height: auto; border: calc(0.5 * var(--u)) solid var(--ink); border-radius: calc(2.4 * var(--u)); background: linear-gradient(#c9f0fc, #e9fbff); }
+  .pcard input.name { font-size: calc(3.4 * var(--u)); padding: calc(0.8 * var(--u)) calc(1.2 * var(--u)); text-align: center; }
   .swatches { display: flex; flex-wrap: wrap; gap: calc(1 * var(--u)); }
   .swatches button { width: calc(6.4 * var(--u)); height: calc(6.4 * var(--u)); border-radius: 50%; border: calc(0.5 * var(--u)) solid var(--ink); cursor: pointer; padding: 0; }
   .swatches button.on { outline: calc(0.8 * var(--u)) solid var(--ink); outline-offset: 2px; }
@@ -177,7 +185,7 @@
   .center { text-align: center; }
   /* highlight player */
   /* inside the top film bar of the highlight, off the pitch */
-  #hlClose { position: fixed; right: max(12px, env(safe-area-inset-right)); top: calc(1 * var(--u)); z-index: 10; }
+  #hlClose { position: fixed; right: max(12px, env(safe-area-inset-right)); top: calc(3.6 * var(--u)); z-index: 10; }
   /* a video being made in the background: a small pill next to the pause button, over every screen */
   #exportBar { position: fixed; left: calc(50% + max(26px, 6.5 * var(--u))); bottom: max(8px, env(safe-area-inset-bottom)); z-index: 25; }
   #hlClose { width: calc(8 * var(--u)); height: calc(8 * var(--u)); min-width: 30px; min-height: 30px; border-radius: 50%; border: calc(0.5 * var(--u)) solid var(--ink);
@@ -263,6 +271,8 @@
     <h2 id="setupTitle">Thiết lập trận</h2>
     <div class="row" id="rowLevel"><span>Độ khó bot</span>
       <div class="seg" id="lvlSeg"><button data-v="easy">Dễ</button><button data-v="normal">Thường</button><button data-v="hard">Khó</button></div></div>
+    <div class="row" id="rowSide"><span>Bạn chơi bên</span>
+      <div class="seg" id="sideSeg"><button data-v="L">◀ Trái (đỏ)</button><button data-v="R">Phải (xanh) ▶</button></div></div>
     <div class="row" id="rowSlots"><span>Ai điều khiển?</span><div class="slots" id="slotBtns"></div></div>
     <div class="row"><span>Thể thức</span>
       <div class="fmt">
@@ -312,9 +322,9 @@
     <p><b>8 môn</b>: bóng đá, bóng rổ, bóng bầu dục, bóng chuyền, bóng đá Mặt Trăng, sân băng, bóng khổng lồ, <b>bóng bom</b> (bom nổ bên sân ai thì người đó thua). Chọn môn muốn chơi khi vào trận; chọn nhiều môn thì sau mỗi điểm đổi sang môn khác. Bóng kẹt ngoài biên (sau khung thành, sau cột rổ, sau cột bầu dục) 3 giây, hoặc nằm im 15 giây không ai chạm, thì được thả lại giữa sân (game báo trước 3 giây).</p>
     <p><b>Vật phẩm</b> rơi từ trời: 🔥 siêu sút · 🛡️ khiên chắn khung thành · 🧲 nam châm hút bóng · ❄️ đóng băng đối thủ · 🍄 phóng to. <b>Biến thể</b> mỗi ván: 2 quả bóng, người khổng lồ/tí hon, sàn bật nhún, xà ngang di động, bóng siêu nảy, trọng lực thấp, quay chậm. Khi vào trận tích chọn những vật phẩm / biến thể muốn có.</p>
     <p><b>Thời tiết &amp; thiên tai</b>: 🌫️ sương mù (cứ 5–10 giây lại mờ đi) · 🏚️ động đất (8–15 giây một lần, rung 10 giây, mọi người lắc lư) · ⚡ sấm sét (đánh xuống đất thì đất thành hố 5 giây; trúng người thì người đó cháy đen, đứng im 5 giây; trúng bóng thì 5 giây sau dừng ván, không ai được điểm và phát lại cú sét; trúng bom thì bom nổ luôn, không ai được điểm) · 🌪️ lốc xoáy (hút mọi thứ trong ¼ sân lên cao và xoay). Thường mỗi lúc chỉ có một hiện tượng; hiếm khi có 2, 3 hay cả 4 cùng lúc.</p>
-    <p><b>2 người:</b> chạm nửa trái (Đỏ) / nửa phải (Xanh). <b>4 người:</b> mỗi người 1 góc — P1 dưới trái, P2 trên trái, P3 dưới phải, P4 trên phải; chỗ trống có thể để bot. Chế độ <b>4 người</b>: ai ghi bàn người đó +1 (khung thành mang màu người sẽ được điểm). <b>2 vs 2</b>: cả đội +1. Sau mỗi ván người đứng trước/sau đổi chỗ.</p>
+    <p><b>Đấu bot:</b> chạm chỗ nào trên màn hình cũng được; chọn chơi bên trái (Đỏ) hay bên phải (Xanh) khi thiết lập trận. <b>2 người:</b> chạm nửa trái (Đỏ) / nửa phải (Xanh). <b>4 người:</b> mỗi người 1 góc — P1 dưới trái, P2 trên trái, P3 dưới phải, P4 trên phải; chỗ trống có thể để bot. Chế độ <b>4 người</b>: ai ghi bàn người đó +1 (khung thành mang màu người sẽ được điểm). <b>2 vs 2</b>: cả đội +1. Sau mỗi ván người đứng trước/sau đổi chỗ.</p>
     <p><b>Tính giờ:</b> hết giờ mà đang hoà thì mỗi người chơi chọn <b>🤝 hoà</b> hay <b>⭐ bàn thắng vàng</b> (ai ghi trước thắng); số người chọn bàn vàng nhiều hơn hoặc bằng số người chọn hoà thì đá tiếp, không thì trận đấu kết thúc với tỉ số hoà.</p>
-    <p><b>Sau mỗi trận</b>: bảng thống kê từng người (⚽ bàn thắng · 🧤 cứu thua · 🎯 sút trúng đích · 👟 chạm bóng · ⭐ điểm) và <b>🏅 MVP</b>; <b>🎬 highlight</b> gồm mọi bàn thắng, những pha cứu thua hay nhất và những pha suýt vào đẹp nhất (có quay chậm), xem ngay hoặc <b>⬇️ tải về</b> thành video. Mọi trận đã đấu nằm trong <b>📜 Lịch sử</b> (lọc theo chế độ, mức bot, kết quả, môn; xoá highlight để giải phóng bộ nhớ).</p>
+    <p><b>Sau mỗi trận</b>: bảng thống kê từng người (⚽ bàn thắng · 🧤 cứu thua · 🎯 sút trúng đích · 👟 chạm bóng · ⭐ điểm) và <b>🏅 MVP</b>; <b>🎬 highlight</b> gồm mọi bàn thắng, những pha cứu thua hay nhất (chỉ tính khi người chặn thật sự sút, đánh đầu hay bay người ở nửa sân nhà) và những pha suýt vào đẹp nhất (dội xà, sát xà, chạm vành…; có quay chậm); tên hai bên hiện trên tỉ số, xem ngay hoặc <b>⬇️ tải về</b> thành video. Mọi trận đã đấu nằm trong <b>📜 Lịch sử</b> (lọc theo chế độ, mức bot, kết quả, môn; xoá highlight để giải phóng bộ nhớ).</p>
     <p>Máy tính: Đỏ <kbd>A</kbd> <kbd>W</kbd> <kbd>Space</kbd> · Xanh <kbd>L</kbd> <kbd>↑</kbd> <kbd>Enter</kbd> · 4 người: <kbd>A</kbd> / <kbd>G</kbd> / <kbd>K</kbd> / <kbd>↑</kbd> · <kbd>Esc</kbd> tạm dừng.</p>
     <div class="tools"><button class="btn green" data-act="back">✔ Đã hiểu</button></div>
   </div>
@@ -332,19 +342,17 @@
 
 <div id="profiles" class="overlay dim hidden">
   <div class="panel wide">
-    <h2>👤 Người chơi</h2>
-    <div class="tabs" id="profTabs"></div>
-    <div class="prof">
-      <canvas id="profCanvas" width="340" height="440"></canvas>
-      <div>
-        <div class="sub" style="margin-top:0">Tên</div>
-        <input class="name" id="profName" maxlength="10" autocomplete="off">
-        <div class="sub">Màu áo (chế độ 4 người)</div>
-        <div class="swatches" id="profColors"></div>
-        <div class="sub">Mũ · Tóc · Áo (mua thêm ở 🛒)</div>
-        <div class="chips" id="profItems"></div>
-      </div>
+    <h2>👤 Người chơi · Trang phục</h2>
+    <div class="row profTop">
+      <div class="seg" id="profMode"><button data-v="2">👥 Chơi 2 người</button><button data-v="4">🙋 Chơi 4 người</button></div>
+      <div class="seg" id="profFour"><button data-v="team4">🤝 2 vs 2</button><button data-v="ffa">🙋 Mỗi người 1 đội</button></div>
     </div>
+    <!-- one tall card per player: how he looks in a match (kit, number, name), his name under it; tap one to dress him -->
+    <div class="profCards" id="profCards"></div>
+    <div class="sub" id="profFor"></div>
+    <div id="profColorBox"><div class="sub">Màu áo khi mỗi người 1 đội</div><div class="swatches" id="profColors"></div></div>
+    <div class="sub">Mũ · Tóc · Áo (mua thêm ở 🛒)</div>
+    <div class="chips" id="profItems"></div>
     <div class="tools"><button class="btn" data-act="shop">🛒 Cửa hàng</button><button class="btn green" data-act="back">✔ Xong</button></div>
   </div>
 </div>
@@ -405,7 +413,8 @@
       <button class="btn red hidden" id="hDelSel">🗑️ Xoá highlight đã chọn</button>
     </div>
     <div id="hList"></div>
-    <div class="tools"><button class="btn green" data-act="back">✔ Xong</button></div>
+    <!-- always at the bottom of the panel, however long the list -->
+    <div class="tools stickyBar"><button class="btn green" data-act="back">✔ Xong</button></div>
   </div>
 </div>
 
@@ -1467,6 +1476,71 @@
     return null;
   }
 
+  // How far the ball (centre) is from counting as a point for `team` right now, in px (0 = it would count). Measured
+  // where a small change would have made it count, never after it has gone past (a ball dropping onto the roof of
+  // the goal, or rising into the ring from below, is not close):
+  //  goal  - over the bar: its height above the bar where it crosses the goal line (or in front of the line);
+  //          under the bar: how far it is from being all over the line (a ball rolling to a stop on it);
+  //          off the end of the crossbar: one ball radius
+  //  hoop  - coming down at the rim's height: how far in front of the rim (behind the board never counts)
+  //  posts - under the bar: how far under it where it crosses the post line; off a post: from the post
+  // (uses prevX / prevY: the position one step before)
+  function scoreGap(A, b, team) {
+    var R = A.P.ballR, x = team === 1 ? b.x : W - b.x, px = team === 1 ? b.prevX : W - b.prevX, d, pd, top;
+    switch (A.type) {
+      case 'goal':
+        d = x - A.goalD; pd = px - A.goalD; top = A.goalTop + 4; // d > 0: in front of the goal line
+        var cy = b.y - A.goalTop;
+        if (d * d + cy * cy <= (R + 10) * (R + 10)) return R;
+        if (b.y > top) return d > 2 * R || d < -R ? Infinity : Math.max(0, d + R);
+        if (d >= 0) return d > 2 * R ? Infinity : Math.sqrt(d * d + (top - b.y) * (top - b.y));
+        if (pd < 0) return Infinity; // over the roof
+        return Math.max(0, top - (b.prevY + (b.y - b.prevY) * pd / (pd - d)));
+      case 'hoop':
+        if (b.vy <= 0 || x < A.boardX || b.prevY > A.rimY) return Infinity;
+        d = Math.max(0, x - A.rimFront);
+        var up = Math.max(0, A.rimY - b.y);
+        return Math.sqrt(d * d + up * up);
+      case 'posts':
+        d = x - A.postX; pd = px - A.postX; top = A.barY - 4;
+        if (d >= 0) return d > 2 * R ? Infinity : Math.sqrt(d * d + Math.pow(Math.max(0, b.y - top), 2));
+        if (pd < 0) return Infinity; // gone past
+        return Math.max(0, b.prevY + (b.y - b.prevY) * pd / (pd - d) - top);
+    }
+    return Infinity;
+  }
+  // The ball's own flight (as ballFuture) for `seconds`: whether it scores, and how close it comes to scoring for
+  // `team` - { score: team or -1, gap: closest distance in px, t: when, x, y: where }. Not in the first 0.1 s (a ball
+  // touched while it lies against the bar was not shot at the bar); and if the closest moment comes after `seconds`
+  // (the flight is followed a little longer), the ball was still on its way: not known, no gap.
+  var NEAR_MORE = 0.6, NEAR_FROM = 0.1;
+  function ballNear(A, b, seconds, team, path) {
+    var best = { score: -1, gap: Infinity, t: 0, x: b.x, y: b.y };
+    if (A.type === 'bomb' || A.type === 'volley') return best;
+    fb.x = b.x; fb.y = b.y; fb.vx = b.vx; fb.vy = b.vy; fb.ang = b.ang; fb.spin = b.spin;
+    var P = A.P, n = Math.round((seconds + NEAR_MORE) / DT), k0 = Math.round(NEAR_FROM / DT), drag;
+    for (var k = 0; k < n; k++) {
+      fb.prevX = fb.x; fb.prevY = fb.y;
+      fb.vy += P.gBall * DT;
+      drag = 1 - P.ballDrag * DT;
+      fb.vx *= drag; fb.vy *= drag;
+      fb.x += fb.vx * DT; fb.y += fb.vy * DT;
+      fb.ang += fb.spin * DT;
+      fb.touchGround = false;
+      ballStatic(A, fb, null, true, null);
+      var sc = checkScore(A, fb);
+      if (sc >= 0) { best.score = sc; if (sc === team) { best.gap = 0; best.t = k * DT; best.x = fb.x; best.y = fb.y; } return best; }
+      // (goals and posts: only while the ball is still heading for them)
+      var toward = team === 1 ? -fb.vx : fb.vx;
+      var g = k >= k0 && (A.type === 'hoop' || toward > 100) ? scoreGap(A, fb, team) : Infinity;
+      if (path && k % 4 === 0) path.push(Math.round(fb.x), Math.round(fb.y)); // (for the tests: where it would fly)
+      if (g < best.gap) { best.gap = g; best.t = k * DT; best.x = fb.x; best.y = fb.y; }
+      if (fb.touchGround && Math.abs(fb.vy) < 1 && Math.abs(fb.vx) < 20) break;
+    }
+    if (best.t > seconds) best.gap = Infinity;
+    return best;
+  }
+
   // ---- bot ----
   // candidates: [delay, duration] of a button press relative to now; [-1, 0] = don't press
   var LEVELS = {
@@ -1644,7 +1718,7 @@
     startQuake: startQuake, startTornado: startTornado, strike: strike, quakeLevel: quakeLevel, torPull: torPull,
     groundAt: groundAt, craterDepth: craterDepth, isBicycle: isBicycle,
     buildArena: buildArena, createWorld: createWorld, resetRound: resetRound, step: step, stepPlayers: stepPlayers,
-    shapes: shapes, setScale: setScale, copyWorld: copyWorld, emptyWorld: emptyWorld, ballFuture: ballFuture,
+    shapes: shapes, setScale: setScale, copyWorld: copyWorld, emptyWorld: emptyWorld, ballFuture: ballFuture, ballNear: ballNear, scoreGap: scoreGap,
     Bot: Bot
   };
 });
@@ -3029,7 +3103,7 @@
   var prefs = Object.assign({ level: 'hard', fmtType: 'p', fmtPoints: 5, fmtMinutes: 2, bombTime: 12,
     mods: true, modList: MOD_IDS.slice(), items: true, itemList: ITEM_IDS.slice(), weather: false, wxList: WX_IDS.slice(), beginner: false,
     slots: ['h', 'h', 'h', 'h'], replay: true, music: true, sound: true, maps: ALL_MAPS.slice(),
-    hlAsked: false, hlMode: 'all', hlKeep: 30 }, load('prefs', {}));
+    hlAsked: false, hlMode: 'all', hlKeep: 30, side: 'L' }, load('prefs', {}));
   // older versions stored the format as 'p5' / 't120'
   if (typeof prefs.target === 'number' && !prefs.fmt) prefs.fmt = 'p' + prefs.target;
   if (typeof prefs.fmt === 'string') {
@@ -3070,7 +3144,7 @@
 
   // ---------- game state ----------
   var G = {
-    state: 'menu', prev: 'play', mode: 'bot', cfg: null, score: [0, 0], world: null, bot: null, bots: [null, null, null, null],
+    state: 'menu', prev: 'play', mode: 'bot', me: 0, cfg: null, score: [0, 0], world: null, bot: null, bots: [null, null, null, null],
     demo: true, demoCtl: null, demoNext: 0, queue: [], qi: 0, timer: 0, fade: 0, fadeDir: 0, scorer: -1, credit: -1,
     shake: 0, acc: 0, trails: [[], []], parts: [], armT: [0, 0, 0, 0], pressed: [false, false, false, false], round: 0,
     note: '', noteT: 0, botMs: 0, botWin: 0, perfUpd: 0, perfRen: 0, excite: 0, clock: 0, golden: false, roundT: 0,
@@ -3203,6 +3277,8 @@
   function refreshSetup() {
     var four = is4(setupMode), anyBot = setupMode === 'bot' || (four && prefs.slots.indexOf('b') >= 0);
     $('rowLevel').classList.toggle('hidden', !anyBot);
+    $('rowSide').classList.toggle('hidden', setupMode !== 'bot');
+    segSelect('sideSeg', prefs.side);
     segSelect('lvlSeg', prefs.level); segSelect('fmtType', prefs.fmtType);
     var fv = $('fmtValue'), pts = prefs.fmtType === 'p';
     fv.min = pts ? 1 : 0.5; fv.max = pts ? 99 : 60; fv.step = pts ? 1 : 0.5;
@@ -3276,6 +3352,7 @@
   $('bombTime').addEventListener('input', function () { readBomb(false); });
   $('bombTime').addEventListener('change', function () { readBomb(true); });
   $('fmtType').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; prefs.fmtType = b.dataset.v; savePrefs(); Snd.click(); refreshSetup(); });
+  $('sideSeg').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; prefs.side = b.dataset.v; savePrefs(); Snd.click(); refreshSetup(); });
   $('lvlSeg').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; prefs.level = b.dataset.v; savePrefs(); Snd.click(); refreshSetup(); });
   $('tgMods').addEventListener('click', function () { prefs.mods = !prefs.mods; savePrefs(); Snd.click(); refreshSetup(); });
   $('tgItems').addEventListener('click', function () { prefs.items = !prefs.items; savePrefs(); Snd.click(); refreshSetup(); });
@@ -3364,21 +3441,44 @@
     });
   }
 
-  // --- player profiles ---
-  var profSlot = 0;
+  // --- player profiles: how each player looks in a match ---
+  // "2 người": P1 and P2, each a whole side (two bodies in the side's kit, the name beside the score);
+  // "4 người": P1-P4, one body each with the name tag over the head, in the 2 vs 2 kits or each in his own colour.
+  // Every card is a small tall picture of the match look; tap one to dress that player.
+  var profSlot = 0, profPlayers = 2, profFour = 'team4', previewP = null;
   function buildProfiles() {
-    var tabs = $('profTabs'); tabs.innerHTML = '';
-    for (var i = 0; i < 4; i++) (function (i) {
-      var b = document.createElement('button'); b.className = 'chip' + (i === profSlot ? ' on' : ''); b.textContent = slotLabel(i);
-      b.addEventListener('click', function () { profSlot = i; Snd.click(); buildProfiles(); });
-      tabs.appendChild(b);
+    if (profSlot >= profPlayers) profSlot = 0;
+    segSelect('profMode', profPlayers); segSelect('profFour', profFour);
+    $('profFour').classList.toggle('hidden', profPlayers !== 4);
+    var box = $('profCards'); box.innerHTML = ''; box.classList.toggle('four', profPlayers === 4);
+    for (var i = 0; i < profPlayers; i++) (function (i) {
+      var card = document.createElement('div'); card.className = 'pcard' + (i === profSlot ? ' on' : '');
+      var cv = document.createElement('canvas'); cv.width = 240; cv.height = 360; cv.id = 'profCv' + i;
+      var inp = document.createElement('input'); inp.className = 'name'; inp.maxLength = 10; inp.autocomplete = 'off';
+      inp.value = Meta.profile(i).name; inp.setAttribute('aria-label', 'Tên P' + (i + 1));
+      inp.addEventListener('focus', function () { if (profSlot !== i) { profSlot = i; buildDress(); markCards(); } });
+      inp.addEventListener('input', function () {
+        var v = inp.value.replace(/[<>]/g, '').slice(0, 10);
+        Meta.profile(i).name = v || ('P' + (i + 1)); Meta.save();
+        drawCard(i); $('profFor').textContent = dressTitle();
+      });
+      card.addEventListener('click', function (e) { if (e.target === inp || profSlot === i) return; profSlot = i; Snd.click(); buildDress(); markCards(); });
+      card.appendChild(cv); card.appendChild(inp); box.appendChild(card);
+      drawCard(i);
     })(i);
+    buildDress();
+  }
+  function markCards() { Array.prototype.forEach.call($('profCards').children, function (c, k) { c.classList.toggle('on', k === profSlot); }); }
+  function dressTitle() { return 'Trang phục của ' + slotLabel(profSlot); }
+  // the colours, hats, hair and shirts of the chosen player
+  function buildDress() {
     var pr = Meta.profile(profSlot);
-    $('profName').value = pr.name;
+    $('profFor').textContent = dressTitle();
+    $('profColorBox').classList.toggle('hidden', profPlayers !== 4);
     var sw = $('profColors'); sw.innerHTML = '';
     Meta.COLORS.forEach(function (c, ci) {
       var b = document.createElement('button'); b.style.background = c.main; b.title = c.name; b.className = pr.color === ci ? 'on' : '';
-      b.addEventListener('click', function () { pr.color = ci; Meta.save(); Snd.click(); buildProfiles(); });
+      b.addEventListener('click', function () { pr.color = ci; Meta.save(); Snd.click(); if (profFour !== 'ffa') profFour = 'ffa'; buildProfiles(); });
       sw.appendChild(b);
     });
     var items = $('profItems'); items.innerHTML = '';
@@ -3386,28 +3486,53 @@
       Meta.SHOP[cat].forEach(function (it) {
         if (!Meta.owns(cat, it.id)) return;
         var b = document.createElement('button'); b.className = 'chip' + (pr[cat] === it.id ? ' on' : ''); b.textContent = it.icon + ' ' + it.name;
-        b.addEventListener('click', function () { Meta.equip(cat, it.id, profSlot); Snd.click(); buildProfiles(); });
+        b.addEventListener('click', function () { Meta.equip(cat, it.id, profSlot); Snd.click(); buildDress(); for (var k = 0; k < profPlayers; k++) drawCard(k); });
         items.appendChild(b);
       });
     });
-    drawPreview();
   }
-  $('profName').addEventListener('input', function () {
-    var v = $('profName').value.replace(/[<>]/g, '').slice(0, 10);
-    Meta.profile(profSlot).name = v || ('P' + (profSlot + 1)); Meta.save();
-    Array.prototype.forEach.call($('profTabs').children, function (b, i) { b.textContent = slotLabel(i); });
-  });
-  var previewP = null;
-  function drawPreview() {
-    var cv = $('profCanvas'), c = cv.getContext('2d');
-    if (!previewP) { previewP = E.createWorld('soccer', null, 1).players[1]; }
-    var p = previewP, pr = Meta.profile(profSlot);
-    p.x = 165; p.y = 320 - COM_H * 1.6; p.a = 0; p.f = 1; p.leg = -0.12; E.setScale(p, 1.6); p.id = profSlot;
-    c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, cv.width, cv.height);
-    c.fillStyle = '#4fae48'; c.fillRect(0, 320, cv.width, cv.height - 320);
-    D.player(c, p, { col: Meta.color(profSlot), hat: pr.hat, hair: pr.hair, shirt: pr.shirt, num: profSlot + 1, face: 'happy',
-      hairCol: profSlot % 2 ? '#5b3a1f' : INK, armT: 0.6, mapId: 'soccer' });
-    D.textOutlined(c, pr.name, cv.width / 2, 400, 30, '#ffffff', INK);
+  $('profMode').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; profPlayers = +b.dataset.v; Snd.click(); buildProfiles(); });
+  $('profFour').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; profFour = b.dataset.v; Snd.click(); buildProfiles(); });
+  // one card: grass, the player's body (or the side's two bodies) as in a match, and his name as the match shows it
+  function drawCard(i) {
+    var cv = $('profCv' + i);
+    if (!cv) return;
+    var c = cv.getContext('2d'), Wc = cv.width, Hc = cv.height, gy = Hc - 64, pr = Meta.profile(i), name = nameOf(i);
+    if (!previewP) previewP = E.createWorld('soccer', null, 1).players;
+    c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, Wc, Hc);
+    c.fillStyle = '#4fae48'; c.fillRect(0, gy, Wc, Hc - gy); c.fillStyle = '#3f9a39'; c.fillRect(0, gy, Wc, 6);
+    var two = profPlayers === 2, side = two ? i : slotTeam(i), face = side === 0 ? 1 : -1;
+    var col = two || profFour === 'team4' ? teamCol(side) : Meta.color(i);
+    var bodies = two ? [{ id: side * 2, x: Wc / 2 - face * 50, role: 1 }, { id: side * 2 + 1, x: Wc / 2 + face * 34, role: 0 }] : [{ id: i, x: Wc / 2, role: 0 }];
+    var sc = two ? 1.05 : 1.3, fs = two ? 26 : 22;
+    bodies.forEach(function (b, k) {
+      var p = previewP[k];
+      p.x = b.x; p.y = gy - COM_H * sc; p.a = 0; p.f = face; p.leg = -0.12; E.setScale(p, sc); p.id = b.id;
+      c.fillStyle = 'rgba(0,0,0,0.16)'; c.beginPath(); c.ellipse(b.x, gy + 2, 30 * sc, 7, 0, 0, TAU); c.fill();
+      D.player(c, p, { col: { main: col.main, dark: col.dark }, hat: pr.hat, hair: pr.hair, shirt: pr.shirt, num: two ? b.role + 1 : i + 1, face: 'happy',
+        hairCol: b.id % 2 ? '#5b3a1f' : INK, armT: 0.6, mapId: 'soccer' });
+    });
+    c.font = '900 ' + fs + 'px ' + D.FONT; c.textAlign = 'center'; c.textBaseline = 'middle'; c.lineJoin = 'round';
+    if (two) {
+      // the top of the screen in a match: his score pill with the name beside it (toward the middle)
+      var pw = 56, ph = 44, px = side === 0 ? Wc - 14 - pw : 14, py = 14;
+      D.rrect(c, px, py, pw, ph, 12); c.fillStyle = col.main; c.fill(); c.lineWidth = 3; c.strokeStyle = INK; c.stroke();
+      D.textOutlined(c, '0', px + pw / 2, py + ph / 2 + 2, 30, '#ffffff', INK);
+      var nx = side === 0 ? px - 8 : px + pw + 8, room = side === 0 ? nx - 6 : Wc - nx - 6, nfs = fs;
+      c.font = '900 ' + nfs + 'px ' + D.FONT;
+      var tw = c.measureText(name).width;
+      if (tw > room) { nfs *= Math.max(0.55, room / tw); tw = tw * nfs / fs; }
+      D.textOutlined(c, name, side === 0 ? nx - tw / 2 : nx + tw / 2, py + ph / 2 + 1, nfs, '#ffffff', INK);
+      D.textOutlined(c, side === 0 ? 'Bên trái' : 'Bên phải', Wc / 2, Hc - 30, 20, '#ffffff', INK);
+    } else {
+      // the name tag over his head
+      var mark = profFour === 'team4' ? teamCol(side) : Meta.color(i), top = gy - COM_H * sc - 118 * sc;
+      var ty = Math.max(24, top - 20);
+      c.beginPath(); c.moveTo(Wc / 2 - 8, ty + 14); c.lineTo(Wc / 2 + 8, ty + 14); c.lineTo(Wc / 2, ty + 24); c.closePath();
+      c.fillStyle = mark.main; c.fill(); c.lineWidth = 2; c.strokeStyle = INK; c.stroke();
+      tag(c, Wc / 2, ty, name, mark, fs);
+      D.textOutlined(c, (side === 0 ? '◀ Trái' : 'Phải ▶') + ' · P' + (i + 1), Wc / 2, Hc - 30, 20, '#ffffff', INK);
+    }
   }
 
   // --- stats ---
@@ -3523,14 +3648,16 @@
     Snd.init();
     cfg = Object.assign({ level: prefs.level, fmt: fmtString(), maps: prefs.maps.slice(), mods: prefs.mods, modList: prefs.modList.slice(),
       items: prefs.items, itemList: prefs.itemList.slice(), weather: prefs.weather, wxList: prefs.wxList.slice(), bombTime: prefs.bombTime,
-      beginner: prefs.beginner, slots: prefs.slots.slice() }, cfg);
+      beginner: prefs.beginner, slots: prefs.slots.slice(), side: prefs.side }, cfg);
     G.cfg = cfg; G.mode = cfg.mode; G.demo = false; G.round = 0; G.earned = 0; G.golden = false;
     G.matchT = 0; G.goalsLog = []; G.playedMaps = []; G.hlm = { clips: [], singles: [], misses: [] }; G.lastHL = null; G.ps = newStats();
     G.score = is4(cfg.mode) ? [0, 0, 0, 0] : [0, 0];
     G.target = cfg.fmt[0] === 'p' ? +cfg.fmt.slice(1) : 0;
     G.clock = cfg.fmt[0] === 't' ? +cfg.fmt.slice(1) : 0;
     resetBots();
-    if (cfg.mode === 'bot') G.bot = newBot(1, cfg.level, -1);
+    // against the bot the player picks his side: G.me = 0 left (red), 1 right (blue)
+    G.me = cfg.mode === 'bot' && cfg.side === 'R' ? 1 : 0;
+    if (cfg.mode === 'bot') G.bot = newBot(1 - G.me, cfg.level, -1);
     if (is4(cfg.mode)) for (var i = 0; i < 4; i++) if (cfg.slots[i] === 'b') G.bots[i] = newBot(slotTeam(i), cfg.level, i);
     G.looks = matchLooks(); G.hlSettings = matchSettings();
     G.queue = makeQueue(true); G.qi = 0;
@@ -3594,7 +3721,7 @@
     G.word = com.word; G.sub = com.sub;
     if (G.mode === 'tutorial') return;
     hlScored(team);
-    var human = !soloish(G.mode) || team === 0;
+    var human = !soloish(G.mode) || team === G.me;
     G.scoreBefore = G.score.slice();
     if (G.mode === 'ffa') {
       if (G.credit >= 0) { G.score[G.credit]++; col = Meta.color(G.credit); }
@@ -3645,7 +3772,7 @@
       if (!draw) { txt = nameOf(w) + ' THẮNG! 🏆'; color = textCol(teamCol(w)); }
       reward += 5;
     } else {
-      var lvl = G.cfg.level, won = w === 0;
+      var lvl = G.cfg.level, won = w === G.me;
       if (draw) { st.botDraws[lvl] = (st.botDraws[lvl] || 0) + 1; reward += 5; if (lvl === 'hard') st.streak = 0; }
       else if (won) { st.botWins[lvl]++; reward += LEVEL_COINS[lvl]; if (lvl === 'hard') { st.streak++; st.bestStreak = Math.max(st.bestStreak, st.streak); } }
       else { st.botLosses[lvl]++; reward += 3; if (lvl === 'hard') st.streak = 0; }
@@ -3665,7 +3792,7 @@
     // the match goes into the history, with its highlight (kept or not as the player chose)
     var clips = finishHighlights(), rec = matchRecord(w, draw);
     if (ms) { rec.ps = ms.list; rec.mvp = ms.mvp; }
-    var hl = clips ? { match: { id: rec.id, date: rec.date, mode: mode, fmt: G.cfg.fmt, settings: G.hlSettings, looks: G.looks,
+    var hl = clips ? { match: { id: rec.id, date: rec.date, mode: mode, fmt: G.cfg.fmt, settings: G.hlSettings, looks: G.looks, names: sideNames(),
       mvp: ms ? { n: ms.list[ms.mvp].n, r: ms.list[ms.mvp].r } : null }, clips: clips } : null;
     G.lastHL = hl;
     var tools = [['☰ Menu', 'toMenu']];
@@ -3683,7 +3810,7 @@
       winner: draw ? -1 : winner, draw: !!draw, dur: Math.round(G.matchT || 0), goals: G.goalsLog || [], hl: null
     };
     if (mode === 'bot' || (is4(mode) && G.bots.some(Boolean))) r.level = G.cfg.level;
-    if (mode === 'bot') r.result = draw ? 'draw' : (winner === 0 ? 'win' : 'loss');
+    if (mode === 'bot') { r.result = draw ? 'draw' : (winner === G.me ? 'win' : 'loss'); r.me = G.me; }
     return r;
   }
   // white or yellow kits are unreadable as text on the white result card
@@ -3735,7 +3862,7 @@
   function startTutorial() {
     Snd.init();
     G.cfg = { mode: 'tutorial', level: 'easy', fmt: 'p99', maps: ['soccer'], mods: false, items: false, beginner: false, slots: ['h', 'h', 'h', 'h'] };
-    G.mode = 'tutorial'; G.demo = false; G.round = 0; G.score = [0, 0]; G.target = 0; G.clock = 0; G.earned = 0;
+    G.mode = 'tutorial'; G.me = 0; G.demo = false; G.round = 0; G.score = [0, 0]; G.target = 0; G.clock = 0; G.earned = 0;
     G.hlm = null; G.matchT = 0; G.ps = null;
     resetBots();
     G.looks = matchLooks();
@@ -4046,16 +4173,17 @@
   }
 
   // ---------- highlights: saves and clips ----------
-  // A save: a real shot (the ball going at least SAVE_PACE, shot at least SAVE_GAP seconds before) would score for one
-  // side within SAVE_LOOK seconds on its own, then a player of the other side turns it away, SAVE_CONFIRM seconds later
-  // it is still not going in, and
-  //  - that player did something: a kick, a header or a dive (a body hit while in the air), with his button pressed at
-  //    most SAVE_ACTIVE seconds before; a ball bouncing off someone standing there, or off a shield, is no save,
+  // A save: a real shot (the ball going at least SAVE_PACE, any direction - a lob dropping in counts -, shot at least
+  // SAVE_GAP seconds before) would score for one side within SAVE_LOOK seconds on its own, then a player of the other
+  // side turns it away, SAVE_CONFIRM seconds later it is still not going in, and
+  //  - that player did something: he is in the air after his own jump or dive (button pressed at most SAVE_JUMP
+  //    seconds before - not just knocked up), or kicks or heads it with his button pressed at most SAVE_ACTIVE
+  //    seconds before; a ball bouncing off someone standing there, or off a shield, is no save,
   //  - it happened in his own half.
   // A scramble in front of goal (the ball crawling between players touching it all the time) has no saves.
   // Saves by the same side less than SAVE_CHAIN seconds apart make one bigger save, which is always kept; of the
   // single saves the most dangerous third is kept. Every point, and every round stopped by lightning, is kept too.
-  var SAVE_LOOK = 1, SAVE_CONFIRM = 0.25, SAVE_CHAIN = 3, SAVE_ACTIVE = 0.35, SAVE_PACE = 550, SAVE_GAP = 0.15, CLIP_PRE = 3, CLIP_POST = 1.5;
+  var SAVE_LOOK = 1, SAVE_CONFIRM = 0.25, SAVE_CHAIN = 3, SAVE_ACTIVE = 0.35, SAVE_JUMP = 1.5, SAVE_PACE = 400, SAVE_GAP = 0.15, CLIP_PRE = 3, CLIP_POST = 1.5;
   var ZAP_COL = { main: '#ffd23f', dark: '#c4a612' };
   function newWatch() { return { tick: 0, threat: [null, null], cand: [], group: null, seen: [[-1, -1], [-1, -1]], miss: [] }; }
   function watchSaves(w) {
@@ -4066,7 +4194,7 @@
     if (++S.tick % 2) return; // 60 looks a second are plenty
     for (var bi = 0; bi < w.balls.length && bi < 2; bi++) {
       var b = w.balls[bi], th = S.threat[bi], fut = E.ballFuture(A, b, SAVE_LOOK);
-      if (A.type !== 'volley') lookForMiss(w, S, bi, b, fut);
+      lookForMiss(w, S, bi, b);
       if (fut) {
         var att = fut.team, back = null;
         // going in again: the touch a moment ago saved nothing
@@ -4074,8 +4202,7 @@
         if (!th && back) th = S.threat[bi] = back;
         if (!th || th.att !== att) th = S.threat[bi] = { att: att, since: w.time, shot: b.touchT[att], danger: 0 };
         th.seen = w.time; th.danger = Math.max(th.danger, 1 - fut.t / SAVE_LOOK);
-        // pace of the shot: towards the goal for goals and posts (a ball just dropping is no shot), any way for hoops and nets
-        th.pace = Math.max(th.pace || 0, A.type === 'goal' || A.type === 'posts' ? Math.abs(b.vx) : Math.sqrt(b.vx * b.vx + b.vy * b.vy));
+        th.pace = Math.max(th.pace || 0, Math.sqrt(b.vx * b.vx + b.vy * b.vy));
         if (b.touchT[att] > th.shot) th.shot = b.touchT[att];
         // a shot on target: the attacking side's touch just now sent it goalwards (one per touch, dribbling counts once)
         if (b.lastTeam === att && b.touchT[att] >= w.time - 0.5 && b.touchT[att] - (th.counted || -9) > 0.5) { th.counted = b.touchT[att]; statAdd(b.lastBy[att], 'shots'); }
@@ -4085,54 +4212,49 @@
       S.threat[bi] = null;
       var def = 1 - th.att, t = b.touchT[def], by = b.lastTeam === def ? b.lastPid : -1;
       if (by < 0 || t < Math.max(th.since, th.seen - 0.1)) continue; // not turned away by a defender
-      var shot = th.shot >= th.since - 3 ? th.shot : th.since;
-      if ((th.pace || 0) < SAVE_PACE || t - shot < SAVE_GAP) continue; // no real shot: a scramble
-      if (G.pressT[by] < t - SAVE_ACTIVE) continue; // he was just standing there
-      if (b.lastKind === 'body' && !b.lastAir) continue; // it hit him: no kick, no header, no dive
-      if (def === 0 ? b.lastX > W / 2 : b.lastX < W / 2) continue; // not in his own half
+      var shot = th.shot >= th.since - 3 ? th.shot : th.since, x = b.lastX;
+      if ((th.pace || 0) < SAVE_PACE) { why('slow', bi, by, x); continue; } // the ball was hardly moving
+      if (t - shot < SAVE_GAP) { why('scramble', bi, by, x); continue; } // touched by both sides in a scramble
+      var active = b.lastAir ? G.pressT[by] >= t - SAVE_JUMP : (b.lastKind === 'kick' || b.lastKind === 'head') && G.pressT[by] >= t - SAVE_ACTIVE;
+      if (!active) { why('standing', bi, by, x); continue; } // it hit him standing there
+      if (def === 0 ? x > W / 2 : x < W / 2) { why('their half', bi, by, x); continue; } // not in his own half
+      why('save?', bi, by, x);
       S.cand.push({ bi: bi, att: th.att, def: def, t: t, by: by, shot: shot, danger: th.danger, th: th });
     }
     for (i = S.cand.length - 1; i >= 0; i--) if (w.time - S.cand[i].t >= SAVE_CONFIRM) addSave(S.cand.splice(i, 1)[0]);
     if (S.group && w.time - S.group.last > SAVE_CHAIN) closeGroup(true);
     for (i = S.miss.length - 1; i >= 0; i--) {
       var m = S.miss[i], mb = w.balls[m.bi], lastTouch = Math.max(mb.touchT[0], mb.touchT[1]);
-      if (w.time <= m.at + 0.05 && lastTouch > m.shot + 0.1) S.miss.splice(i, 1); // blocked, or played on, before it got there
+      if (w.time <= m.at + 0.05 && lastTouch > m.shot + 0.1) { if (G.dbg) G.dbg.push({ r: 'miss-x', t: w.time, round: G.round, by: m.by }); S.miss.splice(i, 1); } // blocked, or played on, before it got there
       else if (w.time >= m.at + CLIP_POST) fileMiss(S.miss.splice(i, 1)[0]);
     }
   }
 
-  // A near miss: just after a shot the ball on its own goes in nowhere, but the same shot a little stronger, weaker,
-  // higher or lower would have scored, whatever the sport (past the post, over the bar, off the rim). Nobody may touch
-  // it before it gets there. How good a miss it was: how small a change would have scored, hitting the frame,
-  // a long shot, a shot in the air, the power. The best fifth of a match's misses go into its highlight.
-  var MISS_LOOK = 1.5, MISS_SPEED = 500, MISS_SHARE = 0.2;
-  // [power, angle change in radians]
-  var MISS_TRY = [[1, -0.015], [1, 0.015], [0.975, 0], [1.025, 0], [1, -0.03], [1, 0.03], [0.95, 0], [1.05, 0],
-    [1, -0.06], [1, 0.06], [0.9, 0], [1.1, 0], [0.95, -0.03], [0.95, 0.03], [1.05, -0.03], [1.05, 0.03]];
-  var probe = { x: 0, y: 0, vx: 0, vy: 0, ang: 0, spin: 0 };
-  function lookForMiss(w, S, bi, b, fut) {
-    var A = w.arena;
+  // A near miss: a shot (the shooting side's touch sends the ball off at speed) that on its own flight does not go in
+  // but comes very close: within MISS_NEAR ball radii of counting, measured where a small change would have made it
+  // count (E.scoreGap): just over the bar where it crosses the goal line, off the crossbar, stopping on the line, on
+  // the rim, under the bar of the posts or off a post. A ball dropping onto the roof of the goal, or coming up under
+  // the ring, is nowhere near. Nobody may touch it before it gets there; the moment it is closest is the moment shown.
+  // How good a miss it was: how close, hitting the frame, a long shot, a shot in the air, the power. The best fifth of
+  // a match's misses go into its highlight.
+  var MISS_LOOK = 2, MISS_SPEED = 450, MISS_SHARE = 0.2, MISS_NEAR = { goal: 1.9, hoop: 1.5, posts: 1.5 };
+  function lookForMiss(w, S, bi, b) {
+    var A = w.arena, R = A.P.ballR;
     for (var team = 0; team < 2; team++) {
       if (b.touchT[team] <= S.seen[bi][team]) continue;
       S.seen[bi][team] = b.touchT[team];
       var sp = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
-      if (b.lastTeam !== team || sp < MISS_SPEED || fut || E.ballFuture(A, b, MISS_LOOK)) continue; // no shot, or going in
-      var dir = Math.atan2(b.vy, b.vx), best = null;
-      for (var i = 0; i < MISS_TRY.length; i++) {
-        var v = MISS_TRY[i], a = dir + v[1];
-        probe.x = b.x; probe.y = b.y; probe.vx = Math.cos(a) * sp * v[0]; probe.vy = Math.sin(a) * sp * v[0]; probe.ang = b.ang; probe.spin = b.spin;
-        var f = E.ballFuture(A, probe, MISS_LOOK);
-        if (!f || f.team !== team) continue;
-        var close = 1 - 0.5 * (Math.abs(v[0] - 1) / 0.1 + Math.abs(v[1]) / 0.06); // 1: the tiniest change would have scored
-        if (!best || close > best.close) best = { close: close, t: f.t };
-      }
-      if (!best) continue;
+      if (b.lastTeam !== team || sp < MISS_SPEED || !MISS_NEAR[A.type]) continue;
+      var path = G.dbg ? [] : null, nr = E.ballNear(A, b, MISS_LOOK, team, path);
+      if (nr.score === team || !(nr.gap <= MISS_NEAR[A.type] * R)) continue; // going in, or nowhere near
+      if (G.dbg) G.dbg.push({ r: 'miss?', t: w.time, round: G.round, by: b.lastPid, gap: +(nr.gap / R).toFixed(2), at: +(w.time + nr.t).toFixed(2), path: path, nx: Math.round(nr.x), ny: Math.round(nr.y) });
       S.miss = S.miss.filter(function (m) { return m.bi !== bi; }); // a newer shot with the same ball replaces it
-      S.miss.push({ bi: bi, team: team, by: b.lastPid, shot: b.touchT[team], at: w.time + best.t, close: best.close,
+      S.miss.push({ bi: bi, team: team, by: b.lastPid, shot: b.touchT[team], at: w.time + nr.t, close: 1 - nr.gap / (MISS_NEAR[A.type] * R),
         far: Math.abs((team === 0 ? W : 0) - b.x) > 700, air: b.lastAir, sp: sp, post: false });
     }
   }
   function fileMiss(m) {
+    if (G.dbg) G.dbg.push({ r: 'miss', t: m.at, round: G.round, by: m.by });
     var rec = G.rec, r = recRange();
     var beauty = m.close + (m.post ? 0.25 : 0) + (m.far ? 0.2 : 0) + (m.air ? 0.15 : 0) + 0.2 * Math.min(1, m.sp / 1800);
     var from = rec.frameAt(Math.max(m.shot, m.at - 3) - CLIP_PRE, r.oldest, r.newest);
@@ -4158,7 +4280,10 @@
       G.hlm.misses.push(clip);
     }
   }
+  // (for the tests: why a touch that turned a shot away was taken as a save or not)
+  function why(r, bi, by, x) { if (G.dbg) G.dbg.push({ r: r, t: G.world.time, round: G.round, bi: bi, by: by, x: Math.round(x), kind: G.world.balls[bi].lastKind, air: G.world.balls[bi].lastAir }); }
   function addSave(s) {
+    if (G.dbg) G.dbg.push({ r: 'save', t: s.t, round: G.round, by: s.by });
     var S = G.hlw, g = S.group;
     statAdd(s.by, 'saves');
     if (g && g.def === s.def && s.t - g.last <= SAVE_CHAIN) { g.saves.push(s); g.last = s.t; return; }
@@ -4233,9 +4358,14 @@
     S.cand = []; S.threat = [null, null];
     S.miss.forEach(function (m) { if (G.world.time >= m.at) fileMiss(m); }); // one not there yet went in after all
     S.miss = [];
-    var g = S.group;
-    // saves made just before the same side conceded were not enough
-    if (g) closeGroup(!(team >= 0 && g.def === 1 - team && G.world.time - g.last < SAVE_CHAIN));
+    var g = S.group, lost = !!g && team >= 0 && g.def === 1 - team && G.world.time - g.last < SAVE_CHAIN;
+    // saves made just before the same side conceded were not enough; one after which the scorers never touched the
+    // ball again (it went in off him, or off his side) saved nothing at all
+    if (lost) g.saves.forEach(function (s) {
+      var b = G.world.balls[s.bi];
+      if (b && b.touchT[team] < s.t) { statAdd(s.by, 'saves', -1); if (G.dbg) G.dbg.push({ r: 'save-x', t: G.world.time, round: G.round, by: s.by }); }
+    });
+    if (g) closeGroup(!lost);
     G.hlw = null;
   }
   function finishHighlights() {
@@ -4254,9 +4384,9 @@
     return clips.length ? clips : null;
   }
   function scorerName(team, credit) {
-    if (G.mode === 'ffa') return credit >= 0 ? nameOf(credit) : '';
-    if (G.mode === 'team4') return team === 0 ? nameOf(0) + ' + ' + nameOf(1) : nameOf(2) + ' + ' + nameOf(3);
-    if (soloish(G.mode)) return team === 0 ? nameOf(0) : 'Bot';
+    if (G.mode === 'ffa') return credit >= 0 ? slotName(credit) : '';
+    if (G.mode === 'team4') return sideNames()[team];
+    if (soloish(G.mode)) return team === G.me ? nameOf(0) : botLabel();
     return nameOf(team);
   }
   function playerNames(by) {
@@ -4268,13 +4398,17 @@
   // ---------- player stats of a match, rating and MVP ----------
   // "player" = a person: each side in 2-player and bot matches (one button moves both bodies), each slot with 4 players
   function personOf(id) { return is4(G.mode) ? id : slotTeam(id); }
-  function personName(i) { return is4(G.mode) ? nameOf(i) + (G.bots[i] ? ' 🤖' : '') : (G.mode === 'bot' && i === 1 ? 'Bot' : nameOf(i)); }
+  // (a bot by its level; two bots of the same level with 4 players also by their slot)
+  function personName(i) {
+    if (!is4(G.mode)) return G.mode === 'bot' ? (i === G.me ? nameOf(0) : botLabel()) : nameOf(i);
+    return G.bots[i] ? botLabel() + (G.bots.filter(Boolean).length > 1 ? ' · P' + (i + 1) : '') : nameOf(i);
+  }
   function newStats() {
     var out = [];
     for (var i = 0; i < (is4(G.mode) ? 4 : 2); i++) out.push({ goals: 0, saves: 0, shots: 0, touches: 0, own: 0 });
     return out;
   }
-  function statAdd(id, key) { if (G.ps && id >= 0 && id < 4) G.ps[personOf(id)][key]++; }
+  function statAdd(id, key, n) { if (G.ps && id >= 0 && id < 4) G.ps[personOf(id)][key] += n || 1; }
   // touches: kicks, headers and body hits; a player keeping the ball against him counts once
   function countTouches(w) {
     for (var i = 0; i < w.events.length; i++) {
@@ -4454,34 +4588,47 @@
     var left = c.clk[Math.max(0, Math.min(c.clk.length - 1, Math.round(t * HL.RATE)))];
     return left <= 0 ? '⭐ BÀN VÀNG' : '⏱ ' + fmtClock(left);
   }
-  // the small scoreboard in the top bar: coloured scores (the sport between two sides) and the time / target
-  function drawHlScoreboard(c, u, cx, y, cl, t) {
-    var mode = G.hlp.hl.match.mode, sc = hlScoreAt(cl, t), info = hlInfoAt(cl, t), pills = [], i;
+  // the small scoreboard in the top bar: coloured scores (the sport between two sides) and the time / target,
+  // each side's name over its score (ny = the names' row, 0 for highlights older than v3); all of it fits in `room`
+  function drawHlScoreboard(c, u, cx, y, cl, t, ny, room) {
+    var mode = G.hlp.hl.match.mode, names = ny ? G.hlp.hl.match.names : null, sc = hlScoreAt(cl, t), info = hlInfoAt(cl, t), pills = [], i;
     if (sc) {
-      if (mode === 'ffa') for (i = 0; i < 4; i++) pills.push({ col: G.looks.p[i].col, v: sc[i] });
-      else pills = [{ col: teamCol(0), v: sc[0] }, { col: teamCol(1), v: mode === 'team4' ? sc[2] : sc[1] }];
+      if (mode === 'ffa') for (i = 0; i < 4; i++) pills.push({ col: G.looks.p[i].col, v: sc[i], n: names && names[i] });
+      else pills = [{ col: teamCol(0), v: sc[0], n: names && names[0] }, { col: teamCol(1), v: mode === 'team4' ? sc[2] : sc[1], n: names && names[1] }];
     }
-    var ph = 6 * u, pw = (pills.length > 2 ? 6.5 : 8) * u, gap = u, fs = 3.4 * u, icon = pills.length === 2 && E.MAP_BY_ID[cl.map] ? E.MAP_BY_ID[cl.map].icon : '';
+    var ph = 6 * u, pw = (pills.length > 2 ? 6.5 : 8) * u, gap = u, fs = 3.4 * u, nfs = 2.8 * u, icon = pills.length === 2 && E.MAP_BY_ID[cl.map] ? E.MAP_BY_ID[cl.map].icon : '';
     var iconW = icon ? 5 * u : 0, infoW = info ? textW(info, fs) + 2 * u : 0;
-    var x = cx - (pills.length * (pw + gap) + iconW + infoW) / 2;
+    // a name wider than its score widens its slot; too wide altogether, the names shrink (to 60 %)
+    var nw = pills.map(function (p) { return p.n ? textW(p.n, nfs) + 1.5 * u : 0; });
+    var fixed = pills.length * gap + iconW + infoW, slots = function () { return pills.reduce(function (a, p, k) { return a + Math.max(pw, nw[k]); }, 0); };
+    if (room && fixed + slots() > room) {
+      var sum = nw.reduce(function (a, b) { return a + b; }, 0), k2 = Math.max(0.6, Math.min(1, (room - fixed - pills.length * pw * 0.3) / Math.max(1, sum)));
+      nfs *= k2; nw = nw.map(function (x) { return x * k2; });
+    }
+    var x = cx - (fixed + slots()) / 2;
     pills.forEach(function (p, k) {
       if (k === 1 && icon) { c.fillStyle = '#ffffff'; D.emoji(c, icon, x + iconW / 2 - gap / 2, y, 4 * u); x += iconW; }
-      D.rrect(c, x, y - ph / 2, pw, ph, 1.6 * u); c.fillStyle = p.col.main; c.fill(); c.lineWidth = Math.max(2, 0.45 * u); c.strokeStyle = '#000000'; c.stroke();
-      D.textOutlined(c, String(p.v), x + pw / 2, y + 0.2 * u, 4.3 * u, '#ffffff', INK);
-      x += pw + gap;
+      var sw = Math.max(pw, nw[k]), px = x + (sw - pw) / 2;
+      if (p.n) barText(c, p.n, x + sw / 2, ny, nfs, onBlack(p.col), 'center', sw);
+      D.rrect(c, px, y - ph / 2, pw, ph, 1.6 * u); c.fillStyle = p.col.main; c.fill(); c.lineWidth = Math.max(2, 0.45 * u); c.strokeStyle = '#000000'; c.stroke();
+      D.textOutlined(c, String(p.v), px + pw / 2, y + 0.2 * u, 4.3 * u, '#ffffff', INK);
+      x += sw + gap;
     });
     if (info) barText(c, info, x + u, y, fs, info.indexOf('⭐') === 0 ? '#ffd23f' : '#ffffff', 'left');
   }
+  // the top bar of a highlight is a little taller than a replay's: the names over the score
+  var HL_TOP = 13, HL_ROW = 7.6, HL_SCORE = 9.4, HL_NAMES = 4.5;
   function drawHighlightHUD(c, u, cx) {
-    var v = view, h = G.hlp, cl = h.c, N = h.hl.clips.length, pad = 3 * u;
-    replayBars(c, u);
-    var ty = barTextY(u), by = v.ch - ty;
-    // top bar: which clip, the score and the time left (or the target) at this moment, the match's MVP
+    var v = view, h = G.hlp, cl = h.c, N = h.hl.clips.length, pad = 3 * u, named = !!(h.hl.match.names && h.hl.match.names.length);
+    replayBars(c, u, HL_TOP * u);
+    var ty = HL_ROW * u, by = v.ch - barTextY(u);
+    // top bar: which clip, the names and the score, the time left (or the target) at this moment, the match's MVP
     // (the ✖ button sits at its right end)
-    barText(c, '🎬 HIGHLIGHT ' + (h.ci + 1) + '/' + N, pad, ty, 3.8 * u, '#ff5050', 'left');
-    var right = v.cw - pad - (h.exporting ? 0 : Math.max(30, 8 * u) + 2 * u), mvp = h.hl.match.mvp;
-    if (mvp) barText(c, '🏅 MVP: ' + mvp.n + ' · ⭐ ' + fmtRating(mvp.r), right, ty, 3.2 * u, '#ffd23f', 'right');
-    drawHlScoreboard(c, u, cx, ty, cl, h.k / HL.RATE);
+    var lw = barText(c, '🎬 HIGHLIGHT ' + (h.ci + 1) + '/' + N, pad, ty, 3.8 * u, '#ff5050', 'left');
+    var right = v.cw - pad - (h.exporting ? 0 : Math.max(30, 8 * u) + 2 * u), mvp = h.hl.match.mvp, mw = 0;
+    if (mvp) mw = barText(c, '🏅 MVP: ' + mvp.n + ' · ⭐ ' + fmtRating(mvp.r), right, ty, 3.2 * u, '#ffd23f', 'right');
+    var side = Math.max(pad + lw, v.cw - right + mw) + 2 * u;
+    drawHlScoreboard(c, u, cx, named ? HL_SCORE * u : ty, cl, h.k / HL.RATE, named ? HL_NAMES * u : 0, v.cw - 2 * side);
     // bottom bar: slow motion, what the clip is (the moment itself while it flashes), what a tap does
     var tip = h.exporting ? 'BALLGAMES PHYSICS' : (h.ci + 1 < N ? 'Chạm để xem pha tiếp ⏭' : 'Chạm để kết thúc ⏹');
     var tw = barText(c, tip, v.cw - pad, by, 3.2 * u, '#ffffff', 'right');
@@ -4496,7 +4643,7 @@
     if (G.mode === '2p') return [0, 1];
     return [0, 1, 2, 3].filter(function (i) { return !G.bots[i]; });
   }
-  function voterCol(id) { return G.mode === 'ffa' ? Meta.color(id) : teamCol(G.mode === '2p' ? id : slotTeam(id)); }
+  function voterCol(id) { return G.mode === 'ffa' ? Meta.color(id) : teamCol(G.mode === '2p' ? id : (G.mode === 'bot' ? G.me : slotTeam(id))); }
   function scoreHtml() {
     if (G.mode === 'ffa') return [0, 1, 2, 3].map(function (i) { return scoreSpan(Meta.color(i), esc(nameOf(i)) + ': ' + G.score[i]); }).join(' · ');
     if (G.mode === 'team4') return '<span class="r">' + esc(nameOf(0) + '+' + nameOf(1)) + ' ' + G.score[0] + '</span> – <span class="b">' + G.score[2] + ' ' + esc(nameOf(2) + '+' + nameOf(3)) + '</span>';
@@ -4682,17 +4829,22 @@
   }
   function hasHL(r) { return !!(r.hl && !r.hl.gone); }
   function el(tag, cls, txt) { var e = document.createElement(tag); if (cls) e.className = cls; if (txt !== undefined) e.textContent = txt; return e; }
+  // the names a history card shows: a bot by its level (as in the match)
+  function histBot(r) { return '🤖 Bot' + (r.level ? ' ' + LEVEL_LABEL[r.level] : ''); }
+  function histName(r, i) { return r.bots && r.bots[i] ? histBot(r) : (r.names || [])[i] || ''; }
+  function histSide(r, a) { var x = histName(r, a), y = histName(r, a + 1); return x === y && r.bots && r.bots[a] ? x + ' ×2' : x + '+' + y; }
   function scoreLine(r) {
     var n = r.names || [], s = r.score, R = '<span class="r">', B = '<span class="b">', X = '</span>';
-    if (r.mode === 'ffa') return n.map(function (nm, i) { return (r.winner === i ? '<b>' : '') + esc(nm) + ' ' + s[i] + (r.winner === i ? '</b>' : ''); }).join(' · ');
-    if (r.mode === 'team4') return R + esc(n[0] + '+' + n[1]) + ' ' + s[0] + X + ' – ' + B + s[2] + ' ' + esc(n[2] + '+' + n[3]) + X;
-    return R + esc(n[0]) + ' ' + s[0] + X + ' – ' + B + s[1] + ' ' + esc(r.mode === 'bot' ? 'Bot' : n[1]) + X;
+    if (r.mode === 'ffa') return n.map(function (nm, i) { return (r.winner === i ? '<b>' : '') + esc(histName(r, i)) + ' ' + s[i] + (r.winner === i ? '</b>' : ''); }).join(' · ');
+    if (r.mode === 'team4') return R + esc(histSide(r, 0)) + ' ' + s[0] + X + ' – ' + B + s[2] + ' ' + esc(histSide(r, 2)) + X;
+    var left = n[0], right = n[1];
+    if (r.mode === 'bot') { var bot = histBot(r); left = r.me ? bot : n[0]; right = r.me ? n[0] : bot; }
+    return R + esc(left) + ' ' + s[0] + X + ' – ' + B + s[1] + ' ' + esc(right) + X;
   }
   function resultTag(r) {
     if (r.draw) return ['🤝 Hoà', 'draw'];
     if (r.mode === 'bot') return r.result === 'win' ? ['🏆 Thắng', 'win'] : ['Thua', 'loss'];
-    var n = r.names || [];
-    return ['🏆 ' + (r.mode === 'team4' ? 'Đội ' + DEF_TEAM[r.winner < 2 ? 0 : 1].name : n[r.winner] || ''), 'win'];
+    return ['🏆 ' + (r.mode === 'team4' ? 'Đội ' + DEF_TEAM[r.winner < 2 ? 0 : 1].name : histName(r, r.winner)), 'win'];
   }
   function buildHistory() {
     segSelect('hfMode', hf.mode); segSelect('hfLevel', hf.level); segSelect('hfResult', hf.result);
@@ -5056,7 +5208,7 @@
       else if (is4(G.mode)) { for (var k = 0; k < 4; k++) pr[k] = G.bots[k] ? updateBot(G.bots[k], w) : humanPress(k, w); }
       else {
         var r = humanPress(0, w), bl = G.bot ? updateBot(G.bot, w) : (G.mode === '2p' ? humanPress(1, w) : false);
-        pr[0] = pr[1] = r; pr[2] = pr[3] = bl;
+        if (G.me) { pr[0] = pr[1] = bl; pr[2] = pr[3] = r; } else { pr[0] = pr[1] = r; pr[2] = pr[3] = bl; }
       }
       if (celebrate) for (k = 0; k < 4; k++) pr[k] = w.players[k].team === G.scorer ? ((w.time * 1.5 + k * 0.37) % 1) < 0.12 : false;
       else if (G.hlw) for (k = 0; k < 4; k++) if (pr[k]) G.pressT[k] = w.time; // when each player last did something (saves)
@@ -5237,10 +5389,23 @@
       if (e.t === 'respawn' && !G.demo && G.state === 'play') { G.note = 'TUNG BÓNG!'; G.noteT = 1.2; sfx('whistle'); }
     }
   }
+  // the names over the score of a highlight: one per side (one per player with 4 players free for all);
+  // a bot is named by its level ("🤖 Bot Khó")
+  function botLabel() { return '🤖 Bot ' + (LEVEL_LABEL[G.cfg.level] || ''); }
+  function slotName(i) { return G.bots[i] ? botLabel() : nameOf(i); }
+  function sideNames() {
+    if (G.mode === 'ffa') return [0, 1, 2, 3].map(slotName);
+    if (G.mode === 'team4') return [[0, 1], [2, 3]].map(function (p) {
+      var a = slotName(p[0]), b = slotName(p[1]);
+      return a === b && G.bots[p[0]] ? a + ' ×2' : a + ' + ' + b;
+    });
+    if (G.mode === 'bot') return G.me ? [botLabel(), nameOf(0)] : [nameOf(0), botLabel()];
+    return [nameOf(0), nameOf(1)];
+  }
   function whoName(id) {
-    if (is4(G.mode)) return nameOf(id);
+    if (is4(G.mode)) return slotName(id);
     var team = slotTeam(id);
-    if (soloish(G.mode)) return team === 0 ? nameOf(0) : 'Bot';
+    if (soloish(G.mode)) return team === G.me ? nameOf(0) : botLabel();
     return nameOf(team);
   }
 
@@ -5252,10 +5417,10 @@
       var team = slotTeam(i), prof, col;
       if (four) { prof = Meta.profile(i); col = G.mode === 'ffa' ? Meta.color(i) : teamCol(team); }
       else if (G.mode === '2p') { prof = Meta.profile(team); col = teamCol(team); }
-      else { prof = team === 0 ? Meta.profile(0) : BOT_LOOK; col = teamCol(team); }
+      else { prof = team === G.me ? Meta.profile(0) : BOT_LOOK; col = teamCol(team); }
       var mk = four ? slotColor(i) : col;
       out.push({ hat: prof.hat, hair: prof.hair, shirt: prof.shirt, col: { main: col.main, dark: col.dark }, mark: { main: mk.main, dark: mk.dark },
-        label: four ? nameOf(i) + (G.bots[i] ? ' 🤖' : '') : '' });
+        label: four ? slotName(i) : '' });
     }
     return { four: four, ffa: G.mode === 'ffa', p: out, ball: Meta.D.ball };
   }
@@ -5358,7 +5523,7 @@
   function hudTop(u) { return Math.max(8, u * 2); }
   function edgeY(x, u) {
     if (playback()) return barH(u) + 4; // under the replay's black bar
-    var half = (is4(G.mode) ? 38 : 22) * u;
+    var half = is4(G.mode) ? 38 * u : 22 * u + (G.mode === 'tutorial' ? 0 : Math.max(sideW[0], sideW[1]) + 2 * u); // (the scoreboard, with the names)
     return Math.abs(x - view.cw / 2) < half ? hudTop(u) + 11 * u + 7 * u : 3;
   }
   function drawPlayerMarks(c, u, w) {
@@ -5451,6 +5616,7 @@
     if (sub) D.textOutlined(c, sub, 0, 13 * u, 4.2 * u, '#ffffff', INK);
     c.restore();
   }
+  var sideW = [0, 0];
   function drawHUD(c, A, w) {
     var v = view, u = Math.min(v.ch / 100, v.cw / 178);
     if (G.state === 'menu' || !A) return;
@@ -5469,6 +5635,10 @@
     } else {
       scorePill(c, cx - 18 * u, top, 15 * u, bh, u, teamCol(0), G.score[0]);
       scorePill(c, cx + 3 * u, top, 15 * u, bh, u, teamCol(1), G.score[1]);
+      // who plays: the names beside the scores (a bot by its level)
+      var names = sideNames(), room = cx - 26 * u;
+      sideW[0] = barText(c, names[0], cx - 19.5 * u, top + bh / 2, 3.8 * u, '#ffffff', 'right', room);
+      sideW[1] = barText(c, names[1], cx + 19.5 * u, top + bh / 2, 3.8 * u, '#ffffff', 'left', room);
     }
     if (G.mode !== 'tutorial') {
       D.textOutlined(c, A.map.icon, cx, top + bh / 2, 5 * u, '#ffffff', 'rgba(0,0,0,0)');
@@ -5483,7 +5653,7 @@
         if (w.fx.kick[t] > 0) icons += '🔥';
         if (w.fx.shield[t] > 0) icons += '🛡️';
         if (w.fx.freeze[t] > 0) icons += '❄️';
-        if (icons) { c.fillStyle = INK; D.emoji(c, icons, cx + (t === 0 ? -1 : 1) * 26 * u, top + bh / 2, 4.6 * u); }
+        if (icons) { c.fillStyle = INK; D.emoji(c, icons, cx + (t === 0 ? -1 : 1) * (is4(G.mode) ? 26 * u : 24 * u + sideW[t]), top + bh / 2, 4.6 * u); }
       }
     }
     // buttons sit in the corners, partly off-screen like the original
@@ -5498,13 +5668,14 @@
       drawButton(c, slotColor(3), lab(3), v.cw - o, o, r4, G.pressed[3], -1, 1);
     } else {
       var r = Math.max(34, 12.5 * u);
-      drawButton(c, teamCol(0), G.mode === 'tutorial' ? '●' : String(G.score[0]), r * 0.82, v.ch - r * 0.82, r, G.pressed[0], 1, -1);
+      var me = G.mode === 'bot' ? G.me : 0, mx = me ? v.cw - r * 0.82 : r * 0.82; // (the player's button on his side)
+      drawButton(c, teamCol(me), G.mode === 'tutorial' ? '●' : String(G.score[me]), mx, v.ch - r * 0.82, r, G.pressed[me * 2], me ? -1 : 1, -1);
       if (G.mode === '2p') drawButton(c, teamCol(1), String(G.score[1]), v.cw - r * 0.82, v.ch - r * 0.82, r, G.pressed[2], -1, -1);
     }
     c.globalAlpha = 1;
     if (G.mode === 'bot' && G.bot) {
-      var bx = v.cw - pad - 23 * u, by = v.ch - pad - 9 * u;
-      D.rrect(c, bx, by, 23 * u, 9 * u, 3 * u); c.fillStyle = G.pressed[2] ? teamCol(1).dark : teamCol(1).main; c.fill();
+      var bt = 1 - G.me, bx = bt ? v.cw - pad - 23 * u : pad, by = v.ch - pad - 9 * u; // (the bot's box on the other side)
+      D.rrect(c, bx, by, 23 * u, 9 * u, 3 * u); c.fillStyle = G.pressed[bt * 2] ? teamCol(bt).dark : teamCol(bt).main; c.fill();
       c.lineWidth = Math.max(2.5, u * 0.6); c.strokeStyle = INK; c.stroke();
       D.textOutlined(c, 'BOT ' + LEVEL_NAMES[G.bot.level], bx + 11.5 * u, by + 4.7 * u, 3.6 * u, '#ffffff', INK);
     }
@@ -5541,9 +5712,10 @@
   var SLOW_TXT = '🐢 QUAY CHẬM';
   function barH(u) { return 10 * u; }
   function barTextY(u) { return 6.1 * u; } // middle of the text band of the top bar (the bottom bar mirrors it)
-  function replayBars(c, u) {
+  // the black film bars (`top` = the top one's height, the bottom one's by default)
+  function replayBars(c, u, top) {
     var v = view, bar = barH(u), hole = 1.4 * u;
-    c.fillStyle = 'rgba(0,0,0,0.82)'; c.fillRect(0, 0, v.cw, bar); c.fillRect(0, v.ch - bar, v.cw, bar);
+    c.fillStyle = 'rgba(0,0,0,0.82)'; c.fillRect(0, 0, v.cw, top || bar); c.fillRect(0, v.ch - bar, v.cw, bar);
     c.fillStyle = 'rgba(255,255,255,0.8)';
     for (var x = 10; x < v.cw; x += 26) { c.fillRect(x, 0.7 * u, 12, hole); c.fillRect(x, v.ch - 0.7 * u - hole, 12, hole); }
     return bar;
@@ -5622,7 +5794,7 @@
     var dt = lastT ? Math.min(0.05, (now - lastT) / 1000) : 0.016;
     lastT = now;
     var t0 = performance.now();
-    update(dt);
+    if (!G.frozen) update(dt); // (frozen: the tests look at one moment)
     var t1 = performance.now();
     render(dt);
     var t2 = performance.now();
