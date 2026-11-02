@@ -1105,55 +1105,84 @@
   // SAVE_GAP seconds before) would score for one side within SAVE_LOOK seconds on its own (a lob that would still
   // bounce once before rolling in counts too), then a player of the other
   // side turns it away, SAVE_CONFIRM seconds later it is still not going in, and
-  //  - that player did something: he is in the air after his own jump or dive (button pressed at most SAVE_JUMP
-  //    seconds before - not just knocked up), or kicks or heads it with his button pressed at most SAVE_ACTIVE
-  //    seconds before; a ball bouncing off someone standing there, or off a shield, is no save,
+  //  - that player did something: he pressed his button at most SAVE_ACTIVE seconds before the touch (a kick, a
+  //    header, or the ball meeting his body as his jump starts), or he is in the air after his own jump or dive
+  //    (button pressed at most SAVE_JUMP seconds before - not just knocked up); a ball bouncing off someone standing
+  //    there doing nothing, or off a shield, is no save,
   //  - it happened in his own half.
   // A scramble in front of goal (the ball crawling between players touching it all the time) has no saves.
   // Saves by the same side less than SAVE_CHAIN seconds apart make one bigger save, which is always kept; of the
   // single saves the most dangerous third is kept. Every point, and every round stopped by lightning, is kept too.
   var SAVE_LOOK = 1.6, SAVE_CONFIRM = 0.25, SAVE_CHAIN = 3, SAVE_ACTIVE = 0.35, SAVE_JUMP = 1.5, SAVE_PACE = 400, SAVE_GAP = 0.15, CLIP_PRE = 3, CLIP_POST = 1.5;
   var ZAP_COL = { main: '#ffd23f', dark: '#c4a612' };
-  function newWatch() { return { tick: 0, threat: [null, null], cand: [], group: null, flight: [null, null], miss: [] }; }
+  function newWatch() { return { tick: 0, threat: [null, null], cand: [], group: null, flight: [null, null], miss: [], lastT: [-1, -1] }; }
+  // he did something when he touched it at t: pressed his button just before (whatever part of him the ball met: a
+  // kick, a header, or his body as the jump starts), or he is in the air after his own jump or dive
+  function activeTouch(b, pid, t) { return G.pressT[pid] >= t - SAVE_ACTIVE || (b.lastAir && G.pressT[pid] >= t - SAVE_JUMP); }
+  // every step: who touches the ball. A defender doing something while the ball is going in is remembered (he may
+  // deflect it and a later touch of his, doing nothing, is the one that finally stops it); anyone but a waiting
+  // save's player touching it means that save stands, whatever happens next
+  function watchTouches(w, S, bi, b) {
+    var team = b.lastTeam, pid = b.lastPid, tt = team >= 0 ? b.touchT[team] : -1;
+    if (team < 0 || tt <= S.lastT[bi]) return;
+    S.lastT[bi] = tt;
+    var th = S.threat[bi];
+    if (th && team === 1 - th.att && activeTouch(b, pid, tt)) { th.act = pid; th.actX = b.x; }
+    S.cand.forEach(function (c) { if (c.bi === bi && pid !== c.by && tt > c.t) c.other = true; });
+  }
   function watchSaves(w) {
     var S = G.hlw, A = w.arena, ev = w.events, i;
     if (A.type === 'bomb') return;
     // near misses follow the ball's real flight, every step; a shot hitting the frame (post, bar, rim, board) makes
     // a better one
     for (i = 0; i < ev.length; i++) if (ev[i].t === 'post') S.flight.forEach(function (f) { if (f) f.post = true; });
-    for (i = 0; i < w.balls.length && i < 2; i++) followFlight(w, S, i, w.balls[i]);
+    for (i = 0; i < w.balls.length && i < 2; i++) { followFlight(w, S, i, w.balls[i]); watchTouches(w, S, i, w.balls[i]); }
     for (i = S.miss.length - 1; i >= 0; i--) if (w.time >= S.miss[i].at + CLIP_POST) fileMiss(S.miss.splice(i, 1)[0]);
     if (++S.tick % 2) return; // 60 looks a second are plenty for the saves
     for (var bi = 0; bi < w.balls.length && bi < 2; bi++) {
       var b = w.balls[bi], th = S.threat[bi], fut = E.ballFuture(A, b, SAVE_LOOK);
-      if (fut) {
-        var att = fut.team, back = null;
-        // going in again: the touch a moment ago saved nothing
-        S.cand = S.cand.filter(function (c) { if (c.bi === bi && c.att === att) { back = c.th; return false; } return true; });
-        if (!th && back) th = S.threat[bi] = back;
-        if (!th || th.att !== att) th = S.threat[bi] = { att: att, since: w.time, shot: b.touchT[att], danger: 0 };
-        th.seen = w.time; th.danger = Math.max(th.danger, 1 - fut.t / SAVE_LOOK);
-        th.pace = Math.max(th.pace || 0, Math.sqrt(b.vx * b.vx + b.vy * b.vy));
-        if (b.touchT[att] > th.shot) th.shot = b.touchT[att];
-        // a shot on target: the attacking side's touch just now sent it goalwards (one per touch, dribbling counts once)
-        if (b.lastTeam === att && b.touchT[att] >= w.time - 0.5 && b.touchT[att] - (th.counted || -9) > 0.5) { th.counted = b.touchT[att]; statAdd(b.lastBy[att], 'shots'); }
-        continue;
-      }
-      if (!th) continue;
-      S.threat[bi] = null;
-      var def = 1 - th.att, t = b.touchT[def], by = b.lastTeam === def ? b.lastPid : -1;
-      if (by < 0 || t < Math.max(th.since, th.seen - 0.1)) continue; // not turned away by a defender
-      var shot = th.shot >= th.since - 3 ? th.shot : th.since, x = b.lastX;
-      if ((th.pace || 0) < SAVE_PACE) { why('slow', bi, by, x); continue; } // the ball was hardly moving
-      if (t - shot < SAVE_GAP) { why('scramble', bi, by, x); continue; } // touched by both sides in a scramble
-      var active = b.lastAir ? G.pressT[by] >= t - SAVE_JUMP : (b.lastKind === 'kick' || b.lastKind === 'head') && G.pressT[by] >= t - SAVE_ACTIVE;
-      if (!active) { why('standing', bi, by, x); continue; } // it hit him standing there
-      if (def === 0 ? x > W / 2 : x < W / 2) { why('their half', bi, by, x); continue; } // not in his own half
-      why('save?', bi, by, x);
-      S.cand.push({ bi: bi, att: th.att, def: def, t: t, by: by, shot: shot, danger: th.danger, th: th });
+      // the danger is over - no longer going in, or now going in at the OTHER end (a big clearance up an empty
+      // pitch): was it saved?
+      if (th && (!fut || fut.team !== th.att)) { S.threat[bi] = null; endThreat(w, S, bi, b, th); th = null; }
+      if (!fut) continue;
+      var att = fut.team, back = null;
+      // going in again right after a defender's touch: if nobody else touched the ball since (or only the same
+      // player again), that touch saved nothing; if someone else did (a team-mate heading it back, an attacker
+      // shooting again) it is a new danger and the save before it stands
+      S.cand = S.cand.filter(function (c) {
+        if (c.bi !== bi || c.att !== att) return true;
+        var last = Math.max(b.touchT[0], b.touchT[1]);
+        if (c.other || (last > c.t + 1e-6 && !(b.lastTeam === c.def && b.lastPid === c.by))) { addSave(c); return false; }
+        back = c.th; return false;
+      });
+      if (!th && back) th = S.threat[bi] = back;
+      if (!th) th = S.threat[bi] = { att: att, since: w.time, shot: b.touchT[att], danger: 0 };
+      th.seen = w.time; th.danger = Math.max(th.danger, 1 - fut.t / SAVE_LOOK);
+      th.pace = Math.max(th.pace || 0, Math.sqrt(b.vx * b.vx + b.vy * b.vy));
+      if (b.touchT[att] > th.shot) th.shot = b.touchT[att];
+      // a shot on target: the attacking side's touch just now sent it goalwards (one per touch, dribbling counts once)
+      if (b.lastTeam === att && b.touchT[att] >= w.time - 0.5 && b.touchT[att] - (th.counted || -9) > 0.5) { th.counted = b.touchT[att]; statAdd(b.lastBy[att], 'shots'); }
     }
     for (i = S.cand.length - 1; i >= 0; i--) if (w.time - S.cand[i].t >= SAVE_CONFIRM) addSave(S.cand.splice(i, 1)[0]);
     if (S.group && w.time - S.group.last > SAVE_CHAIN) closeGroup(true);
+  }
+
+  // a danger is over: if a defender turned it away (and did something, in his own half, after a real shot) it is a
+  // save waiting SAVE_CONFIRM seconds to be sure the ball is not going in after all
+  function endThreat(w, S, bi, b, th) {
+    var def = 1 - th.att, t = b.touchT[def], by = b.lastTeam === def ? b.lastPid : -1;
+    if (by < 0 || t < Math.max(th.since, th.seen - 0.1)) return; // not turned away by a defender
+    var shot = th.shot >= th.since - 3 ? th.shot : th.since, x = b.lastX;
+    if ((th.pace || 0) < SAVE_PACE) { why('slow', bi, by, x); return; } // the ball was hardly moving
+    if (t - shot < SAVE_GAP) { why('scramble', bi, by, x); return; } // touched by both sides in a scramble
+    // he did something (activeTouch); or a defender did something to it earlier in this danger and it ends here
+    // (his deflection, then the ball dies against him or a team-mate): the save is his
+    var active = activeTouch(b, by, t);
+    if (!active && th.act !== undefined) { by = th.act; x = th.actX; active = true; }
+    if (!active) { why('standing', bi, by, x); return; } // it hit him standing there
+    if (def === 0 ? x > W / 2 : x < W / 2) { why('their half', bi, by, x); return; } // not in his own half
+    why('save?', bi, by, x);
+    S.cand.push({ bi: bi, att: th.att, def: def, t: t, by: by, shot: shot, danger: th.danger, th: th });
   }
 
   // A near miss: a shot (the shooting side's touch sends the ball off at MISS_SPEED or more) whose REAL flight -

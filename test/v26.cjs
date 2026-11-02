@@ -56,7 +56,7 @@ const path = require('path');
   let r = await shot(Object.assign({ kind: 'body', pressed: false }, own));
   check('idle defender, the ball hits him: no save', r.touched && r.saves === 0 && r.clips === 0, JSON.stringify(r));
   r = await shot(Object.assign({ kind: 'body', pressed: true }, own));
-  check('button pressed but the ball just hits him standing: no save', r.touched && r.saves === 0, JSON.stringify(r));
+  check('v3.2: button pressed, the ball meets his body as his jump starts: save', r.touched && r.saves === 1, JSON.stringify(r));
   r = await shot(Object.assign({ kind: 'kick', pressed: true }, own));
   check('a kick that turns it away, own half: save', r.touched && r.saves === 1 && r.clips === 1, JSON.stringify(r));
   r = await shot(Object.assign({ kind: 'head', pressed: true }, own));
