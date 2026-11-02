@@ -1,4 +1,4 @@
-# Ballgames Physics (bản tự làm) – v2.9.4
+# Ballgames Physics (bản tự làm) – v3
 
 Game 2 đội × 2 cầu thủ ragdoll, mỗi đội **1 nút** (bấm = nhảy + vung chân sút, giữ khi đang bay = xoay người).
 Khi vào trận, tích chọn các môn muốn chơi; chọn nhiều môn thì sau mỗi điểm đổi sang môn khác.
@@ -14,6 +14,7 @@ Khi vào trận, tích chọn các môn muốn chơi; chọn nhiều môn thì s
 | ![Sét đánh trên Mặt Trăng](docs/screens/moon_lightning.png) | ![Bóng khổng lồ](docs/screens/giant_tornado.png) |
 | ![Phát lại quay chậm](docs/screens/replay.png) | ![Highlight: cứu thua](docs/screens/highlight_save.png) |
 | ![Thống kê trận + MVP](docs/screens/match_stats.png) | ![Lịch sử trận đấu](docs/screens/history.png) |
+| ![Người chơi · Trang phục](docs/screens/players.png) | ![Highlight: tên hai bên trên tỉ số](docs/screens/highlight_names.png) |
 
 ## 8 môn
 Bóng đá, bóng rổ, bóng bầu dục, bóng chuyền bãi biển, bóng đá Mặt Trăng, sân băng, bóng khổng lồ,
@@ -27,7 +28,7 @@ Cầu thủ ngã (kể cả lộn ngược) tự bật dậy sau khoảng 0,3 gi
 
 ## Chế độ
 - **2 người** – mỗi đội 1 nút (chạm nửa trái / nửa phải màn hình).
-- **Đấu bot** – Dễ / Thường / Khó (bot mô phỏng vật lý trước để chọn lúc bấm).
+- **Đấu bot** – Dễ / Thường / Khó (bot mô phỏng vật lý trước để chọn lúc bấm). Chọn **bạn chơi bên ◀ Trái (đỏ) hay Phải (xanh) ▶**; nút bấm của bạn và ô "BOT …" nằm đúng phía của mỗi bên.
 - **4 người (điểm riêng)** và **2 vs 2** – mỗi người 1 góc màn hình; ô trống có thể để **bot** (vd. 2 người chung đội đấu 2 bot).
   Khung thành mang màu người chạm bóng cuối; sau mỗi ván người trước/sau đổi chỗ.
 - **Hướng dẫn** 3 bước tương tác (nhảy → sút → xoay người), lần đầu xong được +30 xu.
@@ -49,6 +50,7 @@ Cầu thủ ngã (kể cả lộn ngược) tự bật dậy sau khoảng 0,3 gi
   - Đếm giờ chỉ chạy khi không có hiện tượng nào. Khi một hiện tượng đến: 90% các bộ đếm khác reset (chỉ có 1 hiện tượng), 9% có 2 hiện tượng cùng lúc, 0,9% có 3, 0,1% có cả 4.
 - Mỗi mục trên bật/tắt riêng, và khi bật thì **tích chọn từng thứ** muốn có.
 - **Phát lại** mỗi bàn thắng (chạm để bỏ qua): bắt đầu từ 5 giây trước cú chạm bóng cuối của bên được điểm (với phản lưới là cú sút trúng người bên kia rồi vào lưới), chạy tốc độ thường rồi quay chậm từ ngay trước cú sút (nhiều nhất 2,5 giây trước khi bóng vào) và chậm luôn tới hết phát lại, lúc bóng vào có vòng sáng quanh quả bóng; vật phẩm, khiên, đóng băng, phóng to, thời tiết hiện đúng như lúc diễn ra; bóng hay người bay lên trời có mũi tên ngay dưới vạch đen; kèm bình luận: phản lưới, xe đạp chổng ngược (chỉ khi thật sự lộn ngược trên không: đầu thấp hơn hông, đang bay, chân vung lên), đánh đầu, sút xa, chớp nhoáng…
+- **Tên người chơi trong trận**: chế độ 2 người / đấu bot hiện tên hai bên cạnh tỉ số (bot ghi theo mức: "🤖 Bot Dễ / Thường / Khó"); chế độ 4 người / 2 vs 2 hiện bảng tên trên đầu từng người (ô để bot ghi "🤖 Bot Khó"…).
   Khi xem lại (phát lại hay highlight) **mọi chữ nằm trong hai dải đen trên / dưới, không che sân**: dải trên ghi PHÁT LẠI / HIGHLIGHT, tên pha, MVP (và nút ✖); dải dưới ghi lời bình, đúng lúc bóng vào / cứu thua / suýt vào thì đổi thành "VÀO! ✔" / "🧤 CỨU THUA!" / "😱 SUÝT VÀO!", hai bên là QUAY CHẬM và Chạm để bỏ qua.
 - Cầu thủ có **nét mặt** (gắng sức, vui, buồn, choáng, lạnh cóng), đội ghi bàn ăn mừng, khán giả nhảy múa.
 - **Nhạc nền** tự tạo theo môn + tiếng khán giả; bật/tắt riêng nhạc và hiệu ứng.
@@ -59,19 +61,19 @@ Một trận là từ lúc bắt đầu đến khi có người chạm mốc đi
   Kết quả và cách biệt tỉ số ảnh hưởng nhiều nhất (thua 1–6 chỉ còn khoảng 4 điểm, thắng đậm khoảng 9–10), sau đó tới bàn thắng, cứu thua (+0,4 mỗi pha), sút trúng đích, chạm bóng; phản lưới bị trừ (−0,45 mỗi bàn).
   Ở chế độ 2 người / đấu bot mỗi bên là 1 người (1 nút điều khiển cả 2 cầu thủ); ở 4 người / 2 vs 2 mỗi ô là 1 người.
 - **🎬 Highlight**: mọi bàn thắng, các ván bị dừng vì sét đánh trúng bóng, những pha **cứu thua** và những pha **suýt vào**.
-  Cứu thua = một **cú sút thật** (bóng đi nhanh về phía khung thành, sút trước lúc chặn ít nhất 0,15 giây) sắp vào trong khoảng 1 giây thì bị cầu thủ bên kia chặn lại **ở nửa sân nhà** bằng **cú sút, cú đánh đầu hoặc bay người**, và người đó vừa bấm nút trong vòng 0,35 giây. Đứng yên để bóng đập vào người, chen nhau đẩy bóng trước khung thành, khiên chắn, hay chặn ở nửa sân đối phương đều không tính.
+  Cứu thua = một **cú sút thật** (bóng bay nhanh từ 400 trở lên theo **mọi hướng**, kể cả bóng bổng đang rơi xuống khung thành; sút trước lúc chặn ít nhất 0,15 giây) sắp vào trong khoảng 1 giây thì bị cầu thủ bên kia chặn lại **ở nửa sân nhà**, và người đó **có làm gì đó**: sút hoặc đánh đầu khi vừa bấm nút trong vòng 0,35 giây, hoặc đang **bật nhảy / bay người** do chính mình bấm (trong vòng 1,5 giây trước). Đứng yên để bóng đập vào người, bị va chạm hất lên không rồi bóng trúng người, chen nhau đẩy bóng trước khung thành, khiên chắn, hay chặn ở nửa sân đối phương đều không tính. Nếu chặn rồi mà bóng vẫn lăn vào lưới (bên sút không chạm thêm) thì cũng không tính là cứu thua.
   Các pha cứu thua liên tiếp (cách nhau dưới 3 giây, cùng một bên) gộp thành 1 pha lớn và luôn có trong highlight; với các pha cứu thua lẻ, giữ khoảng 1/3 pha nguy hiểm nhất.
-  Suýt vào = cú sút không vào (và không ai chạm vào bóng trước khi nó tới khung thành / rổ / cột) nhưng chỉ cần mạnh / nhẹ hơn tối đa 10% hoặc lệch góc tối đa khoảng 3° là đã vào: dội cột, sượt xà, bóng xoay ra khỏi vành rổ… Mỗi pha được chấm điểm đẹp (càng sát càng cao, cộng thêm khi dội cột / vành, sút xa, sút trên không, sút mạnh) và highlight lấy **20% pha đẹp nhất** (làm tròn lên).
+  Suýt vào = cú sút không vào (và không ai chạm vào bóng trước khi nó tới khung thành / rổ / cột) nhưng **đường bay thật của bóng** đi rất sát: dội xà, bay sát trên xà (đo ngay tại vạch vôi, cách xà chưa tới khoảng 1 quả bóng), lăn dừng ngay trên vạch, rơi trúng vành rổ / sát mép vành, sượt dưới xà ngang hoặc dội cột dọc bóng bầu dục. Bóng bổng rơi lên nóc khung thành, bóng bay cao vút rồi rơi xa khung thành, bóng đi lên từ dưới vành rổ, hay bóng còn đang lăn tới khi hết thời gian xét đều **không** tính. Mỗi pha được chấm điểm đẹp (càng sát càng cao, cộng thêm khi dội cột / vành, sút xa, sút trên không, sút mạnh) và highlight lấy **20% pha đẹp nhất** (làm tròn lên).
   Pha nào cũng có quay chậm lúc vào lưới / lúc cứu thua / lúc suýt vào. Các pha chồng lên nhau trong cùng một ván (vd. cứu thua rồi phản công ghi bàn luôn) được gộp thành 1 đoạn, không chiếu 2 lần. Xem ngay ở màn hình cuối trận hoặc trong Lịch sử (chạm để sang pha tiếp, ✖ để thoát). Pha ghi bàn dài như đoạn phát lại trong trận. Giữa các pha là một nhịp tối màn hình ngắn.
-  Highlight **có tiếng** như lúc đá (sút, đánh đầu, bóng nảy, dội cột, khiên, nhảy, nổ bom, vật phẩm, sấm sét, động đất, lốc xoáy, còi và tiếng hò reo khi ghi bàn, tiếng khán giả). Dải đen phía trên hiện **tỉ số ngay lúc đó** (bàn thắng được cộng đúng lúc bóng vào) và **thời gian còn lại của trận** (⏱ 1:23, hết giờ thì ⭐ BÀN VÀNG) hoặc **Chạm N**; dải dưới hiện tên pha và lời bình.
+  Highlight **có tiếng** như lúc đá (sút, đánh đầu, bóng nảy, dội cột, khiên, nhảy, nổ bom, vật phẩm, sấm sét, động đất, lốc xoáy, còi và tiếng hò reo khi ghi bàn, tiếng khán giả). Dải đen phía trên hiện **tên hai bên ngay trên tỉ số** (bot ghi "🤖 Bot Khó"…), **tỉ số ngay lúc đó** (bàn thắng được cộng đúng lúc bóng vào) và **thời gian còn lại của trận** (⏱ 1:23, hết giờ thì ⭐ BÀN VÀNG) hoặc **Chạm N**; dải dưới hiện tên pha và lời bình.
 - **⬇️ Tải highlight**: tạo video **MP4 Full HD (1920×1080, 30 hình/giây)** của highlight trận đó, H.264 (máy không có H.264 thì VP9, vẫn là file .mp4). Video được vẽ **từng khung hình đều nhau** rồi nén, không phải quay màn hình, nên không giật dù máy yếu. Nó được làm **ở chế độ nền**: bấm tải xong bạn cứ chơi tiếp (menu, trận mới…), góc dưới có ô "⬇️ Đang tạo video 42% ✖", xong thì báo đã lưu. Điện thoại: lưu vào **Movies/Ballgames** (Android 9 trở xuống sẽ hỏi quyền bộ nhớ; nếu từ chối thì lưu vào thư mục riêng của app). Trình duyệt: tải về như file bình thường. Video **có tiếng** (AAC, máy không có AAC thì Opus), dựng lại từ chính âm thanh của game theo đúng từng khung hình. Máy quá cũ không có WebCodecs thì quay màn hình trong lúc phát highlight như bản cũ.
-- **📜 Lịch sử trận đấu**: ngày giờ, chế độ, mức bot, thể thức, các môn, tỉ số, thắng/thua/hoà, thời lượng, danh sách bàn thắng, bảng thống kê. Lọc theo chế độ (2 người / đấu bot / 4 người / 2 vs 2), mức bot (Dễ / Thường / Khó), kết quả (thắng bot / thua bot / hoà), môn; sắp xếp mới nhất / cũ nhất / cách biệt nhiều nhất. Lưu tối đa 500 trận.
+- **📜 Lịch sử trận đấu**: ngày giờ, chế độ, mức bot, thể thức, các môn, tỉ số, thắng/thua/hoà, thời lượng, danh sách bàn thắng, bảng thống kê. Lọc theo chế độ (2 người / đấu bot / 4 người / 2 vs 2), mức bot (Dễ / Thường / Khó), kết quả (thắng bot / thua bot / hoà), môn; sắp xếp mới nhất / cũ nhất / cách biệt nhiều nhất; nút **✔ Xong** nhỏ, luôn ghim ở dưới dù danh sách dài. Lưu tối đa 500 trận.
 - **Lưu highlight**: lần đầu đấu xong game hỏi 1 lần: 💾 lưu tất cả / 🔢 chỉ lưu N trận gần nhất (1–100) / 🚫 không lưu (chỉ xem / tải ngay sau trận). Đổi lại trong ⚙️ Cài đặt (có xác nhận trước khi xoá bớt). Mỗi trận khoảng 0,05–0,2 MB. Bản điện thoại lưu trong máy, bản web lưu trong trình duyệt.
   Xoá để giải phóng bộ nhớ: 🗑️ từng trận trong Lịch sử, ☑️ chọn nhiều trận rồi xoá, hoặc 🗑️ xoá tất cả trong Cài đặt (tuỳ chọn xoá luôn lịch sử). Trận đã xoá highlight vẫn còn trong lịch sử; video đã tải về không bị ảnh hưởng.
 
 ## Ngoài trận
 - **Xu & cửa hàng**: mũ, tóc, áo, skin bóng. Xu nhận khi thắng bot (Dễ 10 / Thường 20 / Khó 40), ghi bàn, chơi 2/4 người, học xong hướng dẫn.
-- **Người chơi**: đặt tên + màu áo + trang phục cho P1–P4 (xem trước hình).
+- **👤 Người chơi · Trang phục**: chọn **👥 Chơi 2 người** hoặc **🙋 Chơi 4 người**. Mỗi người có 1 **thẻ dọc** vẽ đúng hình trong trận: 2 người thì mỗi thẻ là cả một bên (2 cầu thủ cùng màu đội, số áo, tên cạnh ô tỉ số); 4 người thì mỗi thẻ 1 cầu thủ với bảng tên trên đầu, xem theo kiểu 🤝 2 vs 2 (màu đội) hoặc 🙋 mỗi người 1 đội (màu riêng). Sửa tên ngay dưới thẻ; chạm thẻ để chọn mũ, tóc, áo (và màu áo riêng khi chơi 4 người).
 - **Thống kê**: số trận, thắng/thua/hoà từng mức bot, chuỗi thắng bot Khó, tổng bàn, môn ghi nhiều nhất, bàn nhanh nhất.
 - **Cài đặt**: lực nhảy, lực sút, trọng lực, độ nảy, cỡ bóng, tốc độ game, **độ trễ nhảy**, **độ dài tối thiểu 1 lần chạm**, bật/tắt phát lại, nhạc, hiệu ứng.
 - **Chế độ người mới**: bóng/khung thành/rổ to hơn, bot hay mắc lỗi hơn.
@@ -91,7 +93,7 @@ Dữ liệu (xu, đồ, thống kê, cài đặt, lịch sử) lưu trong máy (
 - `android/` – vỏ Android (WebView toàn màn hình, khoá màn hình ngang, nút Back, cầu nối `BGNative` để lưu highlight và video).
 - `build_apk.sh` – build APK không cần Gradle (aapt2 → javac → d8 → zipalign → apksigner).
 - `build_html.py` – gộp thành 1 file HTML chơi trên trình duyệt.
-- `test/` – kiểm tra vật lý (`sanity2.cjs`), bot đấu nhau (`match2.cjs`), kiểm tra giao diện bằng Playwright (`v21.cjs`, `v22.cjs`, `v23.cjs`, `flow2.cjs`, `tut.cjs`, `migrate.cjs`), thời gian đứng dậy sau khi ngã (`getup.cjs`), thiên tai (`hazards.cjs`), bóng mọi cỡ đều vào được khung thành (`goalfit.cjs`), quay chậm liền mạch (`slowmo.cjs`), lời bình xe đạp chổng ngược (`bicycle.cjs`), highlight / lịch sử / thống kê / bình chọn / xuất video (`v25.cjs`), luật cứu thua, gộp pha trùng, cách tính điểm (`v26.cjs`), bóng nằm im 15 giây được thả lại (`stillball.cjs`), báo trước khi thả lại bóng, pha suýt vào, giao diện tối (`v28.cjs`), tạm dừng đúng lúc màn hình đang chuyển ván (`pausefade.cjs`), video MP4 làm ở chế độ nền (`video.cjs`), tiếng + tỉ số + thời gian trong highlight và video (`hlsound.cjs`), bộ ghi file MP4 với dữ liệu H.264 / VP9 thật của ffmpeg (`mp4mux.cjs`), đường đi của bản Android với cầu nối giả lập (`native.cjs`), dung lượng highlight (`hlsize.cjs`).
+- `test/` – kiểm tra vật lý (`sanity2.cjs`), bot đấu nhau (`match2.cjs`), kiểm tra giao diện bằng Playwright (`v21.cjs`, `v22.cjs`, `v23.cjs`, `flow2.cjs`, `tut.cjs`, `migrate.cjs`), thời gian đứng dậy sau khi ngã (`getup.cjs`), thiên tai (`hazards.cjs`), bóng mọi cỡ đều vào được khung thành (`goalfit.cjs`), quay chậm liền mạch (`slowmo.cjs`), lời bình xe đạp chổng ngược (`bicycle.cjs`), highlight / lịch sử / thống kê / bình chọn / xuất video (`v25.cjs`), luật cứu thua, gộp pha trùng, cách tính điểm (`v26.cjs`), suýt vào theo đường bay thật, tên người chơi / bot, màn Người chơi mới (`v3.cjs`), soát hàng loạt quyết định cứu thua / suýt vào / bàn thắng qua nhiều trận bot (`diag.cjs`), bóng nằm im 15 giây được thả lại (`stillball.cjs`), báo trước khi thả lại bóng, pha suýt vào, giao diện tối (`v28.cjs`), tạm dừng đúng lúc màn hình đang chuyển ván (`pausefade.cjs`), video MP4 làm ở chế độ nền (`video.cjs`), tiếng + tỉ số + thời gian trong highlight và video (`hlsound.cjs`), bộ ghi file MP4 với dữ liệu H.264 / VP9 thật của ffmpeg (`mp4mux.cjs`), đường đi của bản Android với cầu nối giả lập (`native.cjs`), dung lượng highlight (`hlsize.cjs`).
 
 ## Tuỳ chỉnh vật lý
 Trong game: Menu → ⚙️ Cài đặt.
@@ -100,7 +102,7 @@ Trong code: sửa từng môn ở `MAPS` trong `www/engine.js` (`g`, `gBall`, `j
 ## Build
 Cần JDK 17+ và Android SDK (build-tools 36.1.0, platforms;android-34):
 ```
-ANDROID_HOME=/đường/dẫn/sdk VERSION_CODE=22 VERSION_NAME=2.9.4 ./build_apk.sh
+ANDROID_HOME=/đường/dẫn/sdk VERSION_CODE=23 VERSION_NAME=3.0 ./build_apk.sh
 python3 build_html.py BallgamesPhysics.html
 ```
 Chạy kiểm tra: `node test/sanity2.cjs` (engine), các file Playwright như `node test/v25.cjs` (cần `npm i -g playwright` và Chromium).
