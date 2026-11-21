@@ -6,7 +6,7 @@ const SH = path.resolve(__dirname, '../shots7');
 const ONLY = process.env.ONLY || '';
 const want = k => !ONLY || ONLY.split(',').includes(k);
 (async () => {
-  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' }).catch(() => chromium.launch());
   const ctx = await browser.newContext({ viewport: { width: 800, height: 380 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true, acceptDownloads: true });
   const page = await ctx.newPage();
   const errs = [];

@@ -24,7 +24,7 @@
   var P_MASS = 5, P_INERTIA = 2600;
   var LEG_REST = -0.12, LEG_KICK = 1.95, KICK_REACH = 12;
   // two players touching for longer than STICK_T s are eased apart, sideways, at up to STICK_PUSH px/s
-  var STICK_T = 0.35, STICK_PUSH = 260, STICK_GAP = 3, PAIR = [[0, 0, 1, 2], [0, 0, 3, 4], [0, 0, 0, 5]];
+  var STICK_T = 0.35, STICK_PUSH = 120, STICK_GAP = 3, MATE_STEP = 2, PAIR = [[0, 0, 1, 2], [0, 0, 3, 4], [0, 0, 0, 5]];
   var POP_TIME = 0.16, POP_REACH = 6, POP_SIN = Math.sin(1.3), POP_COS = Math.cos(1.3);
   var GETUP_DELAY = 0.3, RISE_TIME = 2;
   // standing sway: aimed this far forward so that, with gravity, the body leans as far forward as back (even sway);
@@ -580,7 +580,7 @@
   function playerPlayer(w, k, A, B, part) {
     var dx = B.x - A.x, dy = B.y - A.y, lim = 115 * (A.sc + B.sc);
     if (dx * dx + dy * dy > lim * lim) { w.stick[k] = 0; return; }
-    var mates = A.team === B.team, side = dx > 0 || (dx === 0 && A.id < B.id) ? 1 : -1, touch = false;
+    var mates = A.team === B.team, side = dx > 0 || (dx === 0 && A.id < B.id) ? 1 : -1, touch = false, deepest = 0;
     for (var i = 0; i < NS; i++) {
       for (var j = 0; j < NS; j++) {
         var nx = B.sx[j] - A.sx[i], ny = B.sy[j] - A.sy[i], rr = A.rad[i] + B.rad[j];
@@ -591,7 +591,7 @@
         var d = Math.sqrt(d2);
         nx /= d; ny /= d;
         var pen = rr - d, c = pen * 0.35;
-        if (mates) { shiftPlayer(A, -side * c, 0); shiftPlayer(B, side * c, 0); continue; }
+        if (mates) { if (pen > deepest) deepest = pen; continue; }
         var cx = A.sx[i] + nx * A.rad[i], cy = A.sy[i] + ny * A.rad[i];
         var rax = cx - A.x, ray = cy - A.y, rbx = cx - B.x, rby = cy - B.y;
         var vax = A.vx - A.w * ray + A.ex[i], vay = A.vy + A.w * rax + A.ey[i];
@@ -608,12 +608,21 @@
         if (ny > 0.6) A.cT = 0; else if (ny < -0.6) B.cT = 0;
       }
     }
+    // team-mates: one sideways push for the deepest overlap (not one per touching part: they added up into jumps),
+    // a few px at most each time, so they slide apart smoothly
+    if (deepest > 0) {
+      var m = Math.min(deepest * 0.35, MATE_STEP); shiftPlayer(A, -side * m, 0); shiftPlayer(B, side * m, 0);
+      // and they don't run into each other: the sideways speed towards each other is taken out
+      // (only the one running into the other is held back: the other keeps his own speed, nobody is pushed on)
+      var into = (A.vx - B.vx) * side;
+      if (into > 0) { if (A.vx * side > -B.vx * side) A.vx -= side * into; else B.vx += side * into; }
+    }
     // (a moment apart doesn't start the count again: it only winds down, twice as fast)
     if (!touch) { w.stick[k] = Math.max(0, w.stick[k] - 2 * DT * part); return; }
     w.stick[k] += DT * part;
     var over = w.stick[k] - STICK_T;
     if (over > 0) {
-      var push = Math.min(STICK_PUSH, over * STICK_PUSH * 2.5) * DT * part * 0.5;
+      var push = Math.min(STICK_PUSH, over * STICK_PUSH * 3) * DT * part * 0.5; // (eased in, then a steady slow slide)
       shiftPlayer(A, -side * push, 0); shiftPlayer(B, side * push, 0);
     }
   }

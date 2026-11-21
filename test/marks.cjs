@@ -1,7 +1,7 @@
 const { chromium } = require('playwright');
 const path = require('path');
 (async () => {
-  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' }).catch(() => chromium.launch());
   const out = path.resolve(__dirname, '../shots');
   const errs = [];
   for (const [vw, vh, dpr, tagName] of [[800, 380, 2, 'phone'], [640, 300, 3, 'small']]) {
