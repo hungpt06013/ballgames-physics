@@ -3718,9 +3718,18 @@
       c.beginPath(); c.moveTo(Wc / 2 - 8, ty + 14); c.lineTo(Wc / 2 + 8, ty + 14); c.lineTo(Wc / 2, ty + 24); c.closePath();
       c.fillStyle = mark.main; c.fill(); c.lineWidth = 2; c.strokeStyle = INK; c.stroke();
       tag(c, Wc / 2, ty, name, mark, fs);
-      D.textOutlined(c, (side === 0 ? '◀ Trái' : 'Phải ▶') + ' · P' + (i + 1), Wc / 2, Hc - 30, 20, '#ffffff', INK);
+      // where his button is in a match: a corner of the screen (P1 bottom left, P2 top left, P3 bottom right, P4 top
+      // right), named under him and pointed at by an arrow in that corner of the card
+      var left = i < 2, bottom = i % 2 === 0, k = CORNERS[i];
+      D.textOutlined(c, k, Wc / 2, Hc - 30, 19, '#ffffff', INK);
+      c.save();
+      c.translate(left ? 24 : Wc - 24, bottom ? Hc - 24 : 24); c.rotate(Math.atan2(bottom ? 1 : -1, left ? -1 : 1));
+      c.beginPath(); c.moveTo(-15, -5); c.lineTo(1, -5); c.lineTo(1, -12); c.lineTo(17, 0); c.lineTo(1, 12); c.lineTo(1, 5); c.lineTo(-15, 5); c.closePath();
+      c.fillStyle = mark.main; c.fill(); c.lineWidth = 3; c.strokeStyle = INK; c.stroke();
+      c.restore();
     }
   }
+  var CORNERS = ['Góc dưới trái', 'Góc trên trái', 'Góc dưới phải', 'Góc trên phải'];
 
   // --- stats ---
   function buildStats() {
