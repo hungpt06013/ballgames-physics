@@ -1,4 +1,4 @@
-# ⚽ Ballgames Physics – v3.3
+# ⚽ Ballgames Physics – v3.4
 
 Game thể thao ragdoll vui nhộn: 2 đội × 2 cầu thủ, mỗi đội chỉ **1 nút**.
 
@@ -29,7 +29,8 @@ Game thể thao ragdoll vui nhộn: 2 đội × 2 cầu thủ, mỗi đội ch�
 ⚽ Bóng đá · 🏀 Bóng rổ · 🏈 Bóng bầu dục · 🏐 Bóng chuyền bãi biển · 🌙 Bóng đá Mặt Trăng · 🧊 Sân băng · 🎈 Bóng khổng lồ · 💣 Bóng bom (bom nổ bên sân ai thì người đó thua)
 
 ## 👥 Chế độ
-- 🤖 Đấu bot (Dễ / Thường / Khó) · 👥 2 người · 🙋 4 người · 🤝 2 vs 2 (ô trống để bot)
+- 🤖 Đấu bot (Dễ / Thường / Khó) · 👥 2 người · 🙋 4 người · 🤝 2 vs 2
+- Ở 2 người / 4 người / 2 vs 2, chạm vào ô từng người để đổi: người → bot Dễ → Thường → Khó. Mỗi bot một độ khó riêng; để tất cả là bot thì ngồi xem
 - Thắng khi đủ điểm hoặc hết giờ; hết giờ mà hoà thì chọn 🤝 hoà hay ⭐ bàn vàng
 - 🎓 Hướng dẫn 3 bước cho người mới
 
