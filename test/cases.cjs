@@ -51,7 +51,8 @@ const path = require('path');
       const tt = mt(tc.team), tp = mb(tc.pid);
       ball.lastTeam = tt; ball.lastBy[tt] = tp; ball.lastPid = tp; ball.touchT[tt] = t0 - (tc.ago || 0); ball.lastX = ball.x; ball.lastKind = 'kick'; ball.lastAir = false;
       if (o.shield !== undefined) w.fx.shield[mt(o.shield)] = 10;
-      let rebounded = false, touch0 = -1;
+      if (G.cf) G.cf = new G.cf.constructor(); // (what-if replays of a save start from this set-up, not from before it)
+      let rebounded = false, touch0 = -1, rbT = -1;
       const b = ball, D0 = mt(0), slot = k => o.mode && o.mode !== '2p' ? k : mt(k);
       const secs = o.secs || 3.5;
       for (let i = 0; i < secs * 60 && G.state === 'play'; i++) {
@@ -65,7 +66,10 @@ const path = require('path');
           if (r.x !== undefined) { b.x = b.prevX = M ? WW - r.x : r.x; b.y = b.prevY = r.y; }
           const rt = mt(r.team), rp = mb(r.pid);
           b.vx = M ? -r.vx : r.vx; b.vy = r.vy; b.lastTeam = rt; b.lastBy[rt] = rp; b.lastPid = rp; b.touchT[rt] = w.time; b.lastKind = 'head'; b.lastX = b.x;
+          rbT = w.time;
         }
+        // o.pressR: presses timed from the rebound [[slot, after, duration]]
+        if (rbT >= 0) (o.pressR || []).forEach(q => { if (Math.abs(w.time - rbT - q[1]) < 0.009) G.hold[slot(q[0])] = w.time + q[2]; });
         __api.step(1 / 60);
       }
       // (results from red's point of view: mirrored ones swapped back)
@@ -108,47 +112,47 @@ const path = require('path');
     }
     return Object.assign({ found: false }, last);
   }
+  // a shot that would fly in just over the head of a keeper standing there (he has to jump for it): from 555 px out,
+  // the bottom of the ball 190 px up, coming down to the same height at the goal line
+  const HEAD = 'g => ({ x: g.goalD + 555, y: g.GROUND - 190 - g.R, vx: -1200, vy: -0.5 * g.grav * (555 / 1200) })';
   const grid = (xs, ats, extra) => { const out = []; xs.forEach(x => ats.forEach(at => out.push(extra(x, at)))); return out; };
   const short = r => JSON.stringify({ found: r.found, opt: r.opt, score: r.score, saves: r.saves, own: r.own, clips: r.clips, dbg: r.dbg && r.dbg.slice(0, 120), word: r.word });
 
   console.log('--- SAVES that must count ---');
-  // 1. a hard low shot kicked away by the keeper
-  let r = await find({ ball: 'g => ({ x: 720, y: g.GROUND - g.R, vx: -1300, vy: 0 })' },
-    grid([230, 260, 290, 320], [0.12, 0.18, 0.24, 0.3], (x, at) => ({ pl: [x], press: [[0, at, 0.25]] })),
-    (x, v) => x.touched0 && x.score === '0-0' && x.firstTouch0 > v.press[0][1]);
-  check('hard low shot kicked away by the keeper', r.found && r.saves[0] === 1 && /save\[save\]/.test(r.clips), short(r));
-  let fl = await flashes();
-  check('...the highlight shows it with "🧤 CỨU THUA!"', fl.some(f => f.indexOf('CỨU THUA') >= 0), JSON.stringify(fl));
-  // 2. a shot at head height headed / punched away by a jumping keeper
-  r = await find({ ball: 'g => ({ x: 720, y: 600, vx: -1200, vy: -0.5 * g.grav * (470 / 1200) })' },
+  // 1. a shot at head height headed / punched away by a jumping keeper
+  let r = await find({ ball: 'g => ({ x: 720, y: 600, vx: -1200, vy: -0.5 * g.grav * (470 / 1200) })' },
     grid([230, 260, 290], [0.05, 0.1, 0.15, 0.2, 0.25], (x, at) => ({ pl: [x], press: [[0, at, 0.3]] })),
     x => x.touched0 && x.score === '0-0');
-  check('shot at head height cleared by a jumping keeper', r.found && r.saves[0] === 1, short(r));
+  check('shot at head height cleared by a jumping keeper', r.found && r.saves[0] === 1 && /save\[save\]/.test(r.clips), short(r));
+  let fl = await flashes();
+  check('...the highlight shows it with "🧤 CỨU THUA!"', fl.some(f => f.indexOf('CỨU THUA') >= 0), JSON.stringify(fl));
   // 3. the lob of video 2: would bounce once and roll in 1.2 s later; cleared by a jumping header
   r = await find({ ball: 'g => ({ x: 478, y: 365, vx: -255, vy: 930 })', touch: { team: 1, pid: 2, ago: 1.3 } },
     grid([440, 420, 400, 460], [0.05, 0.1, 0.15, 0.2, 0], (x, at) => ({ pl: [x], press: [[0, at, 0.25]] })),
     x => x.touched0 && x.score === '0-0');
   check('video 2: dropping lob cleared by a jumping player', r.found && r.saves[0] === 1, short(r));
-  // 4. video 3: the keeper stops the opponent's lob, a team-mate heads it straight back, the keeper stops it again
-  r = await find({ ball: 'g => ({ x: 1215, y: 638, vx: -701, vy: -1099 })', touch: { team: 1, pid: 2, ago: 0 }, hold: 0, secs: 4.5 },
-    grid([230, 250, 270, 290, 310], [0.3, 0.4, 0.5], (x, after) => ({ pl: [x], rebound: { after, team: 0, pid: 1, x: 540, y: 520, vx: -800, vy: 100 } })),
-    x => x.touched0 && x.rebounded && x.score === '0-0' && x.lastTouch0 > 0.3);
+  // 4. like video 3: the keeper jumps to clear a shot over his head, a team-mate heads it straight back over him, the
+  // keeper jumps and clears it again (each would have gone in over a keeper standing there)
+  const chain = (rb, extra) => { const out = []; [230, 260, 290].forEach(x => [0.1, 0.15, 0.2, 0.25].forEach(at => [0.05, 0.1, 0.15, 0.2].forEach(d =>
+    out.push(Object.assign({ pl: [x], press: [[0, at, 0.3]], rebound: Object.assign({ after: 0.75 }, rb), pressR: [[0, d, 0.3]] }, extra || {}))))); return out; };
+  const HEADBACK = { team: 0, pid: 1, x: 600, y: 520, vx: -900, vy: -350 };
+  r = await find({ ball: HEAD.replace('g.goalD + 555', '720'), secs: 4 }, chain(HEADBACK),
+    x => x.touched0 && x.rebounded && x.score === '0-0' && x.lastTouch0 > x.rebounded + 0.05);
   check('video 3: save, team-mate heads it back, save again = 2 saves, one clip "×2"', r.found && r.saves[0] === 2 && /save×2\[save\+save\]/.test(r.clips), short(r));
   fl = await flashes();
   check('...the highlight flashes "CỨU THUA!" twice', fl.filter(f => f.indexOf('CỨU THUA') >= 0).length === 2, JSON.stringify(fl));
-  // 5. save, the opponent shoots again, save again
-  r = await find({ ball: 'g => ({ x: 1215, y: 638, vx: -701, vy: -1099 })', touch: { team: 1, pid: 2, ago: 0 }, hold: 0, secs: 4.5 },
-    grid([230, 250, 270, 290, 310], [0.3, 0.4, 0.5], (x, after) => ({ pl: [x], rebound: { after, team: 1, pid: 2, x: 820, y: 690, vx: -1100, vy: -200 } })),
-    x => x.touched0 && x.rebounded && x.score === '0-0' && x.lastTouch0 > x.rebounded + 0.2);
+  // 5. save, the opponent shoots again (over his head again), save again
+  r = await find({ ball: HEAD.replace('g.goalD + 555', '720'), secs: 4 }, chain({ team: 1, pid: 2, x: 820, y: 580, vx: -1200, vy: -464 }),
+    x => x.touched0 && x.rebounded && x.score === '0-0' && x.lastTouch0 > x.rebounded + 0.05);
   check('save, opponent shoots again, save again = 2 saves', r.found && r.saves[0] === 2, short(r));
   // 6. a shot blocked near the halfway line, in his own half
-  r = await find({ ball: 'g => ({ x: 1150, y: g.GROUND - g.R, vx: -1500, vy: 0 })' },
-    grid([640, 680, 720], [0.12, 0.18, 0.24, 0.3], (x, at) => ({ pl: [x], press: [[0, at, 0.25]] })),
+  r = await find({ ball: 'g => ({ x: 1150, y: g.GROUND - 200, vx: -1500, vy: -0.5 * g.grav * (985 / 1500) })' },
+    grid([640, 680, 720, 760], [0.05, 0.1, 0.15, 0.2, 0.25, 0.3], (x, at) => ({ pl: [x], press: [[0, at, 0.3]] })),
     x => x.touched0 && x.score === '0-0');
-  check('hard shot blocked in his own half near the middle', r.found && r.saves[0] === 1, short(r));
+  check('high shot headed away in his own half near the middle', r.found && r.saves[0] === 1, short(r));
   // 7. a ball his own team-mate sent toward his own goal, stopped by the keeper
-  r = await find({ ball: 'g => ({ x: 720, y: g.GROUND - g.R, vx: -1300, vy: 0 })', touch: { team: 0, pid: 1, ago: 0.3 } },
-    grid([230, 260, 290, 320], [0.12, 0.18, 0.24, 0.3], (x, at) => ({ pl: [x, 900], press: [[0, at, 0.25]] })),
+  r = await find({ ball: HEAD.replace('g.goalD + 555', '720'), touch: { team: 0, pid: 1, ago: 0.3 } },
+    grid([230, 260, 290, 320], [0.05, 0.1, 0.15, 0.2, 0.25, 0.3], (x, at) => ({ pl: [x, 900], press: [[0, at, 0.3]] })),
     x => x.touched0 && x.score === '0-0' && x.lastTouch0 > 0);
   check('own team-mate\'s miskick toward his goal, stopped by the keeper', r.found && r.saves[0] === 1, short(r));
   // 8. basketball: a ball dropping into the ring blocked by a jumping player
@@ -158,6 +162,11 @@ const path = require('path');
   check('basketball: shot dropping into the ring blocked by a jump', r.found && r.saves[0] === 1, short(r));
 
   console.log('--- touches that must NOT count as saves ---');
+  // a hard low shot straight at the keeper: kicking it away is no save, it would have hit him anyway (v3.3)
+  r = await find({ ball: 'g => ({ x: 720, y: g.GROUND - g.R, vx: -1300, vy: 0 })' },
+    grid([230, 260, 290, 320], [0.12, 0.18, 0.24, 0.3], (x, at) => ({ pl: [x], press: [[0, at, 0.25]] })),
+    (x, v) => x.touched0 && x.score === '0-0' && x.firstTouch0 > v.press[0][1]);
+  check('low shot straight at the keeper kicked away: no save (it would have hit him anyway)', r.found && r.saves[0] === 0 && !/save/.test(r.clips) && /anyway/.test(r.dbg), short(r));
   // 9. keeper standing still (never pressed), the shot hits him
   r = await find({ ball: 'g => ({ x: 720, y: g.GROUND - g.R - 60, vx: -1300, vy: -200 })' },
     [230, 260, 290, 320].map(x => ({ pl: [x] })), x => x.touched0);
@@ -286,9 +295,12 @@ const path = require('path');
     // geometry of this pitch
     const geo = await page.evaluate(m => { const A = BGP.createWorld(m || 'soccer', null, 1).arena; return { goalD: A.goalD, R: A.P.ballR }; }, base.map);
     const kx = d => geo.goalD + d;
-    let q = await find(Object.assign({ ball: LOW }, base), grid([65, 95, 125, 155, 185], [0.12, 0.18, 0.24, 0.3, 0.36], (dx, at) => ({ pl: [kx(dx)], press: [[0, at, 0.25]] })),
+    let q = await find(Object.assign({ ball: HEAD }, base), grid([65, 95, 125, 155, 185], [0.05, 0.1, 0.15, 0.2, 0.25, 0.3], (dx, at) => ({ pl: [kx(dx)], press: [[0, at, 0.3]] })),
       (x, v) => x.touched0 && x.score === '0-0' && x.firstTouch0 > v.press[0][1]);
-    check(label + ': low shot kicked away by the keeper = save', q.found && q.saves[0] === 1 && /save\[save\]/.test(q.clips), short(q));
+    check(label + ': shot over his head cleared by a jump = save', q.found && q.saves[0] === 1 && /save\[save\]/.test(q.clips), short(q));
+    q = await find(Object.assign({ ball: LOW }, base), grid([65, 95, 125, 155, 185], [0.12, 0.18, 0.24, 0.3, 0.36], (dx, at) => ({ pl: [kx(dx)], press: [[0, at, 0.25]] })),
+      (x, v) => x.touched0 && x.score === '0-0' && x.firstTouch0 > v.press[0][1]);
+    check(label + ': low shot at his feet kicked away = no save', q.found && q.saves[0] === 0, short(q));
     q = await find(Object.assign({ ball: 'g => ({ x: g.goalD + 555, y: g.GROUND - g.R - 60, vx: -1300, vy: -200 })' }, base), [65, 95, 125, 155].map(dx => ({ pl: [kx(dx)] })), x => x.touched0);
     check(label + ': keeper standing still, the ball hits him = no save', q.found && q.saves[0] === 0, short(q));
     q = await sc(Object.assign({ fmt: 'p1', ball: 'g => ({ x: g.goalD + 555, y: g.GROUND - g.R - 30, vx: -1300, vy: -100 })' }, base));
@@ -302,9 +314,8 @@ const path = require('path');
   }
   console.log('--- the other side of the pitch (blue keeper at the right goal) ---');
   await keyCases('right side', { mirror: true });
-  r = await find({ mirror: true, ball: 'g => ({ x: 1215, y: 638, vx: -701, vy: -1099 })', touch: { team: 1, pid: 2, ago: 0 }, hold: 0, secs: 4.5 },
-    grid([210, 230, 250, 270, 290, 310, 330], [0.3, 0.4, 0.5, 0.6], (x, after) => ({ pl: [x], rebound: { after, team: 0, pid: 1, x: 540, y: 520, vx: -800, vy: 100 } })),
-    x => x.touched0 && x.rebounded && x.score === '0-0' && x.lastTouch0 > x.rebounded + 0.1);
+  r = await find({ mirror: true, ball: HEAD.replace('g.goalD + 555', '720'), secs: 4 }, chain(HEADBACK),
+    x => x.touched0 && x.rebounded && x.score === '0-0' && x.lastTouch0 > x.rebounded + 0.05);
   check('right side: save, team-mate heads it back, save again = ×2', r.found && r.saves[0] === 2 && /save×2/.test(r.clips), short(r));
   r = await find({ mirror: true, ball: 'g => ({ x: 1250, y: g.GROUND - g.R, vx: -1700, vy: 0 })' },
     grid([880, 930, 980], [0.08, 0.12, 0.16, 0.2, 0.24], (x, at) => ({ pl: [x], press: [[0, at, 0.25]] })), x => x.touched0 && x.score === '0-0');
@@ -313,22 +324,22 @@ const path = require('path');
 
   console.log('--- other modes ---');
   // 2 vs 2: each body is a person with its own button (slot = body)
-  r = await find({ mode: 'team4', slots: ['h', 'h', 'h', 'h'], ball: LOW.replace('g.goalD + 555', '720') },
-    grid([230, 260, 290, 320], [0.12, 0.18, 0.24, 0.3], (x, at) => ({ pl: [x], press: [[0, at, 0.25]] })), x => x.touched0 && x.score.split('-')[2] === '0');
+  r = await find({ mode: 'team4', slots: ['h', 'h', 'h', 'h'], ball: HEAD.replace('g.goalD + 555', '720') },
+    grid([230, 260, 290, 320], [0.05, 0.1, 0.15, 0.2, 0.25, 0.3], (x, at) => ({ pl: [x], press: [[0, at, 0.3]] })), x => x.touched0 && x.score.split('-')[2] === '0');
   check('2 vs 2: P1 keeper saves = his save', r.found && r.saves[0] === 1 && r.saves[1] === 0, short(r));
-  r = await find({ mode: 'team4', slots: ['h', 'h', 'h', 'h'], ball: LOW.replace('g.goalD + 555', '720') },
-    grid([230, 260, 290, 320], [0.12, 0.18, 0.24, 0.3], (x, at) => ({ pl: [1500, x], press: [[1, at, 0.25]] })), x => x.touched0 && x.score.split('-')[2] === '0');
+  r = await find({ mode: 'team4', slots: ['h', 'h', 'h', 'h'], ball: HEAD.replace('g.goalD + 555', '720') },
+    grid([230, 260, 290, 320], [0.05, 0.1, 0.15, 0.2, 0.25, 0.3], (x, at) => ({ pl: [1500, x], press: [[1, at, 0.3]] })), x => x.touched0 && x.score.split('-')[2] === '0');
   check('2 vs 2: P2 (red\'s second player) saves = P2\'s save', r.found && r.saves[1] === 1 && r.saves[0] === 0, short(r));
-  r = await find({ mode: 'ffa', slots: ['h', 'h', 'h', 'h'], ball: LOW.replace('g.goalD + 555', '720') },
-    grid([230, 260, 290, 320], [0.12, 0.18, 0.24, 0.3], (x, at) => ({ pl: [1500, x], press: [[1, at, 0.25]] })), x => x.touched0 && x.score === '0-0-0-0');
+  r = await find({ mode: 'ffa', slots: ['h', 'h', 'h', 'h'], ball: HEAD.replace('g.goalD + 555', '720') },
+    grid([230, 260, 290, 320], [0.05, 0.1, 0.15, 0.2, 0.25, 0.3], (x, at) => ({ pl: [1500, x], press: [[1, at, 0.3]] })), x => x.touched0 && x.score === '0-0-0-0');
   check('4 players: P2 saves = P2\'s save', r.found && r.saves[1] === 1, short(r));
   // against the bot, playing the right side: the player's keeper (blue) saves a shot at the right goal
-  r = await find({ mode: 'bot', side: 'R', mirror: true, ball: LOW.replace('g.goalD + 555', '720') },
-    grid([230, 260, 290, 320], [0.12, 0.18, 0.24, 0.3], (x, at) => ({ pl: [x, null, 1500, 1540], press: [[0, at, 0.25]] })), x => x.touched0 && x.score === '0-0');
+  r = await find({ mode: 'bot', side: 'R', mirror: true, ball: HEAD.replace('g.goalD + 555', '720') },
+    grid([230, 260, 290, 320], [0.05, 0.1, 0.15, 0.2, 0.25, 0.3], (x, at) => ({ pl: [x, null, 1500, 1540], press: [[0, at, 0.3]] })), x => x.touched0 && x.score === '0-0');
   check('vs bot on the right side: the player\'s save is his', r.found && r.saves[0] === 1 && /save/.test(r.clips), short(r));
   // two balls: a save with the second ball
-  r = await find({ twoBalls: true, ballIndex: 1, ball: LOW.replace('g.goalD + 555', '720') },
-    grid([230, 260, 290, 320], [0.12, 0.18, 0.24, 0.3], (x, at) => ({ pl: [x], press: [[0, at, 0.25]] })), x => x.touched0 && x.score === '0-0');
+  r = await find({ twoBalls: true, ballIndex: 1, ball: HEAD.replace('g.goalD + 555', '720') },
+    grid([230, 260, 290, 320], [0.05, 0.1, 0.15, 0.2, 0.25, 0.3], (x, at) => ({ pl: [x], press: [[0, at, 0.3]] })), x => x.touched0 && x.score === '0-0');
   check('two balls: a save with the second ball', r.found && r.saves[0] === 1, short(r));
 
   check('no page errors', errs.length === 0, errs.slice(0, 3).join(' | '));

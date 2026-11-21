@@ -44,7 +44,8 @@ const pr = [false, false, false, false], resp = [];
 let kickedAt = -1;
 for (let i = 0; i < Math.round(25 / E.DT); i++) {
   const t = i * E.DT;
-  pr[0] = t > 14 && t < 14.25; // press the button at 14 s
+  // press the button at 14 s (after 14 s without pressing he has dozed off: a tap at 13.7 s only wakes him)
+  pr[0] = (t > 13.7 && t < 13.75) || (t > 14 && t < 14.25);
   const before = w.ball.touchT[0];
   E.stepPlayers(w, pr);
   if (kickedAt < 0 && w.ball.touchT[0] > 13.9 && w.ball.touchT[0] !== before) kickedAt = +w.time.toFixed(2);

@@ -2,13 +2,17 @@
 (function () {
   'use strict';
 
-  // music styles: tempo, root note (MIDI), scale, chord progression (scale degrees per bar)
+  // Music styles - stadium music that drives the match along: tempo, root note (MIDI), scale, chords (scale degree of
+  // each bar of an 8-bar section), lead / bass waves, kick and clap steps (16 a bar), stabs: off-beat chord hits,
+  // arp: 16th-note arpeggios, gain: overall level
+  var MAJOR = [0, 2, 4, 5, 7, 9, 11], MINOR = [0, 2, 3, 5, 7, 8, 10], HARM = [0, 2, 3, 5, 7, 8, 11];
+  var FOUR = [0, 4, 8, 12];
   var STYLES = {
-    sport: { bpm: 122, root: 60, scale: [0, 2, 4, 5, 7, 9, 11], prog: [0, 5, 3, 4], lead: 'square', kick: [0, 8], seed: 3 },
-    beach: { bpm: 104, root: 65, scale: [0, 2, 4, 5, 7, 9, 11], prog: [0, 3, 4, 0], lead: 'triangle', kick: [0, 10], seed: 7 },
-    space: { bpm: 84, root: 57, scale: [0, 2, 3, 5, 7, 8, 10], prog: [0, 5, 2, 6], lead: 'sine', kick: [0], seed: 11 },
-    arena: { bpm: 134, root: 52, scale: [0, 2, 3, 5, 7, 8, 10], prog: [0, 0, 5, 6], lead: 'sawtooth', kick: [0, 6, 8, 14], seed: 5 },
-    menu: { bpm: 112, root: 62, scale: [0, 2, 4, 5, 7, 9, 11], prog: [0, 4, 5, 3], lead: 'triangle', kick: [0, 8], seed: 13 }
+    sport: { bpm: 148, root: 62, scale: MAJOR, prog: [0, 4, 5, 3, 0, 4, 3, 4], lead: 'square', bass: 'sawtooth', kick: FOUR, clap: [4, 12], stabs: [3, 6, 10], arp: false, seed: 3, gain: 1 },
+    beach: { bpm: 128, root: 65, scale: MAJOR, prog: [0, 3, 4, 3, 0, 3, 4, 4], lead: 'triangle', bass: 'triangle', kick: [0, 7, 8], clap: [4, 12], stabs: [2, 6, 10, 14], arp: false, seed: 7, gain: 1 },
+    space: { bpm: 134, root: 57, scale: MINOR, prog: [0, 5, 2, 6, 0, 5, 3, 4], lead: 'sine', bass: 'sawtooth', kick: FOUR, clap: [4, 12], stabs: [], arp: true, seed: 11, gain: 1 },
+    arena: { bpm: 162, root: 52, scale: HARM, prog: [0, 0, 5, 4, 0, 0, 5, 6], lead: 'sawtooth', bass: 'square', kick: [0, 6, 10], clap: [4, 12], stabs: [3, 11], arp: true, seed: 5, gain: 1 },
+    menu: { bpm: 118, root: 60, scale: MAJOR, prog: [0, 4, 5, 3], lead: 'triangle', bass: 'triangle', kick: [0, 8], clap: [4, 12], stabs: [6, 14], arp: false, seed: 13, gain: 0.8 }
   };
   var STYLE_FOR_MAP = { volley: 'beach', moon: 'space', bomb: 'arena' };
 
@@ -72,6 +76,8 @@
     bounce: function (v) { if (!this.ok('bounce', 0.06)) return; var k = Math.min(1, v / 1200); this.tone(125, 70, 0.09, 'sine', 0.08 + 0.3 * k); },
     post: function () { if (!this.ok('post', 0.08)) return; this.tone(1250, 1180, 0.35, 'triangle', 0.22); this.tone(1870, 1800, 0.25, 'sine', 0.08); },
     jump: function () { if (!this.ok('jump', 0.09)) return; this.tone(240, 420, 0.08, 'sine', 0.04); },
+    // a drowsy player woken with a start: a short high blip
+    startle: function () { if (!this.ok('startle', 0.09)) return; this.tone(620, 900, 0.06, 'triangle', 0.035); },
     whistle: function () { if (!this.ok('whistle', 0.3)) return; this.tone(2350, 2250, 0.16, 'square', 0.04); this.tone(2350, 2250, 0.38, 'square', 0.04, 0.2); },
     cheer: function () { if (!this.ok('cheer', 0.5)) return; this.noise(1.8, 0.3, 1100, 0.6, 0, 0.25); this.noise(1.4, 0.12, 2600, 0.9, 0.1, 0.2); },
     click: function () { if (!this.sfxOn || !this.ac) return; this.tone(700, 520, 0.05, 'square', 0.04); },
@@ -157,20 +163,34 @@
       this.musicOn = on;
       if (this.mus) this.mus.gain.setTargetAtTime(on ? 0.16 : 0, this.ac.currentTime, 0.1);
     },
-    style: 'menu', step: 0, nextT: 0, bar: 0,
+    styles: STYLES, style: 'menu', step: 0, nextT: 0, bar: 0, hype: false,
     setStyle: function (mapId) {
       var st = mapId === 'menu' ? 'menu' : (STYLE_FOR_MAP[mapId] || 'sport');
       if (st !== this.style) { this.style = st; this.step = 0; this.bar = 0; this.mel = null; }
     },
+    // the end of a timed match (or a golden goal): busier drums, the lead an octave up
+    setHype: function (on) { this.hype = !!on; },
     melody: function (st) {
-      // a deterministic two-bar motif built from chord tones
-      var seed = st.seed, out = [];
+      // a deterministic two-bar hook from chord tones: punchy syncopated rhythm, climbing towards the end of the bar
+      var seed = st.seed, out = [], rhythm = [0, 2, 3, 6, 8, 10, 11, 14];
       for (var i = 0; i < 32; i++) {
         seed = (seed * 1103515245 + 12345) & 0x7fffffff;
-        var hit = [0, 3, 6, 8, 10, 12, 14].indexOf(i % 16) >= 0 && (seed % 5) !== 0;
-        out.push(hit ? seed % 3 : -1);
+        var s16 = i % 16, hit = rhythm.indexOf(s16) >= 0 && (s16 === 0 || (seed % 6) !== 0);
+        out.push(hit ? Math.min(3, (seed % 3) + (s16 >= 10 ? 1 : 0)) : -1);
       }
       return out;
+    },
+    // a note through a low-pass filter that closes after the attack (bass, stabs, lead)
+    synth: function (f, dur, type, vol, delay, cut, dest) {
+      var ac = this.ac, t = ac.currentTime + (delay || 0);
+      var o = ac.createOscillator(), fl = ac.createBiquadFilter(), g = ac.createGain();
+      o.type = type; o.frequency.setValueAtTime(f, t);
+      fl.type = 'lowpass'; fl.Q.value = 4;
+      fl.frequency.setValueAtTime(cut, t); fl.frequency.exponentialRampToValueAtTime(Math.max(120, cut * 0.25), t + dur);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(vol, t + 0.006);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(fl); fl.connect(g); g.connect(dest || this.mus); o.start(t); o.stop(t + dur + 0.03);
     },
     tick: function () {
       var ac = this.ac;
@@ -182,19 +202,44 @@
         this.playStep(st, this.step, this.nextT, spb);
         this.nextT += spb;
         this.step = (this.step + 1) % 16;
-        if (this.step === 0) this.bar = (this.bar + 1) % 4;
+        if (this.step === 0) this.bar = (this.bar + 1) % st.prog.length;
       }
     },
+    // one 16th-note step: four-on-the-floor kick, claps on 2 and 4, driving hats, an octave-bouncing bass, off-beat
+    // chord stabs, the hook (an octave up in the second half of the 8 bars, arpeggios in some styles), a clap roll
+    // into every fourth bar and a crash at the top of the section
     playStep: function (st, s, t, spb) {
-      var deg = st.prog[this.bar], sc = st.scale, dst = this.mus, dl = Math.max(0, t - this.ac.currentTime);
+      var bar = this.bar, deg = st.prog[bar], sc = st.scale, dst = this.mus, dl = Math.max(0, t - this.ac.currentTime);
+      var gain = st.gain, hype = this.hype, half = bar >= 4, fill = bar % 4 === 3 && s >= 12;
       function note(d, oct) { var k = ((d % 7) + 7) % 7; return st.root + sc[k] + 12 * (Math.floor(d / 7) + oct); }
-      var chord = [note(deg, 0), note(deg + 2, 0), note(deg + 4, 0)];
-      if (s === 0 || s === 6 || s === 8 || s === 14) this.tone(midi(chord[0] - 24), midi(chord[0] - 24), spb * 1.8, 'triangle', 0.5, dl, dst);
-      if (st.kick.indexOf(s) >= 0) this.tone(150, 45, 0.16, 'sine', 0.55, dl, dst);
-      if (s % 2 === 0) this.noise(0.04, s % 4 === 2 ? 0.12 : 0.06, 7000, 1, 0, 0.002, dst, t);
-      if (s === 4 || s === 12) for (var i = 0; i < 3; i++) this.tone(midi(chord[i]), midi(chord[i]), spb * 1.5, 'square', 0.05, dl, dst);
-      var m = this.mel[(this.bar % 2) * 16 + s];
-      if (m >= 0) this.tone(midi(chord[m] + 12), midi(chord[m] + 12), spb * 1.6, st.lead, st.lead === 'sawtooth' ? 0.06 : 0.1, dl, dst);
+      var chord = [note(deg, 0), note(deg + 2, 0), note(deg + 4, 0), note(deg + 7, 0)];
+      // drums
+      if (st.kick.indexOf(s) >= 0 && !(fill && s > 12)) { this.tone(160, 42, 0.18, 'sine', 0.6 * gain, dl, dst); this.noise(0.012, 0.08 * gain, 3000, 0.7, 0, 0.001, dst, t); }
+      if (st.clap.indexOf(s) >= 0) { this.noise(0.13, 0.2 * gain, 1500, 0.8, 0, 0.002, dst, t); this.noise(0.08, 0.1 * gain, 3200, 1, 0, 0.002, dst, t + 0.012); }
+      if (fill) this.noise(0.07, (0.08 + 0.05 * (s - 12)) * gain, 1700, 0.9, 0, 0.002, dst, t); // clap roll into the next bar
+      if (s % 4 === 2) this.noise(0.09, 0.08 * gain, 7600, 0.9, 0, 0.003, dst, t); // open hat on the off-beat
+      else if (s % 2 === 0 || hype || half) this.noise(0.03, (s % 2 ? 0.035 : 0.05) * gain, 9500, 1, 0, 0.002, dst, t);
+      if (bar === 0 && s === 0) this.noise(1.1, 0.1 * gain, 6000, 0.5, 0, 0.004, dst, t); // crash
+      // octave bass: low root on the beat, an octave up on the off-beat (16ths in the final seconds)
+      if (s % 2 === 0 || hype) {
+        var bn = chord[0] - (s % 4 === 0 ? 24 : 12);
+        this.synth(midi(bn), spb * (hype ? 0.9 : 1.7), st.bass, (st.bass === 'triangle' ? 0.42 : 0.2) * gain, dl, st.bass === 'triangle' ? 3000 : 900, dst);
+      }
+      // stabs: the chord on the one, and off-beat hits
+      if (s === 0 || st.stabs.indexOf(s) >= 0) {
+        var len = s === 0 ? spb * 3 : spb * 0.9;
+        for (var i = 0; i < 3; i++) this.synth(midi(chord[i]), len, 'sawtooth', 0.035 * gain, dl, s === 0 ? 2600 : 2000, dst);
+      }
+      // arpeggio: up through the chord, 16ths (second half, or always where the style has it)
+      if (st.arp && (half || st.bpm < 140 || hype)) this.synth(midi(chord[s % 4] + 12 + (s % 8 >= 4 ? 12 : 0)), spb * 0.8, st.lead === 'sawtooth' ? 'square' : st.lead, 0.04 * gain, dl, 3500, dst);
+      // the hook
+      var m = this.mel[(bar % 2) * 16 + s];
+      if (m >= 0) {
+        var up = (half || hype ? 24 : 12), f = midi(chord[m] + up);
+        var lv = (st.lead === 'sawtooth' ? 0.05 : (st.lead === 'square' ? 0.06 : 0.11)) * gain;
+        this.synth(f, spb * 1.7, st.lead, lv, dl, 4200, dst);
+        if (st.lead === 'square') this.synth(f * 1.005, spb * 1.7, 'sawtooth', lv * 0.5, dl, 3000, dst); // a little detune for width
+      }
     }
   };
 

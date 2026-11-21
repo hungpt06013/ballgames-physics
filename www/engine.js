@@ -22,11 +22,22 @@
   for (var ri = 0; ri < NB; ri++) RAD[ri] = BODY[ri][2];
   for (ri = 0; ri < LEG.length; ri++) RAD[NB + ri] = LEG[ri][1];
   var P_MASS = 5, P_INERTIA = 2600;
-  var LEG_REST = -0.12, LEG_KICK = 1.95, KICK_REACH = 12;
+  var LEG_REST = -0.12, LEG_KICK = 1.95, KICK_REACH = 12, LEG_HIT = 3;
   var POP_TIME = 0.16, POP_REACH = 6, POP_SIN = Math.sin(1.3), POP_COS = Math.cos(1.3);
   var GETUP_DELAY = 0.3, RISE_TIME = 2;
+  // standing sway: aimed this far forward so that, with gravity, the body leans as far forward as back (even sway);
+  // jumps are aimed JUMP_LEAN further forward than the body
+  var LEAN0 = -0.01, JUMP_LEAN = 0.11;
+  // holding the button: after HOLD_TIRE s the raised leg tires (trembles and sinks), by HOLD_MAX s it is down and the
+  // hold no longer counts (no kick, no turning in the air) until the button is let go
+  var HOLD_TIRE = 1, HOLD_MAX = 5, LEG_SHAKE = 0.06;
+  // drowsiness, the same for everybody: SLEEP_T s without pressing and a player dozes off (💤). It comes on gently over
+  // SLEEP_RAMP s: a wider sway (up to SLEEP_SWAY more each way, never so wide that he falls) and a softer body (a hard
+  // shot knocks him back instead of bouncing off). The first press of a drowsy player only wakes him with a start: a
+  // hop of STARTLE_HOP of a jump on the spot, no kick; the next press plays as usual
+  var SLEEP_T = 3, SLEEP_RAMP = 4, SLEEP_SWAY = 0.25, SLEEP_SOFT = 2, STARTLE_HOP = 0.22;
   var BICYCLE_ANG = 2.0; // about 115°: the head is clearly below the hips
-  var BOMB_TIME = 12, BIG_SCALE = 1.4, OUT_TIME = 3;
+  var BOMB_TIME = 12, BIG_SCALE = 1.4, OUT_TIME = 3, OUT_BOUNCE = 0.25;
   // a ball lying still for STILL_TIME seconds with nobody touching it is dropped again in the middle (not the bomb)
   var STILL_TIME = 15, STILL_SPEED = 30;
   // weather / disasters (scheduled by the game, simulated here)
@@ -136,7 +147,7 @@
       floorE: mods.trampoline ? 0.82 : 0,
       pscale: mods.giant ? 1.3 : (mods.tiny ? 0.72 : 1)
     };
-    var A = { map: m, type: m.type, P: P, segs: [], mods: mods,
+    var A = { map: m, type: m.type, P: P, segs: [], mods: mods, outX: -1, outE: 0, sleep: s.sleep !== false,
       split: m.type === 'volley' || m.type === 'bomb',
       timeScale: mods.slowmo ? 0.6 : 1, shield: [null, null], wallX: 0,
       bombTime: Math.max(3, Math.min(99, num(s.bombTime, BOMB_TIME))) };
@@ -173,7 +184,9 @@
         segs.push(seg(mx(m.boardX - 55), ry + 70, mx(m.boardX - 55), GROUND, 7)); // pole
         A.shield[side] = seg(mx(m.boardX + 4), ry - 14, mx(rf + 16), ry - 14, 8); // lid over the hoop
       });
-      A.wallX = m.boardX - 55 - 7; // players stop at the back of the pole
+      A.wallX = m.boardX + 7; // players stop at the front of the backboard: nobody behind it or standing on it
+      // out of bounds behind the pole the floor hardly bounces the ball, so it can't bounce high there and drop in
+      A.outX = m.boardX - 55; A.outE = OUT_BOUNCE;
     } else if (m.type === 'posts') {
       var by = GROUND - m.barH + (beg ? 40 : 0);
       A.barY = by; A.postX = m.postX;
@@ -195,6 +208,7 @@
       id: id, team: team, role: role, f: team === 0 ? 1 : -1, active: true,
       x: 0, y: 0, vx: 0, vy: 0, a: 0, w: 0, leg: LEG_REST, legW: 0, ls: 1,
       phase: 0, prev: false, press: false, gT: 1, cT: 1, jumpCd: 0, jumpT: 0, popT: 0, downT: 0, riseT: 0, air: false, slide: 0,
+      holdT: 0, idleT: 0, sleep: 0, sleepy: false, startle: false,
       sc: 1, baseSc: 1, invM: 0, invI: 0, rad: new Float64Array(NS),
       sx: new Float64Array(NS), sy: new Float64Array(NS),
       ex: new Float64Array(NS), ey: new Float64Array(NS)
@@ -212,7 +226,7 @@
   function makeBall() {
     // outT: how long the ball has been out of play; stillT: how long it has been lying still untouched;
     // touchT: world time of each team's last touch
-    return { x: W / 2, y: 200, vx: 0, vy: 0, ang: 0, spin: 0, outT: 0, stillT: 0, lastBy: [-1, -1], touchT: [-1, -1],
+    return { x: W / 2, y: 200, vx: 0, vy: 0, ang: 0, spin: 0, outT: 0, stillT: 0, over: -1, lastBy: [-1, -1], touchT: [-1, -1],
       prevX: W / 2, prevY: 200, touchGround: false, lastTeam: -1,
       lastKind: '', lastAng: 0, lastX: 0, lastPid: -1, lastAir: false, lastLeg: 0 };
   }
@@ -243,7 +257,7 @@
   }
 
   function placeBall(b, x, y) {
-    b.x = b.prevX = x; b.y = b.prevY = y; b.vx = 0; b.vy = 0; b.spin = 0; b.outT = 0; b.stillT = 0;
+    b.x = b.prevX = x; b.y = b.prevY = y; b.vx = 0; b.vy = 0; b.spin = 0; b.outT = 0; b.stillT = 0; b.over = -1;
     b.lastBy[0] = b.lastBy[1] = -1; b.touchT[0] = b.touchT[1] = -1; b.lastTeam = -1; b.lastKind = ''; b.lastPid = -1; b.lastAir = false; b.lastLeg = 0;
     b.touchGround = false;
   }
@@ -268,6 +282,7 @@
       p.vx = p.vy = 0; p.a = 0; p.w = 0;
       p.leg = LEG_REST; p.legW = 0; p.prev = p.press = false;
       p.gT = p.cT = 0; p.jumpCd = 0; p.jumpT = 0; p.popT = 0; p.downT = 0; p.riseT = 0; p.air = false; p.slide = 0;
+      p.holdT = 0; p.idleT = 0; p.sleep = 0; p.sleepy = false; p.startle = false;
       p.phase = (p.role === 0 ? 0 : 1.9) + (p.team === 0 ? 0 : 0.8) + rand(w) * 0.6;
       if (!p.active) { p.x = -2000 - i * 300; p.y = GROUND - COM_H; }
       shapes(p);
@@ -326,7 +341,10 @@
   }
 
   function jump(w, p, P) {
-    var jx = Math.sin(p.a), jy = -Math.cos(p.a);
+    // a standing player jumps as if he leant JUMP_LEAN further forward: the sway is even around upright, and jumps
+    // go forward as often as they did when the sway itself leant forward
+    var ja = Math.abs(p.a) < 1.0 ? p.a + p.f * JUMP_LEAN : p.a;
+    var jx = Math.sin(ja), jy = -Math.cos(ja);
     // jumping while lying down hops straight up and turns the player back onto the feet
     if (jy > -0.55) { jx *= 0.35; jy = -0.95; p.w -= p.a * 3; p.riseT = RISE_TIME; } else p.riseT = 0;
     var J = P.jump * Math.sqrt(p.sc);
@@ -335,6 +353,13 @@
     p.w -= p.f * 1.0;
     p.jumpCd = 0.2; p.cT = 1; p.gT = 1; p.popT = POP_TIME;
     if (w.events) w.events.push({ t: 'jump', x: p.x, y: p.y + COM_H * p.sc, team: p.team, id: p.id });
+  }
+
+  // a drowsy player woken by his button: a little hop straight up on the spot (no kick, no jump forward)
+  function startle(w, p, P) {
+    p.vy = Math.min(p.vy, 0) * 0.25 - P.jump * Math.sqrt(p.sc) * STARTLE_HOP; p.vx *= 0.5;
+    p.jumpCd = 0.2; p.cT = 1; p.gT = 1;
+    if (w.events) w.events.push({ t: 'startle', x: p.x, y: p.y - 120 * p.sc, team: p.team, id: p.id });
   }
 
   // ---- weather / disasters ----
@@ -393,27 +418,47 @@
     return hit;
   }
 
-  function control(w, p, press, P, dt) {
+  // press: the button is down; frozen: he can't move (frozen / struck by lightning), which doesn't make him drowsy
+  function control(w, p, press, P, dt, frozen) {
     var f = p.f;
     var touching = p.cT < 0.07;
     if (p.jumpCd > 0) p.jumpCd -= dt;
     if (p.popT > 0) p.popT -= dt;
     if (p.riseT > 0) p.riseT -= dt;
+    p.holdT = press ? p.holdT + dt : 0;
+    var edge = press && !p.prev;
+    if (edge && p.sleepy) {
+      // the first press of a drowsy player only wakes him with a start: a little hop on the spot, no kick
+      p.startle = true; p.idleT = 0;
+      if (touching && p.jumpCd <= 0 && p.jumpT <= 0) startle(w, p, P);
+      edge = false;
+    }
+    if (!press) p.startle = false;
+    var act = press && !p.startle && p.holdT < HOLD_MAX; // the press counts (kick, jump, turning in the air)
     // the leg swings first and the hop follows a moment later, so the foot can
     // sweep a ball lying at the player's feet before the body leaves the ground
-    if (press && !p.prev && touching && p.jumpCd <= 0 && p.jumpT <= 0) {
+    if (edge && touching && p.jumpCd <= 0 && p.jumpT <= 0) {
       if (P.jumpDelay > 0) p.jumpT = P.jumpDelay; else jump(w, p, P);
     }
     if (p.jumpT > 0) {
       p.jumpT -= dt;
       if (p.jumpT <= 0 && p.cT < 0.15) jump(w, p, P);
     }
-    p.prev = press; p.press = press;
-    var tgt = press ? LEG_KICK : LEG_REST;
+    p.prev = press; p.press = act;
+    if (act) p.idleT = 0; else if (!frozen) p.idleT += dt;
+    var sl = 0;
+    if (w.arena.sleep && p.idleT >= SLEEP_T) { sl = Math.min(1, (p.idleT - SLEEP_T) / SLEEP_RAMP); sl *= sl; p.sleepy = true; }
+    else { p.sleepy = false; if (!w.arena.sleep) p.idleT = 0; }
+    p.sleep = sl;
+    // a held leg tires after HOLD_TIRE s: it trembles and sinks, and is back down at HOLD_MAX s
+    var tire = act && p.holdT > HOLD_TIRE ? Math.min(1, (p.holdT - HOLD_TIRE) / (HOLD_MAX - HOLD_TIRE)) : 0;
+    var tgt = act ? LEG_KICK - (LEG_KICK - LEG_REST) * tire * tire * (3 - 2 * tire) + LEG_SHAKE * tire * Math.sin(w.time * 45) : LEG_REST;
     var lw = (tgt - p.leg) * 30, ls = P.legSpd;
     if (lw > ls) lw = ls; else if (lw < -ls) lw = -ls;
     p.legW = lw;
-    var target = f * 0.07 + 0.2 * Math.sin(w.time * 2.1 + p.phase);
+    // the sway is even: as far forward as back around upright (the jump still leans forward, see jump());
+    // drowsy players sway wider
+    var target = f * LEAN0 + (0.2 + SLEEP_SWAY * sl) * Math.sin(w.time * 2.1 + p.phase);
     var qk = quakeLevel(w.hz);
     if (qk > 0) target += qk * 0.45 * Math.sin(w.time * 10 + p.phase * 3); // earthquake: everybody wobbles
     var err = wrap(target - p.a);
@@ -443,7 +488,7 @@
           p.downT = 0; p.cT = p.gT = 1; p.riseT = RISE_TIME;
         }
       } else p.downT = 0;
-    } else if (press) {
+    } else if (act) {
       p.air = true;
       p.w -= f * 12 * dt; // holding in the air rotates backwards -> bicycle kicks
     } else if (p.riseT > 0) {
@@ -521,6 +566,7 @@
       var wl = A.wallX, wr = W - A.wallX;
       if (p.sx[j] - r < wl) hitStatic(p, j, 1, 0, wl - (p.sx[j] - r), 0, 0.3, 0);
       else if (p.sx[j] + r > wr) hitStatic(p, j, -1, 0, p.sx[j] + r - wr, 0, 0.3, 0);
+      if (A.type === 'goal') offRoof(A, p, j, r);
       for (k = 0; k < segs.length; k++) {
         var s = segs[k];
         if (!near[k]) continue;
@@ -535,11 +581,32 @@
     }
   }
 
+  // nobody stands on a goal: above the crossbar (the sloping roof) an invisible wall goes up from the front of the
+  // goal and pushes anyone there back out onto the pitch; under the roof (inside the goal) is still allowed
+  function offRoof(A, p, j, r) {
+    var gd = A.goalD, x = p.sx[j], y = p.sy[j], s, t;
+    if (x - r < gd) {
+      s = A.segs[0]; t = x <= 0 ? 0 : (x >= gd ? 1 : x / gd);
+      if (y < s.y1 + (s.y2 - s.y1) * t) hitStatic(p, j, 1, 0, gd - (x - r), 0, 0.3, 0);
+    } else if (x + r > W - gd) {
+      s = A.segs[1]; t = x >= W ? 0 : (x <= W - gd ? 1 : (W - x) / gd);
+      if (y < s.y1 + (s.y2 - s.y1) * t) hitStatic(p, j, -1, 0, x + r - (W - gd), 0, 0.3, 0);
+    }
+  }
+
+  // Two players bump into each other. Legs never catch on legs (two legs used to hook together and hold the players
+  // locked), and a leg only hits someone while it swings (a kick); a leg hanging still passes through people.
+  // Team-mates never kick each other and don't knock each other about (they only keep apart): a team-mate jumping
+  // right behind used to launch the one in front twice as high and far. Nobody jumps off a team-mate either.
   function playerPlayer(A, B) {
     var dx = B.x - A.x, dy = B.y - A.y, lim = 115 * (A.sc + B.sc);
     if (dx * dx + dy * dy > lim * lim) return;
+    var mates = A.team === B.team;
+    var aLeg = !mates && Math.abs(A.legW) > LEG_HIT, bLeg = !mates && Math.abs(B.legW) > LEG_HIT;
     for (var i = 0; i < NS; i++) {
+      if (i >= NB && !aLeg) continue;
       for (var j = 0; j < NS; j++) {
+        if (j >= NB && (i >= NB || !bLeg)) continue;
         var nx = B.sx[j] - A.sx[i], ny = B.sy[j] - A.sy[i], rr = A.rad[i] + B.rad[j];
         var d2 = nx * nx + ny * ny;
         if (d2 >= rr * rr || d2 < 1e-9) continue;
@@ -551,19 +618,24 @@
         var vax = A.vx - A.w * ray + A.ex[i], vay = A.vy + A.w * rax + A.ey[i];
         var vbx = B.vx - B.w * rby + B.ex[j], vby = B.vy + B.w * rbx + B.ey[j];
         var vn = (vbx - vax) * nx + (vby - vay) * ny;
-        if (vn < 0) {
+        if (vn < 0 && !mates) {
           var rna = rax * ny - ray * nx, rnb = rbx * ny - rby * nx;
           var jn = -1.2 * vn / (A.invM + B.invM + rna * rna * A.invI + rnb * rnb * B.invI);
           A.vx -= jn * nx * A.invM; A.vy -= jn * ny * A.invM; A.w -= rna * jn * A.invI;
           B.vx += jn * nx * B.invM; B.vy += jn * ny * B.invM; B.w += rnb * jn * B.invI;
         }
-        var c = pen * 0.35;
-        shiftPlayer(A, -nx * c, -ny * c);
-        shiftPlayer(B, nx * c, ny * c);
+        // (team-mates are only eased apart sideways: pushing one up off the other would still lift him)
+        var c = pen * 0.35, cy = mates ? 0 : 1;
+        shiftPlayer(A, -nx * c, -ny * c * cy);
+        shiftPlayer(B, nx * c, ny * c * cy);
+        if (mates) continue;
         if (ny > 0.6) A.cT = 0; else if (ny < -0.6) B.cT = 0;
       }
     }
   }
+
+  // how bouncy the floor is under the ball (out of bounds behind a basketball pole it hardly bounces)
+  function groundE(A, b) { return A.outX > 0 && (b.x < A.outX || b.x > W - A.outX) ? Math.min(A.outE, A.P.ballE) : A.P.ballE; }
 
   // ball vs world; `ev` is an events array or null, `w` (optional) adds power-up shields
   function ballStatic(A, b, ev, first, w) {
@@ -578,7 +650,7 @@
         var vn = b.vx * gnx + b.vy * gny;
         if (vn < 0) {
           if (ev && -vn > 120) ev.push({ t: 'bounce', x: b.x, y: gy, v: -vn });
-          var e = -vn > 45 ? P.ballE : 0;
+          var e = -vn > 45 ? groundE(A, b) : 0;
           b.vx -= (1 + e) * vn * gnx; b.vy -= (1 + e) * vn * gny;
         }
         b.touchGround = true;
@@ -589,7 +661,7 @@
       if (b.vy > 0) {
         var vin = b.vy;
         if (ev && vin > 120) ev.push({ t: 'bounce', x: b.x, y: GROUND, v: vin });
-        b.vy = -vin * P.ballE;
+        b.vy = -vin * groundE(A, b);
         if (b.vy > -45) b.vy = 0;
         if (P.oval) { b.vx += Math.sin(2 * b.ang) * vin * 0.35; b.spin += Math.cos(2 * b.ang) * vin * 0.02; }
       }
@@ -673,10 +745,12 @@
         nx = kx; ny = ky;
         var rn = rx * ny - ry * nx;
         var e = j >= NB ? P.kickE : (j === HEAD ? 0.55 : 0.4);
-        var jn = -(1 + e) * vn / (P.ballInvM + p.invM + rn * rn * p.invI);
+        // a drowsy player is softer: lighter against the ball, so a hard shot knocks him back instead of bouncing off
+        var soft = 1 + SLEEP_SOFT * p.sleep, im = p.invM * soft, ii = p.invI * soft;
+        var jn = -(1 + e) * vn / (P.ballInvM + im + rn * rn * ii);
         if (j >= NB) jn *= boost;
         b.vx += jn * nx * P.ballInvM; b.vy += jn * ny * P.ballInvM;
-        p.vx -= jn * nx * p.invM * 0.6; p.vy -= jn * ny * p.invM * 0.6; p.w -= rn * jn * p.invI * 0.6;
+        p.vx -= jn * nx * im * 0.6; p.vy -= jn * ny * im * 0.6; p.w -= rn * jn * ii * 0.6;
         var vt = -rvx * ny + rvy * nx;
         b.spin += vt / R * 0.3;
         touched(w, b, p, j >= NB ? 'kick' : (j === HEAD ? 'head' : 'body'));
@@ -743,12 +817,18 @@
           if (b.x - R > W - A.goalD) return 0;
         }
         return -1;
-      case 'hoop':
+      case 'hoop': {
+        // only a ball that has been all the way above the rim (inside the ring) and then drops through counts; one
+        // coming in at the height of the rim, half below it, does not (b.over: the team it would score for, or -1)
+        var inL = b.x > A.boardX && b.x < A.rimFront, inR = b.x < W - A.boardX && b.x > W - A.rimFront;
+        if (!inL && !inR) b.over = -1;
+        else if (b.y + R <= A.rimY) b.over = inL ? 1 : 0;
         if (b.prevY < A.rimY && b.y >= A.rimY && b.vy > 0) {
-          if (b.x > A.boardX && b.x < A.rimFront) return 1;
-          if (b.x < W - A.boardX && b.x > W - A.rimFront) return 0;
+          if (inL && b.over === 1) return 1;
+          if (inR && b.over === 0) return 0;
         }
         return -1;
+      }
       case 'posts':
         if (b.y < A.barY - 4) {
           if (b.prevX >= A.postX && b.x < A.postX) return 1;
@@ -858,7 +938,7 @@
       if (!p.active) continue;
       if (hz.stun[i] > 0) hz.stun[i] -= dt;
       var frozen = fx.freeze[p.team] > 0 || hz.stun[i] > 0;
-      control(w, p, frozen ? false : presses[i], P, dt);
+      control(w, p, frozen ? false : presses[i], P, dt, frozen);
       if (frozen) p.w *= 1 - 4 * dt;
       p.vy += P.g * dt;
       p.vx -= p.vx * 0.12 * dt;
@@ -971,11 +1051,12 @@
     d.x = s.x; d.y = s.y; d.vx = s.vx; d.vy = s.vy; d.a = s.a; d.w = s.w;
     d.leg = s.leg; d.legW = s.legW; d.phase = s.phase; d.prev = s.prev; d.press = s.press;
     d.gT = s.gT; d.cT = s.cT; d.jumpCd = s.jumpCd; d.jumpT = s.jumpT; d.popT = s.popT; d.downT = s.downT; d.riseT = s.riseT; d.air = s.air; d.slide = s.slide;
+    d.holdT = s.holdT; d.idleT = s.idleT; d.sleep = s.sleep; d.sleepy = s.sleepy; d.startle = s.startle;
     d.active = s.active; d.role = s.role; d.baseSc = s.baseSc;
     if (d.sc !== s.sc) setScale(d, s.sc);
   }
   function copyBall(a, b) {
-    a.x = b.x; a.y = b.y; a.vx = b.vx; a.vy = b.vy; a.ang = b.ang; a.spin = b.spin; a.outT = b.outT; a.stillT = b.stillT;
+    a.x = b.x; a.y = b.y; a.vx = b.vx; a.vy = b.vy; a.ang = b.ang; a.spin = b.spin; a.outT = b.outT; a.stillT = b.stillT; a.over = b.over;
     a.lastBy[0] = b.lastBy[0]; a.lastBy[1] = b.lastBy[1]; a.touchT[0] = b.touchT[0]; a.touchT[1] = b.touchT[1];
     a.prevX = b.prevX; a.prevY = b.prevY; a.touchGround = b.touchGround; a.lastTeam = b.lastTeam;
     a.lastKind = b.lastKind; a.lastAng = b.lastAng; a.lastX = b.lastX; a.lastPid = b.lastPid; a.lastAir = b.lastAir; a.lastLeg = b.lastLeg;
@@ -1015,7 +1096,7 @@
   var fb = makeBall();
   function ballFuture(A, b, seconds) {
     if (A.type === 'bomb') return null;
-    fb.x = b.x; fb.y = b.y; fb.vx = b.vx; fb.vy = b.vy; fb.ang = b.ang; fb.spin = b.spin;
+    fb.x = b.x; fb.y = b.y; fb.vx = b.vx; fb.vy = b.vy; fb.ang = b.ang; fb.spin = b.spin; fb.over = b.over === undefined ? -1 : b.over;
     var P = A.P, n = Math.round(seconds / DT), drag;
     for (var k = 0; k < n; k++) {
       fb.prevX = fb.x; fb.prevY = fb.y;
@@ -1074,7 +1155,7 @@
   function ballNear(A, b, seconds, team, path) {
     var best = { score: -1, gap: Infinity, t: 0, x: b.x, y: b.y };
     if (A.type === 'bomb' || A.type === 'volley') return best;
-    fb.x = b.x; fb.y = b.y; fb.vx = b.vx; fb.vy = b.vy; fb.ang = b.ang; fb.spin = b.spin;
+    fb.x = b.x; fb.y = b.y; fb.vx = b.vx; fb.vy = b.vy; fb.ang = b.ang; fb.spin = b.spin; fb.over = b.over === undefined ? -1 : b.over;
     var P = A.P, n = Math.round((seconds + NEAR_MORE) / DT), k0 = Math.round(NEAR_FROM / DT), drag;
     for (var k = 0; k < n; k++) {
       fb.prevX = fb.x; fb.prevY = fb.y;
@@ -1101,14 +1182,15 @@
   // ---- bot ----
   // candidates: [delay, duration] of a button press relative to now; [-1, 0] = don't press
   var LEVELS = {
-    easy: { period: 0.3, horizon: 0.45, mistake: 0.45, oppModels: 1, iters: 2,
+    // wake: how long after dozing off the bot taps its button to wake its players (a press that only wakes them)
+    easy: { period: 0.3, horizon: 0.45, mistake: 0.45, oppModels: 1, iters: 2, wake: 1.5,
       cands: [[-1, 0], [0, 0.15], [0, 0.4], [0.2, 0.2]] },
-    normal: { period: 0.12, horizon: 0.7, mistake: 0.15, oppModels: 1, iters: 2,
+    normal: { period: 0.12, horizon: 0.7, mistake: 0.15, oppModels: 1, iters: 2, wake: 0.6,
       cands: [[-1, 0], [0, 0.08], [0, 0.2], [0, 0.45], [0.15, 0.2], [0.3, 0.25]] },
-    hard: { period: 0.067, horizon: 0.9, mistake: 0, oppModels: 2, iters: 2,
+    hard: { period: 0.067, horizon: 0.9, mistake: 0, oppModels: 2, iters: 2, wake: 0.15,
       cands: [[-1, 0], [0, 0.06], [0, 0.15], [0, 0.3], [0, 0.6], [0.1, 0.2], [0.25, 0.25]] },
     // same as hard with a single opponent model: used automatically on slow devices
-    hardLite: { period: 0.067, horizon: 0.9, mistake: 0, oppModels: 1, iters: 2,
+    hardLite: { period: 0.067, horizon: 0.9, mistake: 0, oppModels: 1, iters: 2, wake: 0.15,
       cands: [[-1, 0], [0, 0.06], [0, 0.15], [0, 0.3], [0, 0.6], [0.1, 0.2], [0.25, 0.25]] }
   };
 
@@ -1263,12 +1345,26 @@
       this.plan = c; this.planT = job.applyAt; this.lastValue = job.best;
       this.job = null;
     }
-    return pressAt(this.plan, world.time - this.planT);
+    var pr = pressAt(this.plan, world.time - this.planT);
+    if (!pr && this.drowsy(world)) pr = true; // one step of the button: they wake with a start, nothing else
+    return pr;
+  };
+  // every player of the bot's is drowsy long enough (by its level), standing, and not pressing: time to wake them
+  Bot.prototype.drowsy = function (world) {
+    var any = false, need = SLEEP_T + this.cfg.wake;
+    for (var i = 0; i < 4; i++) {
+      var p = world.players[i];
+      if (!p.active || !this.mine(i)) continue;
+      if (!p.sleepy || p.idleT < need || p.prev || p.cT > 0.07 || world.hz.stun[i] > 0) return false;
+      any = true;
+    }
+    return any && !(world.fx.freeze[this.team] > 0);
   };
 
   return {
     W: W, H: H, GROUND: GROUND, DT: DT, COM_H: COM_H, HIP_H: HIP_H, SHOULDER_H: SHOULDER_H,
     BODY: BODY, LEG: LEG, NB: NB, NS: NS, RAD: RAD, LEG_REST: LEG_REST, LEG_KICK: LEG_KICK, BOMB_TIME: BOMB_TIME,
+    HOLD_TIRE: HOLD_TIRE, HOLD_MAX: HOLD_MAX, SLEEP_T: SLEEP_T,
     MAPS: MAPS, MAP_BY_ID: MAP_BY_ID, DEFAULT_SETTINGS: DEFAULT_SETTINGS, LEVELS: LEVELS,
     MODS: MODS, modsFor: modsFor, ITEMS: ITEMS, itemsFor: itemsFor,
     TOR_R: TOR_R, TOR_TOP: TOR_TOP, STUN_TIME: STUN_TIME, CRATER_TIME: CRATER_TIME, STILL_TIME: STILL_TIME, OUT_TIME: OUT_TIME,

@@ -370,6 +370,9 @@
         circle(c, ex, ey, 2.6); c.fill();
         line(c, ex - 4, ey - 6, ex + 3, ey - 4);
         circle(c, mx, my, 3.4); c.fill(); break;
+      case 'sleepy': // eyes shut, mouth a little open
+        c.beginPath(); c.arc(ex, ey - 1, 3.5, Math.PI * 0.15, Math.PI * 0.85); c.stroke();
+        circle(c, mx, my, 2.2); c.fill(); break;
       case 'cold':
         circle(c, ex, ey, 2.6); c.fill();
         c.beginPath(); c.moveTo(mx - 5, my); for (var k = 0; k < 4; k++) c.lineTo(mx - 3 + k * 2.6, my + (k % 2 ? -2 : 2)); c.stroke(); break;
@@ -444,6 +447,22 @@
     }
     c.restore();
     skin = SKIN;
+    if (look.zzz) zzz(c, p, look.t || 0);
+  }
+  // a drowsy player: z's drifting up from his head (upright, whichever way he leans)
+  function zzz(c, p, t) {
+    var ca = Math.cos(p.a), sa = Math.sin(p.a), lx = 3 * p.f * p.sc, ly = HEAD_Y * p.sc;
+    var hx = p.x + ca * lx - sa * ly, hy = p.y + sa * lx + ca * ly;
+    c.save(); c.textAlign = 'center'; c.textBaseline = 'middle'; c.lineJoin = 'round';
+    for (var k = 0; k < 3; k++) {
+      var u = (t * 0.55 + k / 3) % 1, size = (26 + 20 * u) * p.sc;
+      var x = hx + p.f * (22 + 34 * u) * p.sc + 6 * Math.sin((t + k) * 3), y = hy - (34 + 70 * u) * p.sc;
+      c.globalAlpha = u < 0.15 ? u / 0.15 : (u > 0.75 ? (1 - u) / 0.25 : 1);
+      c.font = '900 ' + Math.round(size) + 'px system-ui, sans-serif';
+      c.lineWidth = 6; c.strokeStyle = INK; c.strokeText('Z', x, y);
+      c.fillStyle = '#ffffff'; c.fillText('Z', x, y);
+    }
+    c.restore();
   }
 
   // ---------- balls ----------

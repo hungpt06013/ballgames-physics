@@ -8,3 +8,4 @@ shots*/
 *.webm
 test/*.txt
 node_modules/
+test/out/
