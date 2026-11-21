@@ -106,6 +106,7 @@
     border: calc(0.5 * var(--u)) solid var(--ink); border-radius: calc(2 * var(--u)); text-align: center; user-select: text; -webkit-user-select: text;
     background: var(--btn); color: var(--text); }
   .hint { font-weight: 700; font-size: calc(2.9 * var(--u)); color: var(--muted); }
+  #rowSlots .hint { display: block; font-size: calc(2.6 * var(--u)); }
   .opt { display: flex; align-items: center; gap: calc(1.2 * var(--u)); flex-wrap: wrap; margin: calc(1.1 * var(--u)) 0; }
   .opt > .chip { flex: none; }
   .optList { display: flex; flex-wrap: wrap; gap: calc(0.8 * var(--u)); }
@@ -277,7 +278,7 @@
       <div class="seg" id="lvlSeg"><button data-v="easy">Dễ</button><button data-v="normal">Thường</button><button data-v="hard">Khó</button></div></div>
     <div class="row" id="rowSide"><span>Bạn chơi bên</span>
       <div class="seg" id="sideSeg"><button data-v="L">◀ Trái (đỏ)</button><button data-v="R">Phải (xanh) ▶</button></div></div>
-    <div class="row" id="rowSlots"><span>Ai điều khiển?</span><div class="slots" id="slotBtns"></div></div>
+    <div class="row" id="rowSlots"><span>Ai điều khiển?<small class="hint">chạm để đổi: người → bot Dễ → Thường → Khó</small></span><div class="slots" id="slotBtns"></div></div>
     <div class="row"><span>Thể thức</span>
       <div class="fmt">
         <div class="seg" id="fmtType"><button data-v="p">🎯 Chạm điểm</button><button data-v="t">⏱ Tính giờ</button></div>
@@ -3273,7 +3274,7 @@
   var settings = Object.assign({}, E.DEFAULT_SETTINGS, load('settings', {}));
   var prefs = Object.assign({ level: 'hard', fmtType: 'p', fmtPoints: 5, fmtMinutes: 2, bombTime: 12,
     mods: true, modList: MOD_IDS.slice(), items: true, itemList: ITEM_IDS.slice(), weather: false, wxList: WX_IDS.slice(), beginner: false,
-    slots: ['h', 'h', 'h', 'h'], replay: true, music: true, sound: true, maps: ALL_MAPS.slice(),
+    slots: ['h', 'h', 'h', 'h'], slotLv: null, slots2: ['h', 'h'], slotLv2: null, replay: true, music: true, sound: true, maps: ALL_MAPS.slice(),
     hlAsked: false, hlMode: 'all', hlKeep: 30, side: 'L' }, load('prefs', {}));
   // older versions stored the format as 'p5' / 't120'
   if (typeof prefs.target === 'number' && !prefs.fmt) prefs.fmt = 'p' + prefs.target;
@@ -3288,6 +3289,14 @@
   prefs.maps = (prefs.maps || []).filter(function (id) { return E.MAP_BY_ID[id]; });
   if (!prefs.maps.length) prefs.maps = ALL_MAPS.slice();
   if (!E.LEVELS[prefs.level]) prefs.level = 'hard';
+  // who plays each slot ('h' a person, 'b' a bot) and each bot's own level; older versions had one level for all bots
+  function okLevel(l) { return l === 'easy' || l === 'normal' || l === 'hard'; }
+  function fixSlots(sl, lv, n) {
+    for (var i = 0; i < n; i++) { sl[i] = sl[i] === 'b' ? 'b' : 'h'; lv[i] = okLevel(lv[i]) ? lv[i] : (okLevel(prefs.level) ? prefs.level : 'normal'); }
+    sl.length = lv.length = n;
+  }
+  prefs.slots = (prefs.slots || []).slice(); prefs.slotLv = (prefs.slotLv || []).slice(); fixSlots(prefs.slots, prefs.slotLv, 4);
+  prefs.slots2 = (prefs.slots2 || []).slice(); prefs.slotLv2 = (prefs.slotLv2 || []).slice(); fixSlots(prefs.slots2, prefs.slotLv2, 2);
   if (['all', 'last', 'none'].indexOf(prefs.hlMode) < 0) prefs.hlMode = 'all';
   prefs.hlKeep = Math.max(1, Math.min(100, Math.round(+prefs.hlKeep) || 30));
   delete prefs.sport; delete prefs.knownMaps;
@@ -3361,8 +3370,10 @@
     if (code === 'Escape') return -1;
     if (soloish(G.mode)) return 0;
     if (is4(G.mode)) { for (var i = 0; i < 4; i++) if (K4[i][code]) return redirect(i); return -1; }
-    return P1K[code] ? 0 : (P2K[code] ? 1 : -1);
+    return P1K[code] ? redirect2(0) : (P2K[code] ? redirect2(1) : -1);
   }
+  // 2 players: a side played by a bot hands its key and its half of the screen to the person on the other side
+  function redirect2(s) { if (!G.bots[s]) return s; return G.bots[1 - s] ? -1 : 1 - s; }
   // a quadrant that belongs to a bot is handed to the human on the same side
   function redirect(i) {
     if (!isBotSlot(i)) return i;
@@ -3372,7 +3383,7 @@
   function pointSlot(x, y) {
     if (soloish(G.mode)) return 0;
     var right = x >= window.innerWidth / 2;
-    if (!is4(G.mode)) return right ? 1 : 0;
+    if (!is4(G.mode)) return redirect2(right ? 1 : 0);
     return redirect((right ? 2 : 0) + (y < window.innerHeight / 2 ? 1 : 0));
   }
   var latch = [false, false, false, false];
@@ -3441,13 +3452,13 @@
   function openSetup(mode) {
     setupMode = mode;
     $('setupTitle').textContent = { '2p': '👥 2 người', bot: '🤖 Đấu với bot', ffa: '🙋 4 người · điểm riêng', team4: '🤝 2 vs 2' }[mode];
-    $('rowSlots').classList.toggle('hidden', !is4(mode));
+    $('rowSlots').classList.toggle('hidden', !(is4(mode) || mode === '2p'));
     refreshSetup();
     show('setup');
   }
   function refreshSetup() {
-    var four = is4(setupMode), anyBot = setupMode === 'bot' || (four && prefs.slots.indexOf('b') >= 0);
-    $('rowLevel').classList.toggle('hidden', !anyBot);
+    var two = setupMode === '2p';
+    $('rowLevel').classList.toggle('hidden', setupMode !== 'bot'); // (2 / 4 players: each bot has its own level, on its chip)
     $('rowSide').classList.toggle('hidden', setupMode !== 'bot');
     segSelect('sideSeg', prefs.side);
     segSelect('lvlSeg', prefs.level); segSelect('fmtType', prefs.fmtType);
@@ -3457,15 +3468,20 @@
     $('fmtUnit').textContent = pts ? 'điểm thì thắng' : 'phút';
     $('rowBomb').classList.toggle('hidden', prefs.maps.indexOf('bomb') < 0);
     if (document.activeElement !== $('bombTime')) $('bombTime').value = prefs.bombTime;
-    var sb = $('slotBtns'); sb.innerHTML = '';
-    for (var i = 0; i < 4; i++) (function (i) {
-      var b = document.createElement('button'); b.className = 'chip' + (prefs.slots[i] === 'h' ? ' on' : '');
-      var nm = nameOf(i);
-      b.textContent = prefs.slots[i] === 'h' ? '🙋 ' + (nm === 'P' + (i + 1) ? nm : 'P' + (i + 1) + ' ' + nm) : '🤖 P' + (i + 1) + ' Bot';
-      if (prefs.slots[i] === 'h' && setupMode === 'ffa') b.style.boxShadow = 'inset 0 -6px 0 ' + Meta.color(i).main;
+    var sb = $('slotBtns'), sl = two ? prefs.slots2 : prefs.slots, lv = two ? prefs.slotLv2 : prefs.slotLv;
+    sb.innerHTML = '';
+    for (var i = 0; i < sl.length; i++) (function (i) {
+      var b = document.createElement('button'); b.className = 'chip' + (sl[i] === 'h' ? ' on' : '');
+      var nm = nameOf(i), tag = 'P' + (i + 1);
+      b.textContent = sl[i] === 'h' ? '🙋 ' + (nm === tag ? nm : tag + ' ' + nm) : '🤖 ' + tag + ' Bot ' + LEVEL_LABEL[lv[i]];
+      var mark = setupMode === 'ffa' ? Meta.color(i).main : (two ? teamCol(i).main : null);
+      if (mark) b.style.boxShadow = 'inset 0 -6px 0 ' + mark;
       b.addEventListener('click', function () {
-        prefs.slots[i] = prefs.slots[i] === 'h' ? 'b' : 'h';
-        if (prefs.slots.indexOf('h') < 0) prefs.slots[i] = 'h'; // keep at least one human
+        // person -> bot Dễ -> Thường -> Khó -> person (all of them may be bots: a match to watch)
+        if (sl[i] === 'h') { sl[i] = 'b'; lv[i] = 'easy'; }
+        else if (lv[i] === 'easy') lv[i] = 'normal';
+        else if (lv[i] === 'normal') lv[i] = 'hard';
+        else sl[i] = 'h';
         savePrefs(); Snd.click(); refreshSetup();
       });
       sb.appendChild(b);
@@ -3805,7 +3821,7 @@
     Snd.quiet = true; Snd.setStyle('menu'); Snd.setCrowd(false);
   }
   function resetBots() {
-    G.bot = null; G.bots = [null, null, null, null];
+    G.bot = null; G.bots = [null, null, null, null]; G.botLv = [null, null, null, null];
   }
   function newBot(team, level, slot) {
     var b = new E.Bot(team, level, (Math.random() * 4294967295) >>> 0, slot);
@@ -3818,9 +3834,13 @@
   // cfg: { mode, level, fmt ('p5' = first to 5, 't120' = 120 s), maps, mods, modList, items, itemList, weather, wxList, bombTime, beginner, slots }
   function startMatch(cfg) {
     Snd.init();
+    // (a caller giving one level for all bots and no level per slot: every bot at that level)
+    var one = cfg && cfg.level && !cfg.levels && !cfg.levels2 ? [cfg.level, cfg.level, cfg.level, cfg.level] : null;
+    if (one) cfg = Object.assign({ levels: one, levels2: one.slice(0, 2) }, cfg);
     cfg = Object.assign({ level: prefs.level, fmt: fmtString(), maps: prefs.maps.slice(), mods: prefs.mods, modList: prefs.modList.slice(),
       items: prefs.items, itemList: prefs.itemList.slice(), weather: prefs.weather, wxList: prefs.wxList.slice(), bombTime: prefs.bombTime,
-      beginner: prefs.beginner, slots: prefs.slots.slice(), side: prefs.side }, cfg);
+      beginner: prefs.beginner, slots: prefs.slots.slice(), levels: prefs.slotLv.slice(), slots2: prefs.slots2.slice(), levels2: prefs.slotLv2.slice(),
+      side: prefs.side }, cfg);
     G.cfg = cfg; G.mode = cfg.mode; G.demo = false; G.round = 0; G.earned = 0; G.golden = false;
     G.matchT = 0; G.goalsLog = []; G.playedMaps = []; G.hlm = { clips: [], singles: [], misses: [] }; G.lastHL = null; G.ps = newStats();
     G.score = is4(cfg.mode) ? [0, 0, 0, 0] : [0, 0];
@@ -3830,7 +3850,10 @@
     // against the bot the player picks his side: G.me = 0 left (red), 1 right (blue)
     G.me = cfg.mode === 'bot' && cfg.side === 'R' ? 1 : 0;
     if (cfg.mode === 'bot') G.bot = newBot(1 - G.me, cfg.level, -1);
-    if (is4(cfg.mode)) for (var i = 0; i < 4; i++) if (cfg.slots[i] === 'b') G.bots[i] = newBot(slotTeam(i), cfg.level, i);
+    // each bot's level (G.botLv[slot], or [side] with 2 players), for its name
+    var lvOf = function (list, i) { return list && okLevel(list[i]) ? list[i] : cfg.level; };
+    if (is4(cfg.mode)) for (var i = 0; i < 4; i++) if (cfg.slots[i] === 'b') { G.botLv[i] = lvOf(cfg.levels, i); G.bots[i] = newBot(slotTeam(i), G.botLv[i], i); }
+    if (cfg.mode === '2p') for (i = 0; i < 2; i++) if ((cfg.slots2 || [])[i] === 'b') { G.botLv[i] = lvOf(cfg.levels2, i); G.bots[i] = newBot(i, G.botLv[i], -1); }
     G.looks = matchLooks(); G.hlSettings = matchSettings();
     G.queue = makeQueue(true); G.qi = 0;
     clearInput();
@@ -3933,16 +3956,17 @@
     G.state = 'over';
     Snd.setCrowd(false);
     var w = draw ? -1 : matchWinner(), txt, color = '', html, st = Meta.stats(), reward = G.earned, mode = G.mode;
-    st.played++; st.byMode[mode] = (st.byMode[mode] || 0) + 1;
+    var people = voters().length; // (bots only: a match to watch)
+    if (people) { st.played++; st.byMode[mode] = (st.byMode[mode] || 0) + 1; }
     html = scoreHtml();
     if (mode === 'ffa') {
-      if (!draw) { txt = nameOf(w) + ' THẮNG! 🏆'; color = textCol(Meta.color(w)); }
+      if (!draw) { txt = slotName(w) + ' THẮNG! 🏆'; color = textCol(Meta.color(w)); }
       reward += 5;
     } else if (mode === 'team4') {
       if (!draw) { var t = w < 2 ? 0 : 1; txt = 'ĐỘI ' + DEF_TEAM[t].name + ' THẮNG! 🏆'; color = textCol(teamCol(t)); }
       reward += 5;
     } else if (mode === '2p') {
-      if (!draw) { txt = nameOf(w) + ' THẮNG! 🏆'; color = textCol(teamCol(w)); }
+      if (!draw) { txt = slotName(w) + ' THẮNG! 🏆'; color = textCol(teamCol(w)); }
       reward += 5;
     } else {
       var lvl = G.cfg.level, won = w === G.me;
@@ -3952,6 +3976,7 @@
       if (!draw) { color = textCol(teamCol(w)); txt = won ? 'BẠN THẮNG! 🏆' : 'BOT THẮNG! 🤖'; }
     }
     if (draw) txt = 'HOÀ! 🤝';
+    if (!people) reward = 0;
     Meta.save();
     Meta.addCoins(reward);
     $('resultText').textContent = txt;
@@ -3982,7 +4007,12 @@
       maps: (G.playedMaps || []).slice(), score: G.score.slice(), names: [0, 1, 2, 3].map(nameOf), bots: G.bots.map(Boolean),
       winner: draw ? -1 : winner, draw: !!draw, dur: Math.round(G.matchT || 0), goals: G.goalsLog || [], hl: null
     };
-    if (mode === 'bot' || (is4(mode) && G.bots.some(Boolean))) r.level = G.cfg.level;
+    if (mode === 'bot') r.level = G.cfg.level;
+    else if (G.bots.some(Boolean)) {
+      r.levels = G.botLv.slice();
+      var lvs = r.levels.filter(Boolean);
+      if (lvs.every(function (l) { return l === lvs[0]; })) r.level = lvs[0]; // (one level for all its bots)
+    }
     if (mode === 'bot') { r.result = draw ? 'draw' : (winner === G.me ? 'win' : 'loss'); r.me = G.me; }
     return r;
   }
@@ -4661,7 +4691,7 @@
     if (G.mode === 'ffa') return credit >= 0 ? slotName(credit) : '';
     if (G.mode === 'team4') return sideNames()[team];
     if (soloish(G.mode)) return team === G.me ? nameOf(0) : botLabel();
-    return nameOf(team);
+    return slotName(team);
   }
   function playerNames(by) {
     var out = [];
@@ -4674,8 +4704,8 @@
   function personOf(id) { return is4(G.mode) ? id : slotTeam(id); }
   // (a bot by its level; two bots of the same level with 4 players also by their slot)
   function personName(i) {
-    if (!is4(G.mode)) return G.mode === 'bot' ? (i === G.me ? nameOf(0) : botLabel()) : nameOf(i);
-    return G.bots[i] ? botLabel() + (G.bots.filter(Boolean).length > 1 ? ' · P' + (i + 1) : '') : nameOf(i);
+    if (!is4(G.mode)) return G.mode === 'bot' ? (i === G.me ? nameOf(0) : botLabel()) : slotName(i);
+    return G.bots[i] ? botLabel(i) + (G.bots.filter(Boolean).length > 1 ? ' · P' + (i + 1) : '') : nameOf(i);
   }
   function newStats() {
     var out = [];
@@ -4914,7 +4944,7 @@
   // every human player votes; the golden goal is played when at least as many want it as want the draw
   function voters() {
     if (G.mode === 'bot') return [0];
-    if (G.mode === '2p') return [0, 1];
+    if (G.mode === '2p') return [0, 1].filter(function (i) { return !G.bots[i]; });
     return [0, 1, 2, 3].filter(function (i) { return !G.bots[i]; });
   }
   function voterCol(id) { return G.mode === 'ffa' ? Meta.color(id) : teamCol(G.mode === '2p' ? id : (G.mode === 'bot' ? G.me : slotTeam(id))); }
@@ -4925,8 +4955,12 @@
     return scoreSpan(teamCol(0), G.score[0]) + ' – ' + scoreSpan(teamCol(1), G.score[1]);
   }
   function startVote() {
-    G.state = 'vote'; G.votes = {}; G.voteDone = false; clearInput();
     var ids = voters(), box = $('voteRows');
+    if (!ids.length) { // bots only: nobody to ask, straight on to the golden goal
+      G.golden = true; G.note = '⭐ BÀN VÀNG! Ai ghi trước thắng'; G.noteT = 2.4; Snd.whistle();
+      return;
+    }
+    G.state = 'vote'; G.votes = {}; G.voteDone = false; clearInput();
     box.innerHTML = '';
     $('voteScore').innerHTML = scoreHtml();
     $('voteHint').textContent = ids.length > 1
@@ -5093,7 +5127,7 @@
   function filtered() {
     var list = HL.history().filter(function (r) {
       if (hf.mode && r.mode !== hf.mode) return false;
-      if (hf.level && r.level !== hf.level) return false;
+      if (hf.level && r.level !== hf.level && !(r.levels && r.levels.indexOf(hf.level) >= 0)) return false;
       if (hf.result === 'draw' ? !r.draw : (hf.result && r.result !== hf.result)) return false;
       return !hf.sport || (r.maps || []).indexOf(hf.sport) >= 0;
     });
@@ -5104,14 +5138,14 @@
   function hasHL(r) { return !!(r.hl && !r.hl.gone); }
   function el(tag, cls, txt) { var e = document.createElement(tag); if (cls) e.className = cls; if (txt !== undefined) e.textContent = txt; return e; }
   // the names a history card shows: a bot by its level (as in the match)
-  function histBot(r) { return '🤖 Bot' + (r.level ? ' ' + LEVEL_LABEL[r.level] : ''); }
-  function histName(r, i) { return r.bots && r.bots[i] ? histBot(r) : (r.names || [])[i] || ''; }
+  function histBot(r, i) { var lv = r.levels && r.levels[i] ? r.levels[i] : r.level; return '🤖 Bot' + (lv ? ' ' + LEVEL_LABEL[lv] : ''); }
+  function histName(r, i) { return r.bots && r.bots[i] ? histBot(r, i) : (r.names || [])[i] || ''; }
   function histSide(r, a) { var x = histName(r, a), y = histName(r, a + 1); return x === y && r.bots && r.bots[a] ? x + ' ×2' : x + '+' + y; }
   function scoreLine(r) {
     var n = r.names || [], s = r.score, R = '<span class="r">', B = '<span class="b">', X = '</span>';
     if (r.mode === 'ffa') return n.map(function (nm, i) { return (r.winner === i ? '<b>' : '') + esc(histName(r, i)) + ' ' + s[i] + (r.winner === i ? '</b>' : ''); }).join(' · ');
     if (r.mode === 'team4') return R + esc(histSide(r, 0)) + ' ' + s[0] + X + ' – ' + B + s[2] + ' ' + esc(histSide(r, 2)) + X;
-    var left = n[0], right = n[1];
+    var left = histName(r, 0), right = histName(r, 1);
     if (r.mode === 'bot') { var bot = histBot(r); left = r.me ? bot : n[0]; right = r.me ? n[0] : bot; }
     return R + esc(left) + ' ' + s[0] + X + ' – ' + B + s[1] + ' ' + esc(right) + X;
   }
@@ -5480,8 +5514,11 @@
       var celebrate = G.state === 'scored' && !G.demo;
       if (G.demo) { pr[0] = pr[1] = G.demoCtl[0](w); pr[2] = pr[3] = G.demoCtl[1](w); }
       else if (is4(G.mode)) { for (var k = 0; k < 4; k++) pr[k] = G.bots[k] ? updateBot(G.bots[k], w) : humanPress(k, w); }
-      else {
-        var r = humanPress(0, w), bl = G.bot ? updateBot(G.bot, w) : (G.mode === '2p' ? humanPress(1, w) : false);
+      else if (G.mode === '2p') {
+        var lp = G.bots[0] ? updateBot(G.bots[0], w) : humanPress(0, w), rp = G.bots[1] ? updateBot(G.bots[1], w) : humanPress(1, w);
+        pr[0] = pr[1] = lp; pr[2] = pr[3] = rp;
+      } else {
+        var r = humanPress(0, w), bl = G.bot ? updateBot(G.bot, w) : false;
         if (G.me) { pr[0] = pr[1] = bl; pr[2] = pr[3] = r; } else { pr[0] = pr[1] = r; pr[2] = pr[3] = bl; }
       }
       if (celebrate) for (k = 0; k < 4; k++) pr[k] = w.players[k].team === G.scorer ? ((w.time * 1.5 + k * 0.37) % 1) < 0.12 : false;
@@ -5671,8 +5708,9 @@
   }
   // the names over the score of a highlight: one per side (one per player with 4 players free for all);
   // a bot is named by its level ("🤖 Bot Khó")
-  function botLabel() { return '🤖 Bot ' + (LEVEL_LABEL[G.cfg.level] || ''); }
-  function slotName(i) { return G.bots[i] ? botLabel() : nameOf(i); }
+  // (i: the bot's slot - its side with 2 players - for its own level; none: the bot of a match against the bot)
+  function botLabel(i) { var lv = i >= 0 && G.botLv && G.botLv[i] ? G.botLv[i] : G.cfg.level; return '🤖 Bot ' + (LEVEL_LABEL[lv] || ''); }
+  function slotName(i) { return G.bots[i] ? botLabel(i) : nameOf(i); }
   function sideNames() {
     if (G.mode === 'ffa') return [0, 1, 2, 3].map(slotName);
     if (G.mode === 'team4') return [[0, 1], [2, 3]].map(function (p) {
@@ -5680,13 +5718,13 @@
       return a === b && G.bots[p[0]] ? a + ' ×2' : a + ' + ' + b;
     });
     if (G.mode === 'bot') return G.me ? [botLabel(), nameOf(0)] : [nameOf(0), botLabel()];
-    return [nameOf(0), nameOf(1)];
+    return [slotName(0), slotName(1)];
   }
   function whoName(id) {
     if (is4(G.mode)) return slotName(id);
     var team = slotTeam(id);
     if (soloish(G.mode)) return team === G.me ? nameOf(0) : botLabel();
-    return nameOf(team);
+    return slotName(team);
   }
 
   // ---------- drawing ----------
@@ -5696,7 +5734,7 @@
     for (var i = 0; i < 4; i++) {
       var team = slotTeam(i), prof, col;
       if (four) { prof = Meta.profile(i); col = G.mode === 'ffa' ? Meta.color(i) : teamCol(team); }
-      else if (G.mode === '2p') { prof = Meta.profile(team); col = teamCol(team); }
+      else if (G.mode === '2p') { prof = G.bots[team] ? BOT_LOOK : Meta.profile(team); col = teamCol(team); }
       else { prof = team === G.me ? Meta.profile(0) : BOT_LOOK; col = teamCol(team); }
       var mk = four ? slotColor(i) : col;
       out.push({ hat: prof.hat, hair: prof.hair, shirt: prof.shirt, col: { main: col.main, dark: col.dark }, mark: { main: mk.main, dark: mk.dark },
@@ -5950,16 +5988,19 @@
     } else {
       var r = Math.max(34, 12.5 * u);
       var me = G.mode === 'bot' ? G.me : 0, mx = me ? v.cw - r * 0.82 : r * 0.82; // (the player's button on his side)
-      drawButton(c, teamCol(me), G.mode === 'tutorial' ? '●' : String(G.score[me]), mx, v.ch - r * 0.82, r, G.pressed[me * 2], me ? -1 : 1, -1);
-      if (G.mode === '2p') drawButton(c, teamCol(1), String(G.score[1]), v.cw - r * 0.82, v.ch - r * 0.82, r, G.pressed[2], -1, -1);
+      if (!(G.mode === '2p' && G.bots[me])) drawButton(c, teamCol(me), G.mode === 'tutorial' ? '●' : String(G.score[me]), mx, v.ch - r * 0.82, r, G.pressed[me * 2], me ? -1 : 1, -1);
+      if (G.mode === '2p' && !G.bots[1]) drawButton(c, teamCol(1), String(G.score[1]), v.cw - r * 0.82, v.ch - r * 0.82, r, G.pressed[2], -1, -1);
     }
     c.globalAlpha = 1;
-    if (G.mode === 'bot' && G.bot) {
-      var bt = 1 - G.me, bx = bt ? v.cw - pad - 23 * u : pad, by = v.ch - pad - 9 * u; // (the bot's box on the other side)
+    // a side played by a bot: its box (BOT KHÓ...) in its corner
+    var botBox = function (bt, lv) {
+      var bx = bt ? v.cw - pad - 23 * u : pad, by = v.ch - pad - 9 * u;
       D.rrect(c, bx, by, 23 * u, 9 * u, 3 * u); c.fillStyle = G.pressed[bt * 2] ? teamCol(bt).dark : teamCol(bt).main; c.fill();
       c.lineWidth = Math.max(2.5, u * 0.6); c.strokeStyle = INK; c.stroke();
-      D.textOutlined(c, 'BOT ' + LEVEL_NAMES[G.bot.level], bx + 11.5 * u, by + 4.7 * u, 3.6 * u, '#ffffff', INK);
-    }
+      D.textOutlined(c, 'BOT ' + LEVEL_NAMES[lv], bx + 11.5 * u, by + 4.7 * u, 3.6 * u, '#ffffff', INK);
+    };
+    if (G.mode === 'bot' && G.bot) botBox(1 - G.me, G.cfg.level);
+    if (G.mode === '2p') for (var bs = 0; bs < 2; bs++) if (G.bots[bs]) botBox(bs, G.botLv[bs]);
     drawPlayerMarks(c, u, w);
     drawBallArrows(c, u, A, w);
     // banners

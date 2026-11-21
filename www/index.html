@@ -106,6 +106,7 @@
     border: calc(0.5 * var(--u)) solid var(--ink); border-radius: calc(2 * var(--u)); text-align: center; user-select: text; -webkit-user-select: text;
     background: var(--btn); color: var(--text); }
   .hint { font-weight: 700; font-size: calc(2.9 * var(--u)); color: var(--muted); }
+  #rowSlots .hint { display: block; font-size: calc(2.6 * var(--u)); }
   .opt { display: flex; align-items: center; gap: calc(1.2 * var(--u)); flex-wrap: wrap; margin: calc(1.1 * var(--u)) 0; }
   .opt > .chip { flex: none; }
   .optList { display: flex; flex-wrap: wrap; gap: calc(0.8 * var(--u)); }
@@ -277,7 +278,7 @@
       <div class="seg" id="lvlSeg"><button data-v="easy">Dễ</button><button data-v="normal">Thường</button><button data-v="hard">Khó</button></div></div>
     <div class="row" id="rowSide"><span>Bạn chơi bên</span>
       <div class="seg" id="sideSeg"><button data-v="L">◀ Trái (đỏ)</button><button data-v="R">Phải (xanh) ▶</button></div></div>
-    <div class="row" id="rowSlots"><span>Ai điều khiển?</span><div class="slots" id="slotBtns"></div></div>
+    <div class="row" id="rowSlots"><span>Ai điều khiển?<small class="hint">chạm để đổi: người → bot Dễ → Thường → Khó</small></span><div class="slots" id="slotBtns"></div></div>
     <div class="row"><span>Thể thức</span>
       <div class="fmt">
         <div class="seg" id="fmtType"><button data-v="p">🎯 Chạm điểm</button><button data-v="t">⏱ Tính giờ</button></div>
