@@ -8,7 +8,7 @@ Game 2 đội × 2 cầu thủ ragdoll, mỗi đội **1 nút** (bấm = nhảy 
 Khi vào trận, tích chọn các môn muốn chơi; chọn nhiều môn thì sau mỗi điểm đổi sang môn khác.
 
 ## Tải về / chơi thử
-- **Android**: [BallgamesPhysics.apk](https://github.com/hungpt06013/ballgames-physics/raw/main/dist/BallgamesPhysics.apk) (Android 5.0 trở lên; nếu trình duyệt tải về thành `.apk.zip` thì giải nén ra hoặc đổi tên lại thành `.apk`).
+- **Android**: [BallgamesPhysics.apk – bản mới nhất](https://github.com/hungpt06013/ballgames-physics/releases/latest/download/BallgamesPhysics.apk) (Android 5.0 trở lên; cài đè lên bản cũ được, giữ nguyên dữ liệu). GitHub tự build file này mỗi khi code trên `main` thay đổi; bản thử từ các nhánh khác nằm ở mục [Releases](https://github.com/hungpt06013/ballgames-physics/releases) với tên "Bản thử". (Bản trong `dist/` là bản build tay cũ hơn: [dist/BallgamesPhysics.apk](https://github.com/hungpt06013/ballgames-physics/raw/main/dist/BallgamesPhysics.apk); nếu trình duyệt tải về thành `.apk.zip` thì giải nén ra hoặc đổi tên lại thành `.apk`.)
 - **Trình duyệt** (1 file, chơi offline): [BallgamesPhysics.html](https://github.com/hungpt06013/ballgames-physics/raw/main/dist/BallgamesPhysics.html) – tải về rồi mở bằng Chrome.
 - **Chơi online** (khi đã bật GitHub Pages cho thư mục `docs/`): https://hungpt06013.github.io/ballgames-physics/
 
@@ -107,11 +107,14 @@ Trong game: Menu → ⚙️ Cài đặt.
 Trong code: sửa từng môn ở `MAPS` trong `www/engine.js` (`g`, `gBall`, `jump`, `legSpd`, `ballR`, `ballE`, `mu`…).
 
 ## Build
-Cần JDK 17+ và Android SDK (build-tools 36.1.0, platforms;android-34):
+**APK tự động trên GitHub** (`.github/workflows/apk.yml`): mỗi lần đẩy code lên `main` (hoặc nhánh `claude/…`, hoặc bấm *Run workflow* ở tab Actions), GitHub tự build APK và ký bằng khoá của game cất trong secret **`KEYSTORE_B64`** (nội dung file `release.jks` dạng base64; không ai đọc được secret, khoá không bao giờ nằm trong repo). Trước khi ký, nó kiểm tra đó đúng là khoá của các bản trước (SHA-256 `9C:7C:D9:AD…FF:FB:A8`); thiếu hoặc sai khoá thì dừng hẳn, không bao giờ tự tạo khoá mới. `main` → release `v<phiên bản>` (bản mới nhất); nhánh khác → pre-release "test-build".
+Phiên bản app nằm ở `android/version.env` (`VERSION_CODE` phải tăng mỗi lần phát hành để điện thoại nhận là bản cập nhật).
+
+Build trên máy: cần JDK 17+ và Android SDK (build-tools 36.1.0, platforms;android-34), file `release.jks` đặt cạnh `build_apk.sh`:
 ```
-ANDROID_HOME=/đường/dẫn/sdk VERSION_CODE=26 VERSION_NAME=3.3 ./build_apk.sh
+ANDROID_HOME=/đường/dẫn/sdk ./build_apk.sh
 python3 build_html.py BallgamesPhysics.html
 ```
 Chạy kiểm tra: `node test/sanity2.cjs` (engine), các file Playwright như `node test/v25.cjs` (cần `npm i -g playwright` và Chromium).
 
-**Khoá ký APK** (`release.jks`) **không có trong repo**. `build_apk.sh` tự tạo khoá mới nếu chưa có; muốn bản build cài đè lên bản đã cài thì phải dùng đúng khoá cũ (giữ file này ở chỗ riêng, đừng đưa lên mạng).
+**Khoá ký APK** (`release.jks`) **không có trong repo** (repo công khai). Trên máy, `build_apk.sh` tự tạo khoá mới nếu chưa có (trên GitHub thì không); muốn bản build cài đè lên bản đã cài thì phải dùng đúng khoá cũ (giữ file này ở chỗ riêng, đừng đưa lên mạng).

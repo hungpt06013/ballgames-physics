@@ -1,0 +1,89 @@
+# Builds the Android APK on GitHub and signs it with the game's own key, kept in the repository secret KEYSTORE_B64
+# (the key file, base64). Nobody can read the secret; the key never goes into the repository.
+#  - pushes to main: the APK goes to the release "v<version>" (the newest release):
+#    https://github.com/hungpt06013/ballgames-physics/releases/latest/download/BallgamesPhysics.apk
+#  - pushes to claude/* branches (or "Run workflow"): a test build, the pre-release "test-build"
+# Signed with any other key, phones could not install the APK over the game: the build stops instead.
+name: APK
+
+on:
+  push:
+    branches: [main, 'claude/**']
+    paths: ['www/**', 'android/**', 'build_apk.sh', '.github/workflows/apk.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    env:
+      KEY_SHA256: 9C:7C:D9:AD:B6:86:11:47:5E:89:54:9F:D1:81:84:29:50:F8:FC:A2:00:C6:B3:6C:3E:AC:5C:46:71:FF:FB:A8
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Android build tools
+        run: |
+          SM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SM" --licenses > /dev/null || true
+          "$SM" "build-tools;36.1.0" "platforms;android-34" > /dev/null
+
+      - name: Signing key (from the secret, checked against the key of the earlier versions)
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+        run: |
+          if [ -z "$KEYSTORE_B64" ]; then
+            echo "::error title=No signing key::Add the secret KEYSTORE_B64 under Settings > Secrets and variables > Actions"
+            exit 1
+          fi
+          echo "$KEYSTORE_B64" | tr -d ' \r\n' | base64 -d > release.jks
+          FP=$(keytool -list -v -keystore release.jks -storepass ballgames 2>/dev/null | grep -m1 'SHA256:' | awk '{print $2}')
+          if [ "$FP" != "$KEY_SHA256" ]; then
+            echo "::error title=Wrong signing key::KEYSTORE_B64 is not the key of the earlier versions; phones could not update the game with it"
+            exit 1
+          fi
+
+      - name: Build and sign
+        run: ./build_apk.sh
+
+      - name: Check the APK
+        run: |
+          BT="$ANDROID_HOME/build-tools/36.1.0"
+          SIGNER=$("$BT/apksigner" verify --print-certs BallgamesPhysics.apk | grep -m1 'SHA-256 digest' | awk '{print $NF}')
+          WANT=$(echo "$KEY_SHA256" | tr -d ':' | tr 'A-F' 'a-f')
+          [ "$SIGNER" = "$WANT" ] || { echo "::error::signed with $SIGNER"; exit 1; }
+          INFO=$("$BT/aapt2" dump badging BallgamesPhysics.apk | head -1)
+          echo "::notice title=APK ready::$INFO, signed with the game's key ($SIGNER)"
+          rm -f release.jks
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          . android/version.env
+          if [ "$GITHUB_REF_NAME" = "main" ]; then
+            TAG="v$VERSION_NAME"
+            gh release view "$TAG" > /dev/null 2>&1 || gh release create "$TAG" --target "$GITHUB_SHA" --latest \
+              --title "Ballgames Physics $VERSION_NAME" --notes "Tải BallgamesPhysics.apk bên dưới (Android 5.0 trở lên). Cài đè lên bản cũ được, giữ nguyên dữ liệu."
+            gh release upload "$TAG" BallgamesPhysics.apk --clobber
+          else
+            TAG="test-build"
+            gh release delete "$TAG" --yes --cleanup-tag > /dev/null 2>&1 || true
+            gh release create "$TAG" BallgamesPhysics.apk --prerelease --target "$GITHUB_SHA" \
+              --title "Bản thử $VERSION_NAME ($GITHUB_REF_NAME)" --notes "Bản thử từ nhánh $GITHUB_REF_NAME, commit ${GITHUB_SHA::7}. Cài đè lên bản cũ được, giữ nguyên dữ liệu."
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BallgamesPhysics-apk
+          path: BallgamesPhysics.apk
