@@ -25,9 +25,9 @@ jobs:
     env:
       KEY_SHA256: 9C:7C:D9:AD:B6:86:11:47:5E:89:54:9F:D1:81:84:29:50:F8:FC:A2:00:C6:B3:6C:3E:AC:5C:46:71:FF:FB:A8
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
@@ -83,7 +83,7 @@ jobs:
               --title "Bản thử $VERSION_NAME ($GITHUB_REF_NAME)" --notes "Bản thử từ nhánh $GITHUB_REF_NAME, commit ${GITHUB_SHA::7}. Cài đè lên bản cũ được, giữ nguyên dữ liệu."
           fi
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: BallgamesPhysics-apk
           path: BallgamesPhysics.apk
