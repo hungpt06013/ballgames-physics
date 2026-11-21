@@ -1,4 +1,4 @@
-# ⚽ Ballgames Physics – v3.5
+# ⚽ Ballgames Physics – v3.6
 
 Game thể thao ragdoll vui nhộn: 2 đội × 2 cầu thủ, mỗi đội chỉ **1 nút**.
 
@@ -19,7 +19,6 @@ Game thể thao ragdoll vui nhộn: 2 đội × 2 cầu thủ, mỗi đội ch�
 | 👆 **Bấm** | nhảy + vung chân sút |
 | ✊ **Giữ khi đang bay** | lộn người – móc xe đạp |
 | ↗️ **Mẹo** | bấm lúc người nghiêng về trước để lao lên |
-| 💤 **Đứng im 3 giây** | ngủ gật – bấm 1 cái để tỉnh (không nhảy) |
 | 🦵 **Giữ nút quá 5 giây** | chân mỏi, tự hạ xuống |
 
 **Chạm:** đấu bot – đâu cũng được · 2 người – nửa trái / phải · 4 người – mỗi người 1 góc.

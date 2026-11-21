@@ -76,8 +76,6 @@
     bounce: function (v) { if (!this.ok('bounce', 0.06)) return; var k = Math.min(1, v / 1200); this.tone(125, 70, 0.09, 'sine', 0.08 + 0.3 * k); },
     post: function () { if (!this.ok('post', 0.08)) return; this.tone(1250, 1180, 0.35, 'triangle', 0.22); this.tone(1870, 1800, 0.25, 'sine', 0.08); },
     jump: function () { if (!this.ok('jump', 0.09)) return; this.tone(240, 420, 0.08, 'sine', 0.04); },
-    // a drowsy player woken with a start: a short high blip
-    startle: function () { if (!this.ok('startle', 0.09)) return; this.tone(620, 900, 0.06, 'triangle', 0.035); },
     whistle: function () { if (!this.ok('whistle', 0.3)) return; this.tone(2350, 2250, 0.16, 'square', 0.04); this.tone(2350, 2250, 0.38, 'square', 0.04, 0.2); },
     cheer: function () { if (!this.ok('cheer', 0.5)) return; this.noise(1.8, 0.3, 1100, 0.6, 0, 0.25); this.noise(1.4, 0.12, 2600, 0.9, 0.1, 0.2); },
     click: function () { if (!this.sfxOn || !this.ac) return; this.tone(700, 520, 0.05, 'square', 0.04); },
