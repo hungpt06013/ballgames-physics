@@ -535,7 +535,8 @@
   }
   function matchSettings() {
     var cfg = G.cfg || {};
-    return Object.assign({}, settings, { beginner: !!cfg.beginner, powerups: !!cfg.items, itemList: cfg.itemList, bombTime: cfg.bombTime });
+    // (nobody dozes off while learning the button)
+    return Object.assign({}, settings, { beginner: !!cfg.beginner, powerups: !!cfg.items, itemList: cfg.itemList, bombTime: cfg.bombTime, sleep: cfg.mode !== 'tutorial' });
   }
   // a random modifier for the round, from the ones ticked in the setup that suit this sport
   function pickMods(id) {
@@ -546,7 +547,7 @@
     return m;
   }
   function newWorld(id, serve, swapRoles, mods) {
-    var w = E.createWorld(id, G.demo ? settings : matchSettings(), (Math.random() * 4294967295) >>> 0, mods || {});
+    var w = E.createWorld(id, G.demo ? Object.assign({}, settings, { sleep: false }) : matchSettings(), (Math.random() * 4294967295) >>> 0, mods || {});
     if (swapRoles) for (var i = 0; i < 4; i++) w.players[i].role = 1 - w.players[i].role;
     E.resetRound(w, serve);
     w.events.length = 0;
@@ -606,6 +607,7 @@
     var mk = Object.keys(mods)[0];
     G.modName = mk ? E.MODS[mk].icon + ' ' + E.MODS[mk].name : '';
     G.roundMods = mods; G.clipDone = false; G.hlw = G.hlm ? newWatch() : null; G.psT = [-9, -9, -9, -9]; G.pressT = [-9, -9, -9, -9];
+    G.cf = G.hlw ? new CfLog() : null;
     if (G.playedMaps && G.playedMaps.indexOf(id) < 0) G.playedMaps.push(id);
     if (G.bot) G.bot.reset();
     G.bots.forEach(function (b) { if (b) b.reset(); });
@@ -874,14 +876,14 @@
   var FS = 90, RB = Math.round(16 / DT), REPLAY_LEAD = 5, REPLAY_SLOW = 0.4;
   // Next to the frames: the match clock of each frame (clk) and the engine events of each step (evs: [frame, event]),
   // so a highlight shows the time left and plays the sounds.
-  var SOUND_EVENTS = { kick: 1, head: 1, body: 1, bounce: 1, wall: 1, post: 1, shield: 1, jump: 1, explode: 1, pickup: 1, respawn: 1, thunder: 1, rumble: 1, whoosh: 1 };
+  var SOUND_EVENTS = { kick: 1, head: 1, body: 1, bounce: 1, wall: 1, post: 1, shield: 1, jump: 1, startle: 1, explode: 1, pickup: 1, respawn: 1, thunder: 1, rumble: 1, whoosh: 1 };
   function Recorder() { this.buf = new Float32Array(RB * FS); this.clk = new Float32Array(RB); this.evs = []; this.n = 0; this.goal = -1; this.shotT = -1; this.lead = 0; }
   Recorder.prototype.push = function (w) {
     var f = this.buf, o = (this.n % RB) * FS, i, p, b, fx = w.fx, hz = w.hz, it = w.item, v = G.wxv;
     f[o++] = w.time;
     for (i = 0; i < 4; i++) {
       p = w.players[i];
-      f[o++] = p.x; f[o++] = p.y; f[o++] = p.a; f[o++] = p.leg; f[o++] = p.press ? 1 : 0; f[o++] = p.sc; f[o++] = p.cT; f[o++] = hz.stun[i];
+      f[o++] = p.x; f[o++] = p.y; f[o++] = p.a; f[o++] = p.leg; f[o++] = (p.press ? 1 : 0) + (p.sleepy ? 2 : 0); f[o++] = p.sc; f[o++] = p.cT; f[o++] = hz.stun[i];
     }
     for (i = 0; i < 2; i++) {
       b = w.balls[i] || w.balls[0];
@@ -913,7 +915,8 @@
     o++; // the time
     for (i = 0; i < 4; i++) {
       p = w.players[i];
-      p.x = f[o++]; p.y = f[o++]; p.a = f[o++]; p.leg = f[o++]; p.press = f[o++] > 0;
+      p.x = f[o++]; p.y = f[o++]; p.a = f[o++]; p.leg = f[o++];
+      var pv = Math.round(f[o++]); p.press = pv % 2 === 1; p.sleepy = pv >= 2; // (button down: 1, drowsy: +2)
       var sc = f[o++]; if (p.sc !== sc) E.setScale(p, sc);
       p.cT = f[o++]; hz.stun[i] = f[o++];
       E.shapes(p);
@@ -1115,6 +1118,57 @@
   // single saves the most dangerous third is kept. Every point, and every round stopped by lightning, is kept too.
   var SAVE_LOOK = 1.6, SAVE_CONFIRM = 0.25, SAVE_CHAIN = 3, SAVE_ACTIVE = 0.35, SAVE_JUMP = 1.5, SAVE_PACE = 400, SAVE_GAP = 0.15, CLIP_PRE = 3, CLIP_POST = 1.5;
   var ZAP_COL = { main: '#ffd23f', dark: '#c4a612' };
+  // The last CF_KEEP seconds of the round: every step's buttons, and a copy of the world every CF_EVERY steps, so a
+  // possible save can be played again as if the saver had not pressed (goesInWithout).
+  var CF_KEEP = 2.6, CF_EVERY = 4, CF_N = Math.round(CF_KEEP / DT), CF_MORE = SAVE_LOOK + 0.3;
+  var cfWorld = null;
+  function CfLog() { this.n = 0; this.t = new Float64Array(CF_N); this.m = new Uint8Array(CF_N); this.snaps = []; this.pool = []; }
+  // (called just before each physics step, with the buttons of that step)
+  CfLog.prototype.push = function (w, pr) {
+    var k = this.n % CF_N, m = 0;
+    for (var i = 0; i < 4; i++) if (pr[i]) m |= 1 << i;
+    this.t[k] = w.time; this.m[k] = m;
+    if (this.n % CF_EVERY === 0) {
+      var s = this.pool.pop() || { w: E.emptyWorld() };
+      E.copyWorld(s.w, w); s.n = this.n;
+      this.snaps.push(s);
+      while (this.snaps.length && this.snaps[0].n < this.n - CF_N + CF_EVERY) this.pool.push(this.snaps.shift());
+    }
+    this.n++;
+  };
+  // A defender `by` turned the ball away with a touch at time `at`: played again from just before the press that did
+  // it - him (and, with one button per side, his team-mate) not pressing from then on, everybody else pressing as
+  // they did until that touch and nothing after - would the ball `bi` have gone in for `att`? (When the last seconds
+  // are not all there, it is taken as a save.)
+  CfLog.prototype.goesInWithout = function (w, by, def, att, bi, at) {
+    var oldest = Math.max(0, this.n - CF_N + 1), kt = -1, k, n = this.t, m = this.m, i;
+    for (k = this.n - 1; k >= oldest; k--) if (n[k % CF_N] + DT <= at + 1e-6) { kt = k; break; }
+    if (kt < 0) return true;
+    var off = 0;
+    for (i = 0; i < 4; i++) if (i === by || (!is4(G.mode) && w.players[i].team === def)) off |= 1 << i;
+    var bit = 1 << by, k1 = kt;
+    while (k1 >= oldest && !(m[k1 % CF_N] & bit)) k1--;
+    if (k1 < oldest) return true; // (no press of his in the log)
+    var k0 = k1;
+    while (k0 - 1 >= oldest && (m[(k0 - 1) % CF_N] & bit)) k0--;
+    var snap = null;
+    for (i = this.snaps.length - 1; i >= 0; i--) if (this.snaps[i].n <= k0) { snap = this.snaps[i]; break; }
+    if (!snap) return true;
+    var A = w.arena, keep = A.moveGoal ? [A.goalTop, A.segs[0].y1, A.segs[0].y2, A.segs[1].y1, A.segs[1].y2] : null;
+    var sim = E.copyWorld(cfWorld || (cfWorld = E.emptyWorld()), snap.w), pr = [false, false, false, false], went = false;
+    sim.events = null;
+    for (i = 0; i < 4; i++) if (sim.players[i].active) E.shapes(sim.players[i]);
+    var end = at + CF_MORE;
+    for (k = snap.n; sim.time < end; k++) {
+      var mk = k < this.n && sim.time < at - 1e-6 ? m[k % CF_N] : 0;
+      for (i = 0; i < 4; i++) pr[i] = !!(mk & (1 << i)) && !((off & (1 << i)) && k >= k0);
+      var sc = E.stepPlayers(sim, pr);
+      if (sc >= 0) { went = sc === att && sim.scoreBall === bi; break; }
+    }
+    if (keep) { A.goalTop = keep[0]; A.segs[0].y1 = keep[1]; A.segs[0].y2 = keep[2]; A.segs[1].y1 = keep[3]; A.segs[1].y2 = keep[4]; }
+    if (G.dbg) G.dbg.push({ r: went ? 'cf-in' : 'cf-out', t: at, round: G.round, by: by });
+    return went;
+  };
   function newWatch() { return { tick: 0, threat: [null, null], cand: [], group: null, flight: [null, null], miss: [], lastT: [-1, -1] }; }
   // he did something when he touched it at t: pressed his button just before (whatever part of him the ball met: a
   // kick, a header, or his body as the jump starts), or he is in the air after his own jump or dive
@@ -1127,7 +1181,7 @@
     if (team < 0 || tt <= S.lastT[bi]) return;
     S.lastT[bi] = tt;
     var th = S.threat[bi];
-    if (th && team === 1 - th.att && activeTouch(b, pid, tt)) { th.act = pid; th.actX = b.x; }
+    if (th && team === 1 - th.att && activeTouch(b, pid, tt)) { th.act = pid; th.actX = b.x; th.actT = tt; }
     S.cand.forEach(function (c) { if (c.bi === bi && pid !== c.by && tt > c.t) c.other = true; });
   }
   function watchSaves(w) {
@@ -1177,10 +1231,13 @@
     if (t - shot < SAVE_GAP) { why('scramble', bi, by, x); return; } // touched by both sides in a scramble
     // he did something (activeTouch); or a defender did something to it earlier in this danger and it ends here
     // (his deflection, then the ball dies against him or a team-mate): the save is his
-    var active = activeTouch(b, by, t);
-    if (!active && th.act !== undefined) { by = th.act; x = th.actX; active = true; }
+    var active = activeTouch(b, by, t), at = t;
+    if (!active && th.act !== undefined) { by = th.act; x = th.actX; at = th.actT; active = true; }
     if (!active) { why('standing', bi, by, x); return; } // it hit him standing there
     if (def === 0 ? x > W / 2 : x < W / 2) { why('their half', bi, by, x); return; } // not in his own half
+    // what he did has to be what kept it out: played again without his press, would it have gone in? A ball that
+    // would have hit him (or a team-mate) anyway - it came straight at his feet - was no save, whatever he did
+    if (G.cf && !G.cf.goesInWithout(w, by, def, th.att, bi, at)) { why('anyway', bi, by, x); return; }
     why('save?', bi, by, x);
     S.cand.push({ bi: bi, att: th.att, def: def, t: t, by: by, shot: shot, danger: th.danger, th: th });
   }
@@ -1316,6 +1373,9 @@
     var clip = makeClip(r.from, r.to, [{ t: rec.timeAt(r.goal), kind: kind, bi: G.goalBall || 0 }], [[rec.timeAt(r.slowFrom), rec.timeAt(r.to) + 1]], {
       kind: kind, team: G.scorer, credit: G.credit, word: G.word, sub: G.sub, score: G.score.slice(), sc0: G.noPoint ? G.score.slice() : (G.scoreBefore || G.score).slice(),
       name: G.noPoint ? '' : scorerName(G.scorer, G.credit) });
+    // a goal never shows "SUÝT VÀO!" for the side that scored it: that near miss (off the bar, rolling on the line...)
+    // was the same attack, and it went in
+    if (clip && kind === 'goal') clip.marks = clip.marks.filter(function (m) { return !(m.kind === 'miss' && m.team === G.scorer); });
     if (clip) G.hlm.clips.push(clip);
   }
   // a point was scored (team) or the round was stopped (-1): saves are settled and the round's watching ends
@@ -1325,7 +1385,8 @@
     S.cand.forEach(function (c) { if (c.att !== team) addSave(c); }); // a touch just before the ball went in saved nothing
     S.cand = []; S.threat = [null, null];
     S.flight = [null, null]; // (a flight still going went in)
-    S.miss.forEach(function (m) { fileMiss(m); });
+    // a 'near miss' of the side that has just scored was the start of this point (it went in in the end): not a miss
+    S.miss.forEach(function (m) { if (m.team !== team) fileMiss(m); });
     S.miss = [];
     var g = S.group, lost = !!g && team >= 0 && g.def === 1 - team && G.world.time - g.last < SAVE_CHAIN;
     // saves made just before the same side conceded were not enough; one after which the scorers never touched the
@@ -2181,8 +2242,11 @@
         if (G.me) { pr[0] = pr[1] = bl; pr[2] = pr[3] = r; } else { pr[0] = pr[1] = r; pr[2] = pr[3] = bl; }
       }
       if (celebrate) for (k = 0; k < 4; k++) pr[k] = w.players[k].team === G.scorer ? ((w.time * 1.5 + k * 0.37) % 1) < 0.12 : false;
-      else if (G.hlw) for (k = 0; k < 4; k++) if (pr[k]) G.pressT[k] = w.time; // when each player last did something (saves)
+      if (G.cf && G.hlw && G.state === 'play' && !celebrate) G.cf.push(w, pr); // (to replay the last seconds without a save's press)
       var sc = E.stepPlayers(w, pr);
+      // when each player last did something (saves): a press that counts - not one that only woke him, nor a button
+      // held down past its time
+      if (!celebrate && G.hlw) for (k = 0; k < 4; k++) if (w.players[k].press) G.pressT[k] = w.time;
       handleEvents(w);
       if (!G.demo) weatherStep(w);
       if (G.mode === 'tutorial') tutorialTick(DT, w);
@@ -2216,6 +2280,8 @@
         else if (G.fade >= 1) { G.fade = 1; G.fadeDir = 0; fadedOut(); }
       } else if (G.fade >= 1) fadedOut(); // never stay on a white screen
     }
+    // the music gets busier in the last 10 seconds of a timed match and during a golden goal
+    Snd.setHype((G.state === 'play' || G.state === 'scored') && !G.demo && (G.golden || (G.clock > 0 && G.clock <= 10)));
     G.shake = Math.max(0, G.shake - dt * 2.5);
     G.excite = Math.max(0, G.excite - dt * 0.45);
     if (G.noteT > 0) G.noteT -= dt;
@@ -2341,6 +2407,7 @@
       case 'post': sfx('post'); sparks(e.x, e.y, 4); break;
       case 'shield': sfx('shield'); sparks(e.x, e.y, 6, '#7fe3ff'); break;
       case 'jump': sfx('jump'); dust(e.x, e.y, 3); break;
+      case 'startle': sfx('startle'); break; // a drowsy player woken by his button
       case 'explode': sfx('explode'); explosion(e.x, e.y); G.shake = 1.4; break;
       case 'pickup': sfx(e.type === 'freeze' ? 'freeze' : 'pickup'); sparks(e.x, e.y, 12, '#ffd23f'); break;
       case 'respawn': sparks(e.x, e.y, 8); break;
@@ -2411,8 +2478,9 @@
     else if (cheer >= 0) face = p.team === cheer ? 'happy' : 'sad';
     else if (Math.abs(p.a) > 1.4 && p.cT < 0.1) face = 'dizzy';
     else if (p.press) face = 'effort';
+    else if (p.sleepy) face = 'sleepy';
     return { col: col, hat: prof.hat, hair: prof.hair, shirt: prof.shirt, num: L && G.looks.four ? i + 1 : p.role + 1, face: face, frozen: frozen,
-      burnt: burnt, hairCol: burnt ? INK : (p.id % 2 ? '#5b3a1f' : INK), armT: G.armT[i], mapId: m.id };
+      burnt: burnt, hairCol: burnt ? INK : (p.id % 2 ? '#5b3a1f' : INK), armT: G.armT[i], mapId: m.id, zzz: face === 'sleepy', t: clock };
   }
   // replay or highlight: recorded frames are being shown
   function playback() { return G.state === 'replay' || G.state === 'highlight'; }
@@ -2547,7 +2615,7 @@
       var b = w.balls[i], left = Infinity;
       if (b.outT > 0.25) left = Math.min(left, E.OUT_TIME - b.outT); // a ball just flying over a goal for a moment is no warning
       if (b.stillT > 0) left = Math.min(left, E.STILL_TIME - b.stillT);
-      if (left <= REDROP_WARN && left > 0) out.push({ left: left, x: W / 2 + (w.balls.length > 1 ? (i === 0 ? -160 : 160) : 0) });
+      if (left <= REDROP_WARN && left > 0) out.push({ left: left, x: W / 2 + (w.balls.length > 1 ? (i === 0 ? -1 : 1) * E.twoBallGap(w.arena) : 0) });
     }
     return out;
   }
