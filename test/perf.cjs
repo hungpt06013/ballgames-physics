@@ -1,7 +1,7 @@
 const { chromium } = require('playwright');
 const path = require('path');
 (async () => {
-  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' }).catch(() => chromium.launch());
   for (const [mode, dpr, thr] of [['bot', 2.5, 4], ['2p', 2.5, 4], ['bot', 1, 4], ['bot', 2.5, 1]]) {
     const ctx = await browser.newContext({ viewport: { width: 800, height: 380 }, deviceScaleFactor: dpr, hasTouch: true, isMobile: true });
     const page = await ctx.newPage();

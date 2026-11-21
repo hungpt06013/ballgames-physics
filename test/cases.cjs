@@ -7,7 +7,7 @@
 const { chromium } = require('playwright');
 const path = require('path');
 (async () => {
-  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' }).catch(() => chromium.launch());
   const page = await (await browser.newContext({ viewport: { width: 800, height: 380 } })).newPage();
   const errs = [];
   page.on('pageerror', e => errs.push('PE ' + String(e.stack || e)));
@@ -160,6 +160,11 @@ const path = require('path');
     grid([200, 230, 260, 290], [0, 0.05, 0.1, 0.15, 0.2, 0.25], (x, at) => ({ pl: [x], press: [[0, at, 0.3]] })),
     x => x.touched0 && x.score === '0-0');
   check('basketball: shot dropping into the ring blocked by a jump', r.found && r.saves[0] === 1, short(r));
+  // 8b. basketball: a soft ball dropping into the ring (hardly moving), pushed away from under the ring by a jump (v3.8)
+  r = await find({ map: 'basket', ball: 'g => ({ x: g.boardX + 110, y: g.rimY - 90, vx: -30, vy: 0 })', touch: { team: 1, pid: 2, ago: 0.5 } },
+    grid([180, 200, 230], [0, 0.05, 0.1, 0.15, 0.2], (x, at) => ({ pl: [x], press: [[0, at, 0.4]] })),
+    x => x.touched0 && x.score === '0-0');
+  check('basketball: a soft ball dropping in, pushed away from under the ring = save', r.found && r.saves[0] === 1 && !/slow/.test(r.dbg), short(r));
 
   console.log('--- touches that must NOT count as saves ---');
   // a hard low shot straight at the keeper: kicking it away is no save, it would have hit him anyway (v3.3)

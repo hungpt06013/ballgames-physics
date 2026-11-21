@@ -1183,7 +1183,8 @@
   var ZAP_COL = { main: '#ffd23f', dark: '#c4a612' };
   // The last CF_KEEP seconds of the round: every step's buttons, and a copy of the world every CF_EVERY steps, so a
   // possible save can be played again as if the saver had not pressed (goesInWithout).
-  var CF_KEEP = 2.6, CF_EVERY = 4, CF_N = Math.round(CF_KEEP / DT), CF_MORE = SAVE_LOOK + 0.3;
+  // (played on CF_MORE s past the touch, with the cheaper physics the bots plan with: no hitch when it runs)
+  var CF_KEEP = 2.6, CF_EVERY = 4, CF_N = Math.round(CF_KEEP / DT), CF_MORE = 1.2, CF_ITERS = 2;
   var cfWorld = null;
   function CfLog() { this.n = 0; this.t = new Float64Array(CF_N); this.m = new Uint8Array(CF_N); this.snaps = []; this.pool = []; }
   // (called just before each physics step, with the buttons of that step)
@@ -1225,7 +1226,7 @@
     for (k = snap.n; sim.time < end; k++) {
       var mk = k < this.n && sim.time < at - 1e-6 ? m[k % CF_N] : 0;
       for (i = 0; i < 4; i++) pr[i] = !!(mk & (1 << i)) && !((off & (1 << i)) && k >= k0);
-      var sc = E.stepPlayers(sim, pr);
+      var sc = E.stepPlayers(sim, pr, CF_ITERS);
       if (sc >= 0) { went = sc === att && sim.scoreBall === bi; break; }
     }
     if (keep) { A.goalTop = keep[0]; A.segs[0].y1 = keep[1]; A.segs[0].y2 = keep[2]; A.segs[1].y1 = keep[3]; A.segs[1].y2 = keep[4]; }
@@ -1290,7 +1291,8 @@
     var def = 1 - th.att, t = b.touchT[def], by = b.lastTeam === def ? b.lastPid : -1;
     if (by < 0 || t < Math.max(th.since, th.seen - 0.1)) return; // not turned away by a defender
     var shot = th.shot >= th.since - 3 ? th.shot : th.since, x = b.lastX;
-    if ((th.pace || 0) < SAVE_PACE) { why('slow', bi, by, x); return; } // the ball was hardly moving
+    // the ball was hardly moving (not in basketball: a soft ball dropping into the ring is a real danger too)
+    if ((th.pace || 0) < SAVE_PACE && w.arena.type !== 'hoop') { why('slow', bi, by, x); return; }
     if (t - shot < SAVE_GAP) { why('scramble', bi, by, x); return; } // touched by both sides in a scramble
     // he did something (activeTouch); or a defender did something to it earlier in this danger and it ends here
     // (his deflection, then the ball dies against him or a team-mate): the save is his

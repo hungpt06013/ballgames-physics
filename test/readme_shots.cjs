@@ -3,7 +3,7 @@ const { chromium } = require('playwright');
 const path = require('path');
 const OUT = path.resolve(__dirname, '../docs/screens');
 (async () => {
-  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' }).catch(() => chromium.launch());
   const page = await (await browser.newContext({ viewport: { width: 880, height: 410 }, deviceScaleFactor: 1.5, hasTouch: true, isMobile: true })).newPage();
   page.on('pageerror', e => console.log('PE', e.message));
   await page.goto('file://' + path.resolve(__dirname, '../www/index.html'));
