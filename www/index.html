@@ -126,6 +126,10 @@
   .chips button.on { opacity: 1; background: var(--ok-soft); color: var(--text); }
   .sub { font-weight: 800; font-size: calc(3.7 * var(--u)); margin-top: calc(1.6 * var(--u)); }
   .help p { font-size: calc(3.6 * var(--u)); line-height: 1.4; margin: calc(1.2 * var(--u)) 0; }
+  .helpRows { display: grid; grid-template-columns: max-content 1fr; gap: calc(1.1 * var(--u)) calc(2.4 * var(--u)); align-items: baseline;
+    font-size: calc(3.7 * var(--u)); line-height: 1.3; margin: calc(1.4 * var(--u)) 0 calc(1.6 * var(--u)); text-align: left; }
+  .helpRows b { white-space: nowrap; }
+  .help .keys { opacity: 0.8; }
   .help kbd { border: 2px solid var(--ink); border-radius: 6px; padding: 0 6px; font-weight: 800; font-family: inherit; background: var(--soft); }
   .result { font-size: calc(8 * var(--u)); font-weight: 900; margin: 0 0 calc(1 * var(--u)); text-align: center; }
   .result-score { font-size: calc(5 * var(--u)); font-weight: 900; text-align: center; margin-bottom: calc(1.4 * var(--u)); }
@@ -259,7 +263,7 @@
       <button class="btn" data-act="stats">📊<small>Thống kê</small></button>
       <button class="btn" data-act="history">📜<small>Lịch sử</small></button>
       <button class="btn" data-act="tutorial">🎓<small>Hướng dẫn</small></button>
-      <button class="btn" data-act="help">❓<small>Luật</small></button>
+      <button class="btn" data-act="help">❓<small>Cách chơi</small></button>
       <button class="btn" data-act="settings">⚙️<small>Cài đặt</small></button>
       <button class="btn" data-act="sound" id="soundBtn">🔊<small>Âm thanh</small></button>
     </div>
@@ -317,15 +321,17 @@
 
 <div id="help" class="overlay dim hidden">
   <div class="panel wide help">
-    <h2>❓ Luật chơi</h2>
-    <p>Mỗi đội có <b>2 cầu thủ</b>. Bấm nút để <b>nhảy + vung chân sút</b>. <b>Giữ nút</b> khi đang bay để xoay người tung móc xe đạp! Bấm lúc người <b>nghiêng về trước</b> để lao lên.</p>
-    <p><b>8 môn</b>: bóng đá, bóng rổ, bóng bầu dục, bóng chuyền, bóng đá Mặt Trăng, sân băng, bóng khổng lồ, <b>bóng bom</b> (bom nổ bên sân ai thì người đó thua). Chọn môn muốn chơi khi vào trận; chọn nhiều môn thì sau mỗi điểm đổi sang môn khác. Bóng kẹt ngoài biên (sau khung thành, sau cột rổ, sau cột bầu dục) 3 giây, hoặc nằm im 15 giây không ai chạm, thì được thả lại giữa sân (game báo trước 3 giây).</p>
-    <p><b>Vật phẩm</b> rơi từ trời: 🔥 siêu sút · 🛡️ khiên chắn khung thành · 🧲 nam châm hút bóng · ❄️ đóng băng đối thủ · 🍄 phóng to. <b>Biến thể</b> mỗi ván: 2 quả bóng, người khổng lồ/tí hon, sàn bật nhún, xà ngang di động, bóng siêu nảy, trọng lực thấp, quay chậm. Khi vào trận tích chọn những vật phẩm / biến thể muốn có.</p>
-    <p><b>Thời tiết &amp; thiên tai</b>: 🌫️ sương mù (cứ 5–10 giây lại mờ đi) · 🏚️ động đất (8–15 giây một lần, rung 10 giây, mọi người lắc lư) · ⚡ sấm sét (đánh xuống đất thì đất thành hố 5 giây; trúng người thì người đó cháy đen, đứng im 5 giây; trúng bóng thì 5 giây sau dừng ván, không ai được điểm và phát lại cú sét; trúng bom thì bom nổ luôn, không ai được điểm) · 🌪️ lốc xoáy (hút mọi thứ trong ¼ sân lên cao và xoay). Thường mỗi lúc chỉ có một hiện tượng; hiếm khi có 2, 3 hay cả 4 cùng lúc.</p>
-    <p><b>Đấu bot:</b> chạm chỗ nào trên màn hình cũng được; chọn chơi bên trái (Đỏ) hay bên phải (Xanh) khi thiết lập trận. <b>2 người:</b> chạm nửa trái (Đỏ) / nửa phải (Xanh). <b>4 người:</b> mỗi người 1 góc — P1 dưới trái, P2 trên trái, P3 dưới phải, P4 trên phải; chỗ trống có thể để bot. Chế độ <b>4 người</b>: ai ghi bàn người đó +1 (khung thành mang màu người sẽ được điểm). <b>2 vs 2</b>: cả đội +1. Sau mỗi ván người đứng trước/sau đổi chỗ.</p>
-    <p><b>Tính giờ:</b> hết giờ mà đang hoà thì mỗi người chơi chọn <b>🤝 hoà</b> hay <b>⭐ bàn thắng vàng</b> (ai ghi trước thắng); số người chọn bàn vàng nhiều hơn hoặc bằng số người chọn hoà thì đá tiếp, không thì trận đấu kết thúc với tỉ số hoà.</p>
-    <p><b>Sau mỗi trận</b>: bảng thống kê từng người (⚽ bàn thắng · 🧤 cứu thua · 🎯 sút trúng đích · 👟 chạm bóng · ⭐ điểm) và <b>🏅 MVP</b>; <b>🎬 highlight</b> gồm mọi bàn thắng, những pha cứu thua hay nhất (chỉ tính khi người chặn thật sự sút, đánh đầu hay bay người ở nửa sân nhà) và những pha suýt vào đẹp nhất (dội xà, sát xà, chạm vành…; có quay chậm); tên hai bên hiện trên tỉ số, xem ngay hoặc <b>⬇️ tải về</b> thành video. Mọi trận đã đấu nằm trong <b>📜 Lịch sử</b> (lọc theo chế độ, mức bot, kết quả, môn; xoá highlight để giải phóng bộ nhớ).</p>
-    <p>Máy tính: Đỏ <kbd>A</kbd> <kbd>W</kbd> <kbd>Space</kbd> · Xanh <kbd>L</kbd> <kbd>↑</kbd> <kbd>Enter</kbd> · 4 người: <kbd>A</kbd> / <kbd>G</kbd> / <kbd>K</kbd> / <kbd>↑</kbd> · <kbd>Esc</kbd> tạm dừng.</p>
+    <h2>❓ Cách chơi</h2>
+    <div class="helpRows">
+      <b>👆 Bấm</b><span>nhảy + vung chân sút</span>
+      <b>✊ Giữ khi đang bay</b><span>lộn người – móc xe đạp</span>
+      <b>↗️ Mẹo</b><span>bấm lúc người nghiêng về trước để lao lên</span>
+      <b>💤 Đứng im 3 giây</b><span>ngủ gật – bấm 1 cái để tỉnh (không nhảy)</span>
+      <b>🦵 Giữ nút quá 5 giây</b><span>chân mỏi, tự hạ xuống</span>
+    </div>
+    <p><b>Chạm:</b> đấu bot – đâu cũng được · 2 người – trái / phải · 4 người – mỗi người 1 góc</p>
+    <p>🎁 Vật phẩm · 🎲 biến thể · ⛈️ thời tiết: bật / tắt khi tạo trận. <b>Hết giờ mà hoà:</b> 🤝 hoà hay ⭐ bàn vàng.</p>
+    <p class="keys">⌨️ Đỏ <kbd>A</kbd> <kbd>W</kbd> <kbd>Space</kbd> · Xanh <kbd>L</kbd> <kbd>↑</kbd> <kbd>Enter</kbd> · 4 người <kbd>A</kbd> <kbd>G</kbd> <kbd>K</kbd> <kbd>↑</kbd> · <kbd>Esc</kbd> tạm dừng</p>
     <div class="tools"><button class="btn green" data-act="back">✔ Đã hiểu</button></div>
   </div>
 </div>
