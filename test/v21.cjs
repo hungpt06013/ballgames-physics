@@ -32,7 +32,7 @@ const want = k => !ONLY || ONLY.split(',').includes(k);
     maps = await ev(() => JSON.parse(localStorage.getItem('bgp_prefs')).maps);
     console.log('ticked', maps);
     await shot('03_setup_basket');
-    await page.tap('[data-act="start"]:visible'); await page.waitForTimeout(2000);
+    await page.tap('[data-act="start"]:visible'); await page.evaluate(() => { const d = document.getElementById('dialog'); if (!d.classList.contains('hidden')) Array.from(d.querySelectorAll('#dlgBtns button')).find(b => /Đá luôn/.test(b.textContent)).click(); }); await page.waitForTimeout(2000);
     console.log('match map', await ev(() => __game.world.arena.map.id), 'queue', await ev(() => __game.queue));
     await ev(() => __api.onScore(1)); await page.waitForTimeout(400); await page.touchscreen.tap(400, 200);
     await page.waitForTimeout(2500);
