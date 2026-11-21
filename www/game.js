@@ -564,8 +564,7 @@
   }
   function matchSettings() {
     var cfg = G.cfg || {};
-    // (nobody dozes off while learning the button)
-    return Object.assign({}, settings, { beginner: !!cfg.beginner, powerups: !!cfg.items, itemList: cfg.itemList, bombTime: cfg.bombTime, sleep: cfg.mode !== 'tutorial' });
+    return Object.assign({}, settings, { beginner: !!cfg.beginner, powerups: !!cfg.items, itemList: cfg.itemList, bombTime: cfg.bombTime });
   }
   // a random modifier for the round, from the ones ticked in the setup that suit this sport
   function pickMods(id) {
@@ -576,7 +575,7 @@
     return m;
   }
   function newWorld(id, serve, swapRoles, mods) {
-    var w = E.createWorld(id, G.demo ? Object.assign({}, settings, { sleep: false }) : matchSettings(), (Math.random() * 4294967295) >>> 0, mods || {});
+    var w = E.createWorld(id, G.demo ? settings : matchSettings(), (Math.random() * 4294967295) >>> 0, mods || {});
     if (swapRoles) for (var i = 0; i < 4; i++) w.players[i].role = 1 - w.players[i].role;
     E.resetRound(w, serve);
     w.events.length = 0;
@@ -940,14 +939,14 @@
   var FS = 90, RB = Math.round(16 / DT), REPLAY_LEAD = 5, REPLAY_SLOW = 0.4;
   // Next to the frames: the match clock of each frame (clk) and the engine events of each step (evs: [frame, event]),
   // so a highlight shows the time left and plays the sounds.
-  var SOUND_EVENTS = { kick: 1, head: 1, body: 1, bounce: 1, wall: 1, post: 1, shield: 1, jump: 1, startle: 1, explode: 1, pickup: 1, respawn: 1, thunder: 1, rumble: 1, whoosh: 1 };
+  var SOUND_EVENTS = { kick: 1, head: 1, body: 1, bounce: 1, wall: 1, post: 1, shield: 1, jump: 1, explode: 1, pickup: 1, respawn: 1, thunder: 1, rumble: 1, whoosh: 1 };
   function Recorder() { this.buf = new Float32Array(RB * FS); this.clk = new Float32Array(RB); this.evs = []; this.n = 0; this.goal = -1; this.shotT = -1; this.lead = 0; }
   Recorder.prototype.push = function (w) {
     var f = this.buf, o = (this.n % RB) * FS, i, p, b, fx = w.fx, hz = w.hz, it = w.item, v = G.wxv;
     f[o++] = w.time;
     for (i = 0; i < 4; i++) {
       p = w.players[i];
-      f[o++] = p.x; f[o++] = p.y; f[o++] = p.a; f[o++] = p.leg; f[o++] = (p.press ? 1 : 0) + (p.sleepy ? 2 : 0); f[o++] = p.sc; f[o++] = p.cT; f[o++] = hz.stun[i];
+      f[o++] = p.x; f[o++] = p.y; f[o++] = p.a; f[o++] = p.leg; f[o++] = p.press ? 1 : 0; f[o++] = p.sc; f[o++] = p.cT; f[o++] = hz.stun[i];
     }
     for (i = 0; i < 2; i++) {
       b = w.balls[i] || w.balls[0];
@@ -980,7 +979,7 @@
     for (i = 0; i < 4; i++) {
       p = w.players[i];
       p.x = f[o++]; p.y = f[o++]; p.a = f[o++]; p.leg = f[o++];
-      var pv = Math.round(f[o++]); p.press = pv % 2 === 1; p.sleepy = pv >= 2; // (button down: 1, drowsy: +2)
+      var pv = Math.round(f[o++]); p.press = pv % 2 === 1; // (button down: 1; highlights of v3.3-3.5 add 2 for a drowsy player)
       var sc = f[o++]; if (p.sc !== sc) E.setScale(p, sc);
       p.cT = f[o++]; hz.stun[i] = f[o++];
       E.shapes(p);
@@ -2478,7 +2477,6 @@
       case 'post': sfx('post'); sparks(e.x, e.y, 4); break;
       case 'shield': sfx('shield'); sparks(e.x, e.y, 6, '#7fe3ff'); break;
       case 'jump': sfx('jump'); dust(e.x, e.y, 3); break;
-      case 'startle': sfx('startle'); break; // a drowsy player woken by his button
       case 'explode': sfx('explode'); explosion(e.x, e.y); G.shake = 1.4; break;
       case 'pickup': sfx(e.type === 'freeze' ? 'freeze' : 'pickup'); sparks(e.x, e.y, 12, '#ffd23f'); break;
       case 'respawn': sparks(e.x, e.y, 8); break;
@@ -2550,9 +2548,8 @@
     else if (cheer >= 0) face = p.team === cheer ? 'happy' : 'sad';
     else if (Math.abs(p.a) > 1.4 && p.cT < 0.1) face = 'dizzy';
     else if (p.press) face = 'effort';
-    else if (p.sleepy) face = 'sleepy';
     return { col: col, hat: prof.hat, hair: prof.hair, shirt: prof.shirt, num: L && G.looks.four ? i + 1 : p.role + 1, face: face, frozen: frozen,
-      burnt: burnt, hairCol: burnt ? INK : (p.id % 2 ? '#5b3a1f' : INK), armT: G.armT[i], mapId: m.id, zzz: face === 'sleepy', t: clock };
+      burnt: burnt, hairCol: burnt ? INK : (p.id % 2 ? '#5b3a1f' : INK), armT: G.armT[i], mapId: m.id };
   }
   // replay or highlight: recorded frames are being shown
   function playback() { return G.state === 'replay' || G.state === 'highlight'; }

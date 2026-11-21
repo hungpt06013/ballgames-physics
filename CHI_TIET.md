@@ -1,10 +1,9 @@
-# Ballgames Physics – chi tiết luật và kỹ thuật (v3.5)
+# Ballgames Physics – chi tiết luật và kỹ thuật (v3.6)
 
 Bản ngắn gọn: [README](README.md). Ở đây là mọi luật chính xác và ghi chú kỹ thuật, cho ai sửa game.
 
 Game 2 đội × 2 cầu thủ ragdoll, mỗi đội **1 nút** (bấm = nhảy + vung chân sút, giữ khi đang bay = xoay người).
 - **Giữ nút tối đa 5 giây**: từ giây thứ 1 chân đang giơ bắt đầu mỏi (run run, hạ dần), tới giây thứ 5 thì về chỗ cũ và nút giữ không còn tác dụng (không sút, không xoay người) cho tới khi thả ra bấm lại.
-- **💤 Ngủ gật** (luật như nhau cho mọi cầu thủ, bên công hay bên thủ, ở đâu trên sân): không bấm nút 3 giây thì ngủ gật – mặt nhắm mắt, chữ Z bay trên đầu. Ngủ gật tăng dần trong 4 giây: lắc lư rộng hơn (không ngã hẳn) và người "mềm" hơn (cú sút mạnh đập vào thì đẩy bật người ra chứ không dội lại như bức tường). Đang ngủ gật mà bấm thì lần bấm đầu chỉ **giật mình tỉnh tại chỗ** (nhún nhẹ, không vung chân, không nhảy), lần bấm sau mới nhảy + sút như thường. Nên đứng chắn khung thành vẫn là một chiến thuật, nhưng phải bấm đều tay; bấm để tỉnh không bao giờ làm bỏ trống khung thành. Bot cũng tự bấm để tỉnh (bot Khó gần như ngay, bot Dễ chậm hơn). Hướng dẫn và màn menu không có ngủ gật.
 - Cầu thủ đứng yên lắc lư **đều hai bên** (nghiêng trước và sau như nhau); cú nhảy vẫn hướng về phía trước như trước.
 - Chân của hai cầu thủ không móc vào nhau nữa (chân chỉ va vào người khác khi đang vung sút). Đồng đội không đá / hất nhau: đứng sát sau đồng đội rồi cùng nhảy không còn hất người phía trước bay cao gấp đôi.
 Khi vào trận, tích chọn các môn muốn chơi; chọn nhiều môn thì sau mỗi điểm đổi sang môn khác.
