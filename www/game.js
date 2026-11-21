@@ -2547,7 +2547,7 @@
       var b = w.balls[i], left = Infinity;
       if (b.outT > 0.25) left = Math.min(left, E.OUT_TIME - b.outT); // a ball just flying over a goal for a moment is no warning
       if (b.stillT > 0) left = Math.min(left, E.STILL_TIME - b.stillT);
-      if (left <= REDROP_WARN && left > 0) out.push({ left: left, x: W / 2 + (w.balls.length > 1 ? (i === 0 ? -160 : 160) : 0) });
+      if (left <= REDROP_WARN && left > 0) out.push({ left: left, x: W / 2 + (w.balls.length > 1 ? (i === 0 ? -1 : 1) * E.twoBallGap(w.arena) : 0) });
     }
     return out;
   }

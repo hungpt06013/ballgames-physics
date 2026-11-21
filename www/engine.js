@@ -63,7 +63,7 @@
       sky: ['#cfe8ff', '#f2f9ff'], ground: '#bfe3f5', ground2: '#a9d6ec', deco: 'ice',
       g: 2000, gBall: 1700, jump: 1000, legSpd: 16, mu: 0.12,
       ballR: 24, ballM: 1, ballE: 0.55, ballDrag: 0.02, ballRoll: 0.05, kickE: 0.8, lift: 0.4,
-      goalH: 230, goalD: 130 },
+      goalH: 330, goalD: 165 }, // as big as on the ordinary pitch
     { id: 'giant', name: 'Bóng khổng lồ', icon: '🎈', type: 'goal', ball: 'beach',
       sky: ['#ffd9ec', '#fff6e8'], ground: '#62b84f', ground2: '#6dc35a', deco: 'grass',
       g: 2000, gBall: 1000, jump: 1050, legSpd: 15, mu: 0.9,
@@ -248,6 +248,10 @@
     b.touchGround = false;
   }
 
+  // how far from the middle each of two balls starts (and comes back): American football puts both in the middle,
+  // side by side at the same height
+  function twoBallGap(A) { return A.type === 'posts' ? Math.round(A.P.ballR + 8) : 160; }
+
   function resetRound(w, serveTeam) {
     var A = w.arena, pl = w.players, i, p;
     var pos;
@@ -278,8 +282,9 @@
       b0.vx = (rand(w) - 0.5) * 60;
     }
     if (w.balls.length > 1) {
-      var b1 = w.balls[1];
+      var b1 = w.balls[1], gap = twoBallGap(A);
       if (A.type === 'volley') placeBall(b1, W - b0.x, b0.y);
+      else if (gap < 160) { placeBall(b1, W / 2 + gap, b0.y); b1.vx = -b0.vx; b0.x = b0.prevX = W / 2 - gap; } // mirror images
       else { placeBall(b1, W / 2 + 160, 120); b0.x = b0.prevX = W / 2 - 160; }
     }
     w.item.on = false; w.itemT = 5 + rand(w) * 3;
@@ -913,7 +918,7 @@
       if (outOfPlay(A, b)) b.outT += dt; else b.outT = 0;
       if (A.type !== 'bomb' && b.vx * b.vx + b.vy * b.vy < STILL_SPEED * STILL_SPEED) b.stillT += dt; else b.stillT = 0;
       if (b.outT > OUT_TIME || b.stillT > STILL_TIME || !(Math.abs(b.x) < 1e6 && Math.abs(b.y) < 1e6)) {
-        var rx = W / 2 + (nb > 1 ? (bi === 0 ? -160 : 160) : 0);
+        var rx = W / 2 + (nb > 1 ? (bi === 0 ? -1 : 1) * twoBallGap(A) : 0);
         placeBall(b, rx, 150);
         if (w.events) w.events.push({ t: 'respawn', x: rx, y: 150 });
       }
@@ -1269,7 +1274,7 @@
     TOR_R: TOR_R, TOR_TOP: TOR_TOP, STUN_TIME: STUN_TIME, CRATER_TIME: CRATER_TIME, STILL_TIME: STILL_TIME, OUT_TIME: OUT_TIME,
     startQuake: startQuake, startTornado: startTornado, strike: strike, quakeLevel: quakeLevel, torPull: torPull,
     groundAt: groundAt, craterDepth: craterDepth, isBicycle: isBicycle,
-    buildArena: buildArena, createWorld: createWorld, resetRound: resetRound, step: step, stepPlayers: stepPlayers,
+    buildArena: buildArena, twoBallGap: twoBallGap, createWorld: createWorld, resetRound: resetRound, step: step, stepPlayers: stepPlayers,
     shapes: shapes, setScale: setScale, copyWorld: copyWorld, emptyWorld: emptyWorld, ballFuture: ballFuture, ballNear: ballNear, scoreGap: scoreGap,
     Bot: Bot
   };

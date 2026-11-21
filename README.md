@@ -19,7 +19,7 @@ Khi vào trận, tích chọn các môn muốn chơi; chọn nhiều môn thì s
 ## 8 môn
 Bóng đá, bóng rổ, bóng bầu dục, bóng chuyền bãi biển, bóng đá Mặt Trăng, sân băng, bóng khổng lồ,
 **bóng bom** (bom 12 giây, nổ bên sân ai thì người đó thua).
-Khung thành bóng đá / Mặt Trăng cao 330 (bản cũ 250); bóng khổng lồ cao 400, sâu 300 (bản cũ 180). Khung thành luôn sâu hơn đường kính quả bóng ít nhất 70, nên dù chỉnh cỡ bóng tối đa (×1,6) và bật người mới thì bóng vẫn lọt hẳn vào được; chế độ người mới làm khung cao hơn.
+Khung thành bóng đá / Mặt Trăng / sân băng cao 330, sâu 165 (sân băng bản cũ chỉ cao 230, sâu 130); bóng khổng lồ cao 400, sâu 300 (bản cũ 180). Khung thành luôn sâu hơn đường kính quả bóng ít nhất 70, nên dù chỉnh cỡ bóng tối đa (×1,6) và bật người mới thì bóng vẫn lọt hẳn vào được; chế độ người mới làm khung cao hơn.
 Các môn có khung thành (bóng đá, Mặt Trăng, sân băng, bóng khổng lồ): bàn thắng chỉ tính khi **cả quả bóng đã vượt qua vạch vôi** trước khung thành (vạch trắng trên sân).
 Bóng rổ, bóng bầu dục: cầu thủ không đi ra sau cột rổ / cột dọc được, tối đa là đứng trên đỉnh cột.
 Bóng được thả lại giữa sân khi nằm **ngoài biên** (trên nóc khung thành, sau cột rổ, sau cột bầu dục) đủ 3 giây, hoặc khi **nằm im 15 giây mà không ai chạm** (kể cả nằm vắt trên vạch vôi), ở mọi chế độ (người với người, đấu bot, 4 người, 2 vs 2); riêng bóng bom thì không, vì bom tự nổ.
@@ -36,7 +36,7 @@ Cầu thủ ngã (kể cả lộn ngược) tự bật dậy sau khoảng 0,3 gi
 - Hết giờ mà đang hoà: **mỗi người chơi chọn** 🤝 hoà hay ⭐ bàn thắng vàng (bot không chọn). Số người chọn bàn vàng ≥ số người chọn hoà thì đá tiếp, ai ghi trước thắng; không thì trận kết thúc với tỉ số hoà.
 
 ## Trong trận
-- **Biến thể ngẫu nhiên** mỗi ván: 2 quả bóng, người khổng lồ/tí hon, sàn bật nhún, xà ngang di động, bóng siêu nảy, trọng lực thấp, quay chậm.
+- **Biến thể ngẫu nhiên** mỗi ván: 2 quả bóng (bóng bầu dục: cả 2 quả đặt cạnh nhau ở giữa sân), người khổng lồ/tí hon, sàn bật nhún, xà ngang di động, bóng siêu nảy, trọng lực thấp, quay chậm.
 - **Vật phẩm** rơi bằng dù: 🔥 siêu sút, 🛡️ khiên chắn khung thành, 🧲 nam châm hút bóng, ❄️ đóng băng đối thủ, 🍄 phóng to.
 - **Thời tiết & thiên tai**:
   - 🌫️ sương mù: cứ 5–10 giây lại mờ đi khoảng 6 giây.
