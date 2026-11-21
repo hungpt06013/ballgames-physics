@@ -480,7 +480,9 @@
   for (var ri = 0; ri < NB; ri++) RAD[ri] = BODY[ri][2];
   for (ri = 0; ri < LEG.length; ri++) RAD[NB + ri] = LEG[ri][1];
   var P_MASS = 5, P_INERTIA = 2600;
-  var LEG_REST = -0.12, LEG_KICK = 1.95, KICK_REACH = 12, LEG_HIT = 3;
+  var LEG_REST = -0.12, LEG_KICK = 1.95, KICK_REACH = 12;
+  // two players touching for longer than STICK_T s are eased apart, sideways, at up to STICK_PUSH px/s
+  var STICK_T = 0.35, STICK_PUSH = 260, STICK_GAP = 3, PAIR = [[0, 0, 1, 2], [0, 0, 3, 4], [0, 0, 0, 5]];
   var POP_TIME = 0.16, POP_REACH = 6, POP_SIN = Math.sin(1.3), POP_COS = Math.cos(1.3);
   var GETUP_DELAY = 0.3, RISE_TIME = 2;
   // standing sway: aimed this far forward so that, with gravity, the body leans as far forward as back (even sway);
@@ -695,7 +697,7 @@
       players: [makePlayer(0, 0, 0), makePlayer(0, 1, 1), makePlayer(1, 0, 2), makePlayer(1, 1, 3)],
       balls: [makeBall()], events: [], seed: (seed >>> 0) || 12345,
       item: makeItem(), fx: makeFx(), hz: makeHz(), itemT: 6, bombT: A.bombTime,
-      credit: -1, scoreBall: 0
+      credit: -1, scoreBall: 0, stick: new Float64Array(6)
     };
     if (mods && mods.twoBalls) w.balls.push(makeBall());
     w.ball = w.balls[0];
@@ -759,6 +761,7 @@
     var fx = w.fx; fx.kick[0] = fx.kick[1] = fx.shield[0] = fx.shield[1] = fx.freeze[0] = fx.freeze[1] = 0;
     fx.big[0] = fx.big[1] = fx.big[2] = fx.big[3] = 0; fx.magnetT = 0; fx.magnetId = -1;
     w.bombT = A.bombTime; w.credit = -1; w.scoreBall = 0;
+    if (w.stick) for (i = 0; i < 6; i++) w.stick[i] = 0;
     var hz = w.hz; hz.quakeT = hz.torT = 0; hz.craters.length = 0; hz.stun[0] = hz.stun[1] = hz.stun[2] = hz.stun[3] = 0;
   }
 
@@ -1027,43 +1030,49 @@
     }
   }
 
-  // Two players bump into each other. Legs never catch on legs (two legs used to hook together and hold the players
-  // locked), and a leg only hits someone while it swings (a kick); a leg hanging still passes through people.
-  // Team-mates never kick each other and don't knock each other about (they only keep apart): a team-mate jumping
-  // right behind used to launch the one in front twice as high and far. Nobody jumps off a team-mate either.
-  function playerPlayer(A, B) {
+  // Two players bump into each other (every part of them, legs too). Team-mates never knock each other about: they are
+  // only pushed apart sideways, whichever way they touch (one lying or flying on top of the other slides off), so a
+  // team-mate jumping right behind can't launch the one in front, and nobody jumps off a team-mate. Two players who
+  // stay in touch (leaning on each other, legs caught together, piled up) are eased apart, more and more after
+  // STICK_T s. `k`: the pair (w.stick[k] how long it has been touching), `part`: the share of a step of this call.
+  function playerPlayer(w, k, A, B, part) {
     var dx = B.x - A.x, dy = B.y - A.y, lim = 115 * (A.sc + B.sc);
-    if (dx * dx + dy * dy > lim * lim) return;
-    var mates = A.team === B.team;
-    var aLeg = !mates && Math.abs(A.legW) > LEG_HIT, bLeg = !mates && Math.abs(B.legW) > LEG_HIT;
+    if (dx * dx + dy * dy > lim * lim) { w.stick[k] = 0; return; }
+    var mates = A.team === B.team, side = dx > 0 || (dx === 0 && A.id < B.id) ? 1 : -1, touch = false;
     for (var i = 0; i < NS; i++) {
-      if (i >= NB && !aLeg) continue;
       for (var j = 0; j < NS; j++) {
-        if (j >= NB && (i >= NB || !bLeg)) continue;
         var nx = B.sx[j] - A.sx[i], ny = B.sy[j] - A.sy[i], rr = A.rad[i] + B.rad[j];
-        var d2 = nx * nx + ny * ny;
-        if (d2 >= rr * rr || d2 < 1e-9) continue;
+        var d2 = nx * nx + ny * ny, rt = rr + STICK_GAP;
+        if (d2 >= rt * rt || d2 < 1e-9) continue;
+        touch = true; // (pressed against each other counts as touching, even with no overlap left)
+        if (d2 >= rr * rr) continue;
         var d = Math.sqrt(d2);
         nx /= d; ny /= d;
-        var pen = rr - d;
+        var pen = rr - d, c = pen * 0.35;
+        if (mates) { shiftPlayer(A, -side * c, 0); shiftPlayer(B, side * c, 0); continue; }
         var cx = A.sx[i] + nx * A.rad[i], cy = A.sy[i] + ny * A.rad[i];
         var rax = cx - A.x, ray = cy - A.y, rbx = cx - B.x, rby = cy - B.y;
         var vax = A.vx - A.w * ray + A.ex[i], vay = A.vy + A.w * rax + A.ey[i];
         var vbx = B.vx - B.w * rby + B.ex[j], vby = B.vy + B.w * rbx + B.ey[j];
         var vn = (vbx - vax) * nx + (vby - vay) * ny;
-        if (vn < 0 && !mates) {
+        if (vn < 0) {
           var rna = rax * ny - ray * nx, rnb = rbx * ny - rby * nx;
           var jn = -1.2 * vn / (A.invM + B.invM + rna * rna * A.invI + rnb * rnb * B.invI);
           A.vx -= jn * nx * A.invM; A.vy -= jn * ny * A.invM; A.w -= rna * jn * A.invI;
           B.vx += jn * nx * B.invM; B.vy += jn * ny * B.invM; B.w += rnb * jn * B.invI;
         }
-        // (team-mates are only eased apart sideways: pushing one up off the other would still lift him)
-        var c = pen * 0.35, cy = mates ? 0 : 1;
-        shiftPlayer(A, -nx * c, -ny * c * cy);
-        shiftPlayer(B, nx * c, ny * c * cy);
-        if (mates) continue;
+        shiftPlayer(A, -nx * c, -ny * c);
+        shiftPlayer(B, nx * c, ny * c);
         if (ny > 0.6) A.cT = 0; else if (ny < -0.6) B.cT = 0;
       }
+    }
+    // (a moment apart doesn't start the count again: it only winds down, twice as fast)
+    if (!touch) { w.stick[k] = Math.max(0, w.stick[k] - 2 * DT * part); return; }
+    w.stick[k] += DT * part;
+    var over = w.stick[k] - STICK_T;
+    if (over > 0) {
+      var push = Math.min(STICK_PUSH, over * STICK_PUSH * 2.5) * DT * part * 0.5;
+      shiftPlayer(A, -side * push, 0); shiftPlayer(B, side * push, 0);
     }
   }
 
@@ -1411,7 +1420,7 @@
       for (i = 0; i < 4; i++) if (pl[i].active) { shapes(pl[i]); playerStatic(A, pl[i], hz.craters); }
       for (i = 0; i < 4; i++) {
         if (!pl[i].active) continue;
-        for (j = i + 1; j < 4; j++) if (pl[j].active) playerPlayer(pl[i], pl[j]);
+        for (j = i + 1; j < 4; j++) if (pl[j].active) playerPlayer(w, PAIR[i][j], pl[i], pl[j], 1 / nIt);
       }
       for (bi = 0; bi < nb; bi++) {
         b = balls[bi];
@@ -1506,6 +1515,7 @@
     f.freeze[0] = g.freeze[0]; f.freeze[1] = g.freeze[1]; f.magnetT = g.magnetT; f.magnetId = g.magnetId;
     for (i = 0; i < 4; i++) f.big[i] = g.big[i];
     d.itemT = s.itemT; d.bombT = s.bombT;
+    for (i = 0; i < 6; i++) d.stick[i] = s.stick ? s.stick[i] : 0;
     var h = d.hz, k = s.hz;
     h.quakeT = k.quakeT; h.quakeDur = k.quakeDur; h.torT = k.torT; h.torDur = k.torDur; h.torX0 = k.torX0; h.torX = k.torX;
     for (i = 0; i < 4; i++) h.stun[i] = k.stun[i];
@@ -1518,7 +1528,7 @@
     var w = { time: 0, arena: null, settings: null, seed: 1,
       players: [makePlayer(0, 0, 0), makePlayer(0, 1, 1), makePlayer(1, 0, 2), makePlayer(1, 1, 3)],
       balls: [makeBall()], events: null, item: makeItem(), fx: makeFx(), hz: makeHz(), itemT: 0, bombT: 0,
-      credit: -1, scoreBall: 0 };
+      credit: -1, scoreBall: 0, stick: new Float64Array(6) };
     w.ball = w.balls[0];
     return w;
   }

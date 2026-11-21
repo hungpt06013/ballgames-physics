@@ -1,11 +1,11 @@
-# Ballgames Physics – chi tiết luật và kỹ thuật (v3.6)
+# Ballgames Physics – chi tiết luật và kỹ thuật (v3.7)
 
 Bản ngắn gọn: [README](README.md). Ở đây là mọi luật chính xác và ghi chú kỹ thuật, cho ai sửa game.
 
 Game 2 đội × 2 cầu thủ ragdoll, mỗi đội **1 nút** (bấm = nhảy + vung chân sút, giữ khi đang bay = xoay người).
 - **Giữ nút tối đa 5 giây**: từ giây thứ 1 chân đang giơ bắt đầu mỏi (run run, hạ dần), tới giây thứ 5 thì về chỗ cũ và nút giữ không còn tác dụng (không sút, không xoay người) cho tới khi thả ra bấm lại.
 - Cầu thủ đứng yên lắc lư **đều hai bên** (nghiêng trước và sau như nhau); cú nhảy vẫn hướng về phía trước như trước.
-- Chân của hai cầu thủ không móc vào nhau nữa (chân chỉ va vào người khác khi đang vung sút). Đồng đội không đá / hất nhau: đứng sát sau đồng đội rồi cùng nhảy không còn hất người phía trước bay cao gấp đôi.
+- Cầu thủ va chạm bằng mọi bộ phận (cả chân), nên không đi xuyên qua nhau. **Đồng đội** không đá / hất nhau: chạm nhau thì chỉ bị đẩy tách ra theo chiều ngang (người nằm hay bay chồng lên người kia thì trượt ra), nên đứng sát sau đồng đội rồi cùng nhảy không hất người phía trước bay cao, và không ai bật nhảy được từ người đồng đội. **Hai người bất kỳ** (đồng đội hay đối thủ) tì vào nhau, chân móc nhau hay chồng lên nhau quá khoảng 0,35 giây thì được tách dần ra theo chiều ngang, nên không còn dính nhau lâu.
 Khi vào trận, tích chọn các môn muốn chơi; chọn nhiều môn thì sau mỗi điểm đổi sang môn khác.
 
 ## 8 môn
