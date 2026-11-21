@@ -38,14 +38,14 @@ const want = k => !ONLY || ONLY.split(',').includes(k);
     await page.fill('#bombTime', '7'); await page.press('#bombTime', 'Enter');
     await shot('02_setup_filled');
     console.log('prefs', JSON.stringify(await ev(() => { const p = JSON.parse(localStorage.getItem('bgp_prefs')); return { fmtType: p.fmtType, fmtMinutes: p.fmtMinutes, bombTime: p.bombTime, weather: p.weather }; })));
-    await page.tap('[data-act="start"]:visible'); await page.waitForTimeout(1900);
+    await page.tap('[data-act="start"]:visible'); await page.evaluate(() => { const d = document.getElementById('dialog'); if (!d.classList.contains('hidden')) Array.from(d.querySelectorAll('#dlgBtns button')).find(b => /Đá luôn/.test(b.textContent)).click(); }); await page.waitForTimeout(1900);
     console.log('match', JSON.stringify(await ev(() => ({ clock: __game.clock.toFixed(1), target: __game.target, wx: !!__game.wx, items: __game.world.arena.itemList, bombTime: __game.world.arena.bombTime }))));
     await shot('03_time_match');
     // points: type 12
     await ev(() => __api.toMenu());
     await page.tap('[data-act="setup"][data-mode="2p"]'); await page.waitForTimeout(150);
     await page.tap('#fmtType button[data-v="p"]'); await page.fill('#fmtValue', '12');
-    await page.tap('[data-act="start"]:visible'); await page.waitForTimeout(500);
+    await page.tap('[data-act="start"]:visible'); await page.evaluate(() => { const d = document.getElementById('dialog'); if (!d.classList.contains('hidden')) Array.from(d.querySelectorAll('#dlgBtns button')).find(b => /Đá luôn/.test(b.textContent)).click(); }); await page.waitForTimeout(500);
     console.log('points match target', await ev(() => __game.target));
     flush('setup');
   }

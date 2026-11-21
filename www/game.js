@@ -31,7 +31,7 @@
   var prefs = Object.assign({ level: 'hard', fmtType: 'p', fmtPoints: 5, fmtMinutes: 2, bombTime: 12,
     mods: true, modList: MOD_IDS.slice(), items: true, itemList: ITEM_IDS.slice(), weather: false, wxList: WX_IDS.slice(), beginner: false,
     slots: ['h', 'h', 'h', 'h'], slotLv: null, slots2: ['h', 'h'], slotLv2: null, replay: true, music: true, sound: true, maps: ALL_MAPS.slice(),
-    hlAsked: false, hlMode: 'all', hlKeep: 30, side: 'L' }, load('prefs', {}));
+    hlAsked: false, hlMode: 'all', hlKeep: 30, side: 'L', askDress: true }, load('prefs', {}));
   // older versions stored the format as 'p5' / 't120'
   if (typeof prefs.target === 'number' && !prefs.fmt) prefs.fmt = 'p' + prefs.target;
   if (typeof prefs.fmt === 'string') {
@@ -339,11 +339,13 @@
     $('tgMusic').classList.toggle('on', prefs.music);
     $('tgSfx').classList.toggle('on', prefs.sound);
     $('tgDark').classList.toggle('on', isDark());
+    $('tgAskDress').classList.toggle('on', prefs.askDress);
     buildHLSettings();
   }
   $('tgReplay').addEventListener('click', function () { prefs.replay = !prefs.replay; savePrefs(); buildSettings(); });
   $('tgMusic').addEventListener('click', function () { prefs.music = !prefs.music; Snd.init(); Snd.setMusic(prefs.music); savePrefs(); buildSettings(); });
   $('tgDark').addEventListener('click', function () { toggleTheme(); Snd.click(); });
+  $('tgAskDress').addEventListener('click', function () { prefs.askDress = !prefs.askDress; savePrefs(); Snd.click(); buildSettings(); });
   $('themeBtn').addEventListener('click', function () { toggleTheme(); Snd.init(); Snd.click(); });
   $('tgSfx').addEventListener('click', function () { prefs.sound = !prefs.sound; Snd.sfxOn = prefs.sound; savePrefs(); buildSettings(); refreshMenu(); });
 
@@ -394,6 +396,7 @@
     segSelect('profMode', profPlayers); segSelect('profFour', profFour);
     $('profFour').classList.toggle('hidden', profPlayers !== 4);
     var box = $('profCards'); box.innerHTML = ''; box.classList.toggle('four', profPlayers === 4);
+    $('profDone').textContent = G.dressThen ? '▶ Vào trận' : '✔ Xong';
     for (var i = 0; i < profPlayers; i++) (function (i) {
       var card = document.createElement('div'); card.className = 'pcard' + (i === profSlot ? ' on' : '');
       var cv = document.createElement('canvas'); cv.width = 240; cv.height = 360; cv.id = 'profCv' + i;
@@ -511,7 +514,7 @@
     Snd.init(); Snd.click();
     switch (b.dataset.act) {
       case 'setup': openSetup(b.dataset.mode); break;
-      case 'start': readFormat(true); readBomb(true); show(null); startMatch({ mode: setupMode }); break;
+      case 'start': readFormat(true); readBomb(true); askDressThenStart(setupMode); break;
       case 'back': backFromScreen(); break;
       case 'settings': buildSettings(); show('settings'); break;
       case 'defaults':
@@ -519,7 +522,7 @@
         store('settings', settings); buildSettings(); break;
       case 'help': show('help'); break;
       case 'shop': G.shopFrom = G.screen; buildShop(); show('shop'); break;
-      case 'profiles': buildProfiles(); show('profiles'); break;
+      case 'profiles': G.dressThen = null; buildProfiles(); show('profiles'); break;
       case 'stats': buildStats(); show('stats'); break;
       case 'history': buildHistory(); show('history'); break;
       case 'hlWatch': if (G.lastHL) playHighlight(G.lastHL, 'over'); break;
@@ -536,6 +539,8 @@
   $('pauseBtn').addEventListener('click', function () { pauseGame(); });
   function backFromScreen() {
     if (G.screen === 'shop' && G.shopFrom === 'profiles') { buildProfiles(); show('profiles'); return; }
+    // names / outfits changed on the way into a match: on to the match
+    if (G.screen === 'profiles' && G.dressThen) { var m = G.dressThen; G.dressThen = null; show(null); startMatch({ mode: m }); return; }
     refreshMenu(); show('menu');
   }
 
@@ -597,6 +602,25 @@
     return prefs.fmtType === 't' ? 't' + Math.round(clampNum(prefs.fmtMinutes, 0.5, 60, 0.5) * 60) : 'p' + clampNum(prefs.fmtPoints, 1, 99, 1);
   }
   // cfg: { mode, level, fmt ('p5' = first to 5, 't120' = 120 s), maps, mods, modList, items, itemList, weather, wxList, bombTime, beginner, slots }
+  // Start pressed in the match setup: a match with people in it first asks whether to change the players' names /
+  // outfits (unless "don't ask again" was ticked - it can be switched back on in Settings)
+  function askDressThenStart(mode) {
+    var people = mode === 'bot' || (mode === '2p' ? prefs.slots2 : prefs.slots).indexOf('h') >= 0;
+    if (!prefs.askDress || !people) { show(null); startMatch({ mode: mode }); return; }
+    var body = document.createElement('div'), p = document.createElement('p');
+    p.textContent = 'Đổi tên hoặc trang phục cho người chơi trước khi đá không?';
+    var lab = document.createElement('label'); lab.className = 'dlgCheck';
+    var cb = document.createElement('input'); cb.type = 'checkbox'; cb.id = 'dlgNoAsk';
+    var txt = document.createElement('span'); txt.textContent = 'Không hỏi lại (bật lại trong ⚙️ Cài đặt)';
+    lab.appendChild(cb); lab.appendChild(txt); body.appendChild(p); body.appendChild(lab);
+    dialog('👤 Tên & trang phục', body, [['👤 Đổi', 'dress'], ['▶ Đá luôn', 'play', 'green']], 'stay').then(function (v) {
+      if (cb.checked) { prefs.askDress = false; savePrefs(); }
+      if (v === 'dress') {
+        G.dressThen = mode; profPlayers = is4(mode) ? 4 : 2; if (is4(mode)) profFour = mode;
+        buildProfiles(); show('profiles');
+      } else if (v === 'play') { show(null); startMatch({ mode: mode }); }
+    });
+  }
   function startMatch(cfg) {
     Snd.init();
     // (a caller giving one level for all bots and no level per slot: every bot at that level)
@@ -817,6 +841,8 @@
     if (inGame()) { if (G.state === 'replay') skipReplay(); else pauseGame(); return true; }
     if (G.state === 'paused') { resume(); return true; }
     if (G.state === 'over') { toMenu(); return true; }
+    // (changing names / outfits on the way into a match: back goes back to the match setup, not into the match)
+    if (G.screen === 'profiles' && G.dressThen) { G.dressThen = null; refreshSetup(); show('setup'); return true; }
     if (G.screen && G.screen !== 'menu') { backFromScreen(); return true; }
     return false;
   };

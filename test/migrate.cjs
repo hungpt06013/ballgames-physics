@@ -12,7 +12,7 @@ const path = require('path');
   });
   await page.reload(); await page.waitForTimeout(700);
   console.log(await page.evaluate(() => ({ prefs: JSON.parse(localStorage.getItem('bgp_prefs')), coins: BGMeta.coins(), meta: Object.keys(BGMeta.D), played: BGMeta.stats().played, cups: BGMeta.stats().cups })));
-  await page.click('[data-act="setup"][data-mode="2p"]'); await page.click('[data-act="start"]:visible'); await page.waitForTimeout(2000);
+  await page.click('[data-act="setup"][data-mode="2p"]'); await page.click('[data-act="start"]:visible'); await page.evaluate(() => { const d = document.getElementById('dialog'); if (!d.classList.contains('hidden')) Array.from(d.querySelectorAll('#dlgBtns button')).find(b => /Đá luôn/.test(b.textContent)).click(); }); await page.waitForTimeout(2000);
   console.log('map', await page.evaluate(() => __game.world.arena.map.id), 'errors', errs);
   await browser.close();
 })();

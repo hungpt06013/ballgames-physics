@@ -181,6 +181,9 @@
   #dialog h2 { font-size: calc(4.6 * var(--u)); }
   #dlgBody p { font-weight: 700; font-size: calc(3.6 * var(--u)); line-height: 1.4; margin: calc(1 * var(--u)) 0; }
   #dlgBody p.hint { font-size: calc(3 * var(--u)); }
+  .dlgCheck { display: flex; align-items: center; justify-content: center; gap: calc(1.4 * var(--u)); font-weight: 700; font-size: calc(3.1 * var(--u));
+    color: var(--muted); margin: calc(1.6 * var(--u)) 0 calc(0.6 * var(--u)); cursor: pointer; }
+  .dlgCheck input { width: calc(4 * var(--u)); height: calc(4 * var(--u)); accent-color: #4caf50; }
   #toast { position: fixed; left: 50%; top: calc(3 * var(--u)); transform: translateX(-50%); z-index: 30; pointer-events: none; max-width: 90vw;
     background: var(--ink); color: #fff; font-weight: 800; font-size: calc(3.6 * var(--u)); padding: calc(1.4 * var(--u)) calc(3 * var(--u)); border-radius: 99px; text-align: center; }
   .policy { display: flex; flex-direction: column; gap: calc(1.2 * var(--u)); margin: calc(1 * var(--u)) 0; }
@@ -309,6 +312,7 @@
       <button id="tgMusic" class="chip">🎵 Nhạc nền</button>
       <button id="tgSfx" class="chip">🔊 Hiệu ứng âm thanh</button>
       <button id="tgDark" class="chip">🌙 Giao diện tối</button>
+      <button id="tgAskDress" class="chip">👤 Hỏi đổi tên / trang phục trước trận</button>
     </div></div>
     <div class="sub">🎬 Lưu highlight các trận đấu <small class="hint">· mỗi trận khoảng 0,05–0,2 MB</small></div>
     <div id="hlPolicy"></div>
@@ -360,7 +364,7 @@
     <div id="profColorBox"><div class="sub">Màu áo khi mỗi người 1 đội</div><div class="swatches" id="profColors"></div></div>
     <div class="sub">Mũ · Tóc · Áo (mua thêm ở 🛒)</div>
     <div class="chips" id="profItems"></div>
-    <div class="tools"><button class="btn" data-act="shop">🛒 Cửa hàng</button><button class="btn green" data-act="back">✔ Xong</button></div>
+    <div class="tools"><button class="btn" data-act="shop">🛒 Cửa hàng</button><button class="btn green" data-act="back" id="profDone">✔ Xong</button></div>
   </div>
 </div>
 
