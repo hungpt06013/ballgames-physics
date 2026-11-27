@@ -149,9 +149,28 @@
   .card.owned { background: var(--ok-soft2); } .card.eq { background: var(--ok-strong); outline: calc(0.6 * var(--u)) solid var(--green-d); }
   .card.locked { opacity: 0.6; }
   .profTop { margin-top: 0; }
+  #profiles .panel { width: min(96vw, calc(176 * var(--u))); padding-top: calc(2.2 * var(--u)); }
+  #profiles h2 { font-size: calc(4.8 * var(--u)); margin-bottom: calc(1 * var(--u)); }
+  /* the cards on the left, the outfit on the right (one above the other on a tall screen) */
+  .profBody { display: flex; gap: calc(2.4 * var(--u)); align-items: flex-start; }
+  .profBody .profCards { flex: none; flex-wrap: nowrap; }
+  .profDress { flex: 1; min-width: 0; }
+  .profDress .tabs { margin-bottom: calc(0.8 * var(--u)); }
+  .profDress .tabs .chip { padding: calc(1 * var(--u)) calc(1 * var(--u)); white-space: nowrap; }
+  .profDress .sub { margin: 0 0 calc(1 * var(--u)); font-size: calc(3.4 * var(--u)); }
+  #profColorBox { margin-bottom: calc(1.2 * var(--u)); }
+  #profColorBox .hint { margin-bottom: calc(0.6 * var(--u)); }
+  .grid.dress { grid-template-columns: repeat(auto-fill, minmax(calc(18 * var(--u)), 1fr)); gap: calc(1 * var(--u)); }
+  .grid.dress .card { padding: calc(0.8 * var(--u)) calc(0.6 * var(--u)); font-size: calc(2.7 * var(--u)); gap: calc(0.3 * var(--u)); line-height: 1.15; }
+  .grid.dress .card .ic { font-size: calc(6 * var(--u)); }
+  .grid.dress .card .price { font-size: calc(2.5 * var(--u)); }
+  .card.more { background: var(--gold-soft); border-style: dashed; }
+  .profCards.shared .pcard.on { border-color: transparent; background: none; } /* the ball: nobody in particular */
+  @media (max-aspect-ratio: 1/1) { .profBody { flex-direction: column; align-items: stretch; } .profBody .profCards { justify-content: center; flex-wrap: wrap; } }
   .profCards { display: flex; justify-content: center; gap: calc(2 * var(--u)); flex-wrap: wrap; }
-  .pcard { width: calc(34 * var(--u)); display: flex; flex-direction: column; gap: calc(1 * var(--u)); padding: calc(0.8 * var(--u)); border-radius: calc(3.2 * var(--u)); border: calc(0.5 * var(--u)) solid transparent; cursor: pointer; }
-  .profCards.four .pcard { width: calc(26 * var(--u)); }
+  .pcard { width: calc(30 * var(--u)); display: flex; flex-direction: column; gap: calc(1 * var(--u)); padding: calc(0.8 * var(--u)); border-radius: calc(3.2 * var(--u)); border: calc(0.5 * var(--u)) solid transparent; cursor: pointer; }
+  .profCards.four .pcard { width: calc(21 * var(--u)); }
+  .profCards.four .pcard input.name { font-size: calc(3 * var(--u)); padding: calc(0.6 * var(--u)) calc(0.6 * var(--u)); }
   .pcard.on { border-color: var(--ink); background: var(--ok-soft); }
   .pcard canvas { position: static; width: 100%; aspect-ratio: 2 / 3; height: auto; border: calc(0.5 * var(--u)) solid var(--ink); border-radius: calc(2.4 * var(--u)); background: linear-gradient(#c9f0fc, #e9fbff); }
   .pcard input.name { font-size: calc(3.4 * var(--u)); padding: calc(0.8 * var(--u)) calc(1.2 * var(--u)); text-align: center; }
@@ -357,12 +376,17 @@
       <div class="seg" id="profMode"><button data-v="2">👥 Chơi 2 người</button><button data-v="4">🙋 Chơi 4 người</button></div>
       <div class="seg" id="profFour"><button data-v="team4">🤝 2 vs 2</button><button data-v="ffa">🙋 Mỗi người 1 đội</button></div>
     </div>
-    <!-- one tall card per player: how he looks in a match (kit, number, name), his name under it; tap one to dress him -->
-    <div class="profCards" id="profCards"></div>
-    <div class="sub" id="profFor"></div>
-    <div id="profColorBox"><div class="sub">Màu áo khi mỗi người 1 đội</div><div class="swatches" id="profColors"></div></div>
-    <div class="sub">Mũ · Tóc · Áo (mua thêm ở 🛒)</div>
-    <div class="chips" id="profItems"></div>
+    <div class="profBody">
+      <!-- one tall card per player: how he looks in a match (kit, number, name), his name under it; tap one to dress him -->
+      <div class="profCards" id="profCards"></div>
+      <!-- what he wears, one kind at a time; the ball is the same for everybody -->
+      <div class="profDress">
+        <div class="tabs" id="profTabs"><button class="chip" data-tab="hat">🎩 Mũ</button><button class="chip" data-tab="hair">💇 Tóc</button><button class="chip" data-tab="shirt">👕 Áo</button><button class="chip" data-tab="ball">⚽ Bóng</button></div>
+        <div class="sub" id="profFor"></div>
+        <div id="profColorBox"><div class="hint">Màu áo khi mỗi người 1 đội</div><div class="swatches" id="profColors"></div></div>
+        <div class="grid dress" id="profGrid"></div>
+      </div>
+    </div>
     <div class="tools"><button class="btn" data-act="shop">🛒 Cửa hàng</button><button class="btn green" data-act="back" id="profDone">✔ Xong</button></div>
   </div>
 </div>
@@ -481,8 +505,12 @@
   for (ri = 0; ri < LEG.length; ri++) RAD[NB + ri] = LEG[ri][1];
   var P_MASS = 5, P_INERTIA = 2600;
   var LEG_REST = -0.12, LEG_KICK = 1.95, KICK_REACH = 12;
-  // two players touching for longer than STICK_T s are eased apart, sideways, at up to STICK_PUSH px/s
-  var STICK_T = 0.35, STICK_PUSH = 120, STICK_GAP = 3, MATE_STEP = 2, PAIR = [[0, 0, 1, 2], [0, 0, 3, 4], [0, 0, 0, 5]];
+  // two players touching for longer than STICK_T s are eased apart, sideways, at up to STICK_V px/s
+  var STICK_T = 0.3, STICK_V = 200, STICK_GAP = 3, PAIR = [[0, 0, 1, 2], [0, 0, 3, 4], [0, 0, 0, 5]];
+  // two players overlapping: up to PP_SLOP px is left alone (bodies resting against each other don't shake); deeper
+  // overlaps are worked out mostly through speed (moving apart at up to PP_SEP_V px/s, as smoothly as any other motion)
+  // and only a little by moving the bodies (at most PP_STEP px per pass), so nobody jumps from one frame to the next
+  var PP_SLOP = 1.5, PP_SEP_K = 20, PP_SEP_V = 400, PP_POS_K = 0.2, PP_STEP = 0.5, PP_E = 0.2;
   var POP_TIME = 0.16, POP_REACH = 6, POP_SIN = Math.sin(1.3), POP_COS = Math.cos(1.3);
   var GETUP_DELAY = 0.3, RISE_TIME = 2;
   // standing sway: aimed this far forward so that, with gravity, the body leans as far forward as back (even sway);
@@ -663,7 +691,7 @@
       id: id, team: team, role: role, f: team === 0 ? 1 : -1, active: true,
       x: 0, y: 0, vx: 0, vy: 0, a: 0, w: 0, leg: LEG_REST, legW: 0, ls: 1,
       phase: 0, prev: false, press: false, gT: 1, cT: 1, jumpCd: 0, jumpT: 0, popT: 0, downT: 0, riseT: 0, air: false, slide: 0,
-      holdT: 0,
+      holdT: 0, blk: 0,
       sc: 1, baseSc: 1, invM: 0, invI: 0, rad: new Float64Array(NS),
       sx: new Float64Array(NS), sy: new Float64Array(NS),
       ex: new Float64Array(NS), ey: new Float64Array(NS)
@@ -697,7 +725,7 @@
       players: [makePlayer(0, 0, 0), makePlayer(0, 1, 1), makePlayer(1, 0, 2), makePlayer(1, 1, 3)],
       balls: [makeBall()], events: [], seed: (seed >>> 0) || 12345,
       item: makeItem(), fx: makeFx(), hz: makeHz(), itemT: 6, bombT: A.bombTime,
-      credit: -1, scoreBall: 0, stick: new Float64Array(6)
+      credit: -1, scoreBall: 0, stick: new Float64Array(6), side: new Int8Array(6)
     };
     if (mods && mods.twoBalls) w.balls.push(makeBall());
     w.ball = w.balls[0];
@@ -761,7 +789,7 @@
     var fx = w.fx; fx.kick[0] = fx.kick[1] = fx.shield[0] = fx.shield[1] = fx.freeze[0] = fx.freeze[1] = 0;
     fx.big[0] = fx.big[1] = fx.big[2] = fx.big[3] = 0; fx.magnetT = 0; fx.magnetId = -1;
     w.bombT = A.bombTime; w.credit = -1; w.scoreBall = 0;
-    if (w.stick) for (i = 0; i < 6; i++) w.stick[i] = 0;
+    if (w.stick) for (i = 0; i < 6; i++) { w.stick[i] = 0; w.side[i] = 0; }
     var hz = w.hz; hz.quakeT = hz.torT = 0; hz.craters.length = 0; hz.stun[0] = hz.stun[1] = hz.stun[2] = hz.stun[3] = 0;
   }
 
@@ -957,6 +985,8 @@
       p.vx += jt * tx * p.invM; p.vy += jt * ty * p.invM; p.w += rt * jt * p.invI;
     }
     shiftPlayer(p, nx * pen * 0.7, ny * pen * 0.7);
+    if (nx > 0.6) p.blk |= 1; else if (nx < -0.6) p.blk |= 2; // a wall / post on his left (1) or right (2),
+    if (ny < -0.6) p.blk |= 4; // the ground (or a crossbar) under him (4)
     if (ny < -0.6) { p.cT = 0; if (j === 0 || j === NS - 1) p.gT = 0; }
   }
 
@@ -1030,58 +1060,114 @@
     }
   }
 
-  // Two players bump into each other (every part of them, legs too). Team-mates never knock each other about: they are
-  // only pushed apart sideways, whichever way they touch (one lying or flying on top of the other slides off), so a
-  // team-mate jumping right behind can't launch the one in front, and nobody jumps off a team-mate. Two players who
-  // stay in touch (leaning on each other, legs caught together, piled up) are eased apart, more and more after
-  // STICK_T s. `k`: the pair (w.stick[k] how long it has been touching), `part`: the share of a step of this call.
+  // can p not be pushed along (nx, ny)? (a wall / post that way, or the ground under him when pushed down)
+  function blocked(p, nx, ny) { return (nx < -0.3 && (p.blk & 1)) || (nx > 0.3 && (p.blk & 2)) || (ny > 0.5 && (p.blk & 4)); }
+  // A and B move apart along (nx, ny) by dv more (A one way, B the other; shA / shB: how it is shared). Team-mates are
+  // only pushed sideways, and the one in front is never sent off faster: first whoever runs into the other is slowed
+  // down, then the one behind steps back (the one in front moves only when the one behind can't, and only on the
+  // ground), so a team-mate can't launch another
+  function separate(A, B, nx, ny, dv, shA, shB, mates) {
+    if (!mates) { A.vx -= nx * dv * shA; A.vy -= ny * dv * shA; B.vx += nx * dv * shB; B.vy += ny * dv * shB; return; }
+    var a = shA > 0 ? Math.min(dv * shA, Math.max(0, A.vx * nx)) : 0, b = shB > 0 ? Math.min(dv * shB, Math.max(0, -B.vx * nx)) : 0;
+    var rest = dv - a - b;
+    if (rest > 0) {
+      var backA = nx * A.f > 0; // B is in front of A: A is the one behind
+      var shBk = backA ? shA : shB, fr = backA ? B : A, shFr = backA ? shB : shA;
+      var toBk = shBk > 0 ? rest : 0, toFr = shBk > 0 ? 0 : (shFr > 0 && (fr.blk & 4) ? rest : 0);
+      if (backA) { a += toBk; b += toFr; } else { b += toBk; a += toFr; }
+    }
+    A.vx -= nx * a; B.vx += nx * b;
+  }
+  // Two players bump into each other (every part of them, legs too). All the parts touching are taken together as one
+  // contact (one push for the pair, not one per touching part: those added up into jumps and shaking). Parts caught
+  // inside each other (a raised leg around the other's body, legs hooked) push both ways at once and cancel out: then
+  // they are pushed apart sideways. Team-mates never knock each other about: they are only pushed apart sideways,
+  // whichever way they touch (one lying or flying on top of the other slides off), so a team-mate jumping right behind
+  // can't launch the one in front, and nobody jumps off a team-mate. Two players who stay in touch (leaning on each
+  // other, piled up) are eased apart sideways after STICK_T s, always the same way, and when one of them is against
+  // a wall or a post the other one moves. `k`: the pair (w.stick[k] how long it has been touching, w.side[k] the way
+  // they are eased apart), `part`: the share of a step of this call.
   function playerPlayer(w, k, A, B, part) {
     var dx = B.x - A.x, dy = B.y - A.y, lim = 115 * (A.sc + B.sc);
-    if (dx * dx + dy * dy > lim * lim) { w.stick[k] = 0; return; }
-    var mates = A.team === B.team, side = dx > 0 || (dx === 0 && A.id < B.id) ? 1 : -1, touch = false, deepest = 0;
-    for (var i = 0; i < NS; i++) {
-      for (var j = 0; j < NS; j++) {
+    if (dx * dx + dy * dy > lim * lim) { w.stick[k] = 0; w.side[k] = 0; return; }
+    var mates = A.team === B.team, touch = false;
+    var side = w.side[k] || (dx > 0 || (dx === 0 && A.id < B.id) ? 1 : -1);
+    var snx = 0, sny = 0, sum = 0, deepest = 0, pcx = 0, pcy = 0, ia = 0, jb = 0, onA = false, onB = false, i, j;
+    for (i = 0; i < NS; i++) {
+      for (j = 0; j < NS; j++) {
         var nx = B.sx[j] - A.sx[i], ny = B.sy[j] - A.sy[i], rr = A.rad[i] + B.rad[j];
         var d2 = nx * nx + ny * ny, rt = rr + STICK_GAP;
         if (d2 >= rt * rt || d2 < 1e-9) continue;
         touch = true; // (pressed against each other counts as touching, even with no overlap left)
         if (d2 >= rr * rr) continue;
-        var d = Math.sqrt(d2);
+        var d = Math.sqrt(d2), pen = rr - d;
         nx /= d; ny /= d;
-        var pen = rr - d, c = pen * 0.35;
-        if (mates) { if (pen > deepest) deepest = pen; continue; }
-        var cx = A.sx[i] + nx * A.rad[i], cy = A.sy[i] + ny * A.rad[i];
-        var rax = cx - A.x, ray = cy - A.y, rbx = cx - B.x, rby = cy - B.y;
-        var vax = A.vx - A.w * ray + A.ex[i], vay = A.vy + A.w * rax + A.ey[i];
-        var vbx = B.vx - B.w * rby + B.ex[j], vby = B.vy + B.w * rbx + B.ey[j];
-        var vn = (vbx - vax) * nx + (vby - vay) * ny;
-        if (vn < 0) {
-          var rna = rax * ny - ray * nx, rnb = rbx * ny - rby * nx;
-          var jn = -1.2 * vn / (A.invM + B.invM + rna * rna * A.invI + rnb * rnb * B.invI);
-          A.vx -= jn * nx * A.invM; A.vy -= jn * ny * A.invM; A.w -= rna * jn * A.invI;
-          B.vx += jn * nx * B.invM; B.vy += jn * ny * B.invM; B.w += rnb * jn * B.invI;
-        }
-        shiftPlayer(A, -nx * c, -ny * c);
-        shiftPlayer(B, nx * c, ny * c);
-        if (ny > 0.6) A.cT = 0; else if (ny < -0.6) B.cT = 0;
+        snx += nx * pen; sny += ny * pen; sum += pen;
+        pcx += (A.sx[i] + nx * A.rad[i]) * pen; pcy += (A.sy[i] + ny * A.rad[i]) * pen;
+        if (pen > deepest) { deepest = pen; ia = i; jb = j; }
+        if (ny > 0.6) onA = true; else if (ny < -0.6) onB = true;
       }
     }
-    // team-mates: one sideways push for the deepest overlap (not one per touching part: they added up into jumps),
-    // a few px at most each time, so they slide apart smoothly
-    if (deepest > 0) {
-      var m = Math.min(deepest * 0.35, MATE_STEP); shiftPlayer(A, -side * m, 0); shiftPlayer(B, side * m, 0);
-      // and they don't run into each other: the sideways speed towards each other is taken out
-      // (only the one running into the other is held back: the other keeps his own speed, nobody is pushed on)
-      var into = (A.vx - B.vx) * side;
-      if (into > 0) { if (A.vx * side > -B.vx * side) A.vx -= side * into; else B.vx += side * into; }
+    if (sum > 0) {
+      // the way they are pushed apart (from A towards B)
+      var cnx, cny;
+      if (mates) { cnx = side; cny = 0; } else {
+        var hook = 1 - Math.sqrt(snx * snx + sny * sny) / sum; // 0: all the parts agree, 1: they cancel out
+        cnx = snx / sum + side * hook; cny = sny / sum;
+        var cl = Math.sqrt(cnx * cnx + cny * cny);
+        if (cl > 1e-6) { cnx /= cl; cny /= cl; } else { cnx = side; cny = 0; }
+      }
+      // a wall / post behind one of them, or the ground under the one below: the other one gives way
+      var shA = A.invM / (A.invM + B.invM), shB = 1 - shA;
+      if (blocked(B, cnx, cny)) { shA = 1; shB = 0; } else if (blocked(A, -cnx, -cny)) { shA = 0; shB = 1; }
+      var cx = pcx / sum, cy = pcy / sum, rax = cx - A.x, ray = cy - A.y, rbx = cx - B.x, rby = cy - B.y;
+      if (mates) {
+        // team-mates don't run into each other: the sideways speed towards each other is taken out (only the one
+        // running into the other is held back: the other keeps his own speed, nobody is pushed on)
+        var into = (A.vx - B.vx) * side;
+        if (into > 0) { if (A.vx * side > -B.vx * side) A.vx -= side * into; else B.vx += side * into; }
+        // one coming down onto a team-mate standing on the ground stops on him instead of sinking into him (and then
+        // slides off sideways); the one below is not touched, so nobody is lifted
+        if (sny * sny > 0.36 * (snx * snx + sny * sny)) {
+          var up = sny > 0 ? A : B, lo = sny > 0 ? B : A;
+          if ((lo.blk & 4) && lo.vy > -50 && up.vy > lo.vy) up.vy = lo.vy;
+        }
+      } else {
+        // one bump at the middle of the touching parts (with the speed of a swinging leg there)
+        var vax = A.vx - A.w * ray + A.ex[ia], vay = A.vy + A.w * rax + A.ey[ia];
+        var vbx = B.vx - B.w * rby + B.ex[jb], vby = B.vy + B.w * rbx + B.ey[jb];
+        var vn = (vbx - vax) * cnx + (vby - vay) * cny;
+        if (vn < 0) {
+          var rna = rax * cny - ray * cnx, rnb = rbx * cny - rby * cnx;
+          var jn = -(1 + PP_E) * vn / (A.invM + B.invM + rna * rna * A.invI + rnb * rnb * B.invI);
+          A.vx -= jn * cnx * A.invM; A.vy -= jn * cny * A.invM; A.w -= rna * jn * A.invI;
+          B.vx += jn * cnx * B.invM; B.vy += jn * cny * B.invM; B.w += rnb * jn * B.invI;
+        }
+        if (onA) A.cT = 0; else if (onB) B.cT = 0;
+      }
+      var over = deepest - PP_SLOP;
+      if (over > 0) {
+        // overlapping: they move apart at a speed that grows with the overlap (no spin: nobody is tipped over)
+        var tgt = Math.min(PP_SEP_V, over * PP_SEP_K), vrel = (B.vx - A.vx) * cnx + (B.vy - A.vy) * cny;
+        if (vrel < tgt) separate(A, B, cnx, cny, tgt - vrel, shA, shB, mates);
+        // and a small nudge of the bodies
+        var c = Math.min(over * PP_POS_K, PP_STEP * (1 + over / 16)) * 2; // (a little more for a deep overlap)
+        shiftPlayer(A, -cnx * c * shA, -cny * c * shA); shiftPlayer(B, cnx * c * shB, cny * c * shB);
+      }
     }
     // (a moment apart doesn't start the count again: it only winds down, twice as fast)
-    if (!touch) { w.stick[k] = Math.max(0, w.stick[k] - 2 * DT * part); return; }
+    if (!touch) { w.stick[k] = Math.max(0, w.stick[k] - 2 * DT * part); if (w.stick[k] === 0) w.side[k] = 0; return; }
+    if (!w.side[k]) w.side[k] = side;
     w.stick[k] += DT * part;
-    var over = w.stick[k] - STICK_T;
-    if (over > 0) {
-      var push = Math.min(STICK_PUSH, over * STICK_PUSH * 3) * DT * part * 0.5; // (eased in, then a steady slow slide)
-      shiftPlayer(A, -side * push, 0); shiftPlayer(B, side * push, 0);
+    var late = w.stick[k] - STICK_T;
+    if (late > 0) {
+      // still in touch: they move apart sideways (eased in, then steadily), as real motion, not by moving the bodies
+      var sep = Math.min(STICK_V, late * STICK_V * 4), gap = (B.vx - A.vx) * side;
+      if (gap < sep) {
+        var pa = 0.5, pb = 0.5;
+        if (blocked(A, -side, 0)) { pa = 0; pb = 1; } else if (blocked(B, side, 0)) { pa = 1; pb = 0; }
+        separate(A, B, side, 0, sep - gap, pa, pb, mates);
+      }
     }
   }
 
@@ -1425,6 +1511,7 @@
       b.ang += b.spin * dt;
       b.touchGround = false;
     }
+    for (i = 0; i < 4; i++) pl[i].blk = 0;
     for (var it = 0; it < nIt; it++) {
       for (i = 0; i < 4; i++) if (pl[i].active) { shapes(pl[i]); playerStatic(A, pl[i], hz.craters); }
       for (i = 0; i < 4; i++) {
@@ -1524,7 +1611,7 @@
     f.freeze[0] = g.freeze[0]; f.freeze[1] = g.freeze[1]; f.magnetT = g.magnetT; f.magnetId = g.magnetId;
     for (i = 0; i < 4; i++) f.big[i] = g.big[i];
     d.itemT = s.itemT; d.bombT = s.bombT;
-    for (i = 0; i < 6; i++) d.stick[i] = s.stick ? s.stick[i] : 0;
+    for (i = 0; i < 6; i++) { d.stick[i] = s.stick ? s.stick[i] : 0; d.side[i] = s.side ? s.side[i] : 0; }
     var h = d.hz, k = s.hz;
     h.quakeT = k.quakeT; h.quakeDur = k.quakeDur; h.torT = k.torT; h.torDur = k.torDur; h.torX0 = k.torX0; h.torX = k.torX;
     for (i = 0; i < 4; i++) h.stun[i] = k.stun[i];
@@ -1537,7 +1624,7 @@
     var w = { time: 0, arena: null, settings: null, seed: 1,
       players: [makePlayer(0, 0, 0), makePlayer(0, 1, 1), makePlayer(1, 0, 2), makePlayer(1, 1, 3)],
       balls: [makeBall()], events: null, item: makeItem(), fx: makeFx(), hz: makeHz(), itemT: 0, bombT: 0,
-      credit: -1, scoreBall: 0, stick: new Float64Array(6) };
+      credit: -1, scoreBall: 0, stick: new Float64Array(6), side: new Int8Array(6) };
     w.ball = w.balls[0];
     return w;
   }
@@ -2088,7 +2175,15 @@
       { id: 'santa', name: 'Mũ Noel', price: 150, icon: '🎅' },
       { id: 'viking', name: 'Mũ Viking', price: 200, icon: '🪓' },
       { id: 'halo', name: 'Vòng thiên thần', price: 250, icon: '😇' },
-      { id: 'crown', name: 'Vương miện', price: 300, icon: '👑' }
+      { id: 'crown', name: 'Vương miện', price: 300, icon: '👑' },
+      { id: 'beanie', name: 'Mũ len', price: 60, icon: '🧶' },
+      { id: 'helmet', name: 'Mũ bảo hiểm', price: 90, icon: '⛑️' },
+      { id: 'bunny', name: 'Tai thỏ', price: 110, icon: '🐰' },
+      { id: 'wizard', name: 'Mũ phù thủy', price: 160, icon: '🧙' },
+      { id: 'pirate', name: 'Mũ hải tặc', price: 180, icon: '🏴‍☠️' },
+      { id: 'grad', name: 'Mũ tốt nghiệp', price: 200, icon: '🎓' },
+      { id: 'horns', name: 'Sừng quỷ', price: 220, icon: '😈' },
+      { id: 'tophat', name: 'Mũ ảo thuật', price: 260, icon: '🎩' }
     ],
     hair: [
       { id: 'default', name: 'Tóc ngắn', price: 0, icon: '💇' },
@@ -2097,7 +2192,12 @@
       { id: 'afro', name: 'Tóc xù', price: 60, icon: '🦁' },
       { id: 'spiky', name: 'Tóc dựng', price: 70, icon: '⚡' },
       { id: 'pony', name: 'Tóc buộc', price: 70, icon: '🎀' },
-      { id: 'mohawk', name: 'Tóc mào gà', price: 80, icon: '🐓' }
+      { id: 'mohawk', name: 'Tóc mào gà', price: 80, icon: '🐓' },
+      { id: 'curly', name: 'Tóc xoăn', price: 70, icon: '🌀' },
+      { id: 'pigtails', name: 'Tóc hai bím', price: 80, icon: '👧' },
+      { id: 'bangs', name: 'Tóc mái dài', price: 80, icon: '💁' },
+      { id: 'bun', name: 'Tóc búi', price: 90, icon: '🍡' },
+      { id: 'rainbow', name: 'Tóc 7 màu', price: 150, icon: '🌈' }
     ],
     shirt: [
       { id: 'plain', name: 'Áo trơn', price: 0, icon: '👕' },
@@ -2105,7 +2205,13 @@
       { id: 'stripes', name: 'Sọc dọc', price: 60, icon: '🦓' },
       { id: 'hoops', name: 'Sọc ngang', price: 60, icon: '🐝' },
       { id: 'stars', name: 'Áo ngôi sao', price: 120, icon: '⭐' },
-      { id: 'flame', name: 'Áo lửa', price: 150, icon: '🔥' }
+      { id: 'flame', name: 'Áo lửa', price: 150, icon: '🔥' },
+      { id: 'checker', name: 'Áo caro', price: 80, icon: '🏁' },
+      { id: 'cow', name: 'Áo bò sữa', price: 90, icon: '🐄' },
+      { id: 'heart', name: 'Áo trái tim', price: 100, icon: '❤️' },
+      { id: 'bolt', name: 'Áo sấm sét', price: 130, icon: '🌩️' },
+      { id: 'galaxy', name: 'Áo thiên hà', price: 180, icon: '🌌' },
+      { id: 'diamond', name: 'Áo kim cương', price: 250, icon: '💎' }
     ],
     ball: [
       { id: 'classic', name: 'Bóng cổ điển', price: 0, icon: '⚽' },
@@ -2114,9 +2220,17 @@
       { id: 'rainbow', name: 'Cầu vồng', price: 120, icon: '🌈' },
       { id: 'fire', name: 'Bóng lửa', price: 150, icon: '☄️' },
       { id: 'planet', name: 'Hành tinh', price: 200, icon: '🪐' },
-      { id: 'gold', name: 'Bóng vàng', price: 400, icon: '🥇' }
+      { id: 'gold', name: 'Bóng vàng', price: 400, icon: '🥇' },
+      { id: 'tennis', name: 'Bóng tennis', price: 80, icon: '🎾' },
+      { id: 'orange', name: 'Quả cam', price: 100, icon: '🍊' },
+      { id: 'eight', name: 'Bi-a số 8', price: 120, icon: '🎱' },
+      { id: 'donut', name: 'Bánh donut', price: 130, icon: '🍩' },
+      { id: 'snow', name: 'Bóng tuyết', price: 140, icon: '❄️' },
+      { id: 'eye', name: 'Con mắt', price: 160, icon: '👁️' },
+      { id: 'disco', name: 'Bóng disco', price: 250, icon: '🪩' }
     ]
   };
+  Object.keys(SHOP).forEach(function (k) { var free = SHOP[k][0]; SHOP[k] = [free].concat(SHOP[k].slice(1).sort(function (a, b) { return a.price - b.price; })); });
   var SHOP_TABS = [{ id: 'hat', name: 'Mũ' }, { id: 'hair', name: 'Tóc' }, { id: 'shirt', name: 'Áo' }, { id: 'ball', name: 'Bóng' }];
 
   function defaultProfile(i) { return { name: 'P' + (i + 1), color: i, hat: 'none', hair: 'default', shirt: 'plain' }; }
@@ -2475,9 +2589,34 @@
         c.beginPath(); c.moveTo(hx - 14, hy - 12);
         for (k = 0; k < 5; k++) { var px = hx - 14 + k * 7; c.lineTo(px + 3, hy - r - 14); c.lineTo(px + 7, hy - r + 2); }
         c.closePath(); c.fill(); return;
+      case 'curly': // a ring of little curls over the top
+        capHair(c, hx, hy, r);
+        for (k = 0; k < 8; k++) { var ca = Math.PI * (0.88 + k * 0.155); circle(c, hx - 1 + Math.cos(ca) * (r + 1), hy - 2 + Math.sin(ca) * (r + 1), 6.5); c.fill(); }
+        return;
+      case 'pigtails': // tied up on both sides, with a ribbon each
+        capHair(c, hx, hy, r);
+        c.beginPath(); c.ellipse(hx - r - 7, hy - 4, 6, 13, 0.7, 0, TAU); c.fill();
+        c.beginPath(); c.ellipse(hx + r - 4, hy - r + 1, 5, 11, -0.9, 0, TAU); c.fill();
+        c.fillStyle = '#f37ac1'; circle(c, hx - r - 1, hy - 10, 3.5); c.fill(); circle(c, hx + r - 9, hy - r + 6, 3.2); c.fill(); return;
+      case 'bangs': // a long fringe swept over the forehead
+        c.beginPath(); c.arc(hx - 1, hy - 2, r + 2, Math.PI * 0.85, Math.PI * 1.98);
+        c.quadraticCurveTo(hx + r + 6, hy + 8, hx + 17, hy + 3); c.quadraticCurveTo(hx + 6, hy - 8, hx - r - 2, hy + 14); c.closePath(); c.fill(); return;
+      case 'bun': // a round bun on top
+        capHair(c, hx, hy, r);
+        circle(c, hx - 5, hy - r - 7, 9); c.fill(); return;
+      case 'rainbow': // the short cut in seven colours
+        var rc = ['#ef5b5b', '#f5a524', '#f2d33a', '#4cc36b', '#3fb4ea', '#5b6ee8', '#a66bea'];
+        c.save(); capHair(c, hx, hy, r, true); c.clip();
+        for (k = 0; k < 7; k++) { c.fillStyle = rc[k]; c.fillRect(hx - r - 4, hy - r - 4 + k * 4, 2 * r + 8, 4.5); }
+        c.restore(); return;
       default:
-        c.beginPath(); c.arc(hx - 1, hy - 2, r + 1, Math.PI * 0.9, Math.PI * 2.04); c.closePath(); c.fill();
+        capHair(c, hx, hy, r);
     }
+  }
+  // the short cut every style starts from (pathOnly: just its outline, e.g. to clip to)
+  function capHair(c, hx, hy, r, pathOnly) {
+    c.beginPath(); c.arc(hx - 1, hy - 2, r + 1, Math.PI * 0.9, Math.PI * 2.04); c.closePath();
+    if (!pathOnly) c.fill();
   }
   function hat(c, kind, hx, hy, r, col) {
     c.lineWidth = 3; c.strokeStyle = INK; c.lineJoin = 'round';
@@ -2521,6 +2660,55 @@
         c.lineTo(hx + 8, hy - r - 6); c.lineTo(hx + 15, hy - r - 14); c.lineTo(hx + 15, hy - r + 2); c.closePath();
         c.fillStyle = '#ffd23f'; c.fill(); c.stroke();
         c.fillStyle = '#ef5b5b'; circle(c, hx, hy - r - 4, 3); c.fill(); break;
+      case 'beanie': // knitted, in the team colour, with a folded edge and a pompom
+        c.beginPath(); c.arc(hx, hy - 4, r + 1, Math.PI * 1.02, Math.PI * 1.98); c.closePath();
+        c.fillStyle = col.main; c.fill(); c.stroke();
+        c.strokeStyle = 'rgba(0,0,0,0.25)'; c.lineWidth = 2;
+        for (var k = -2; k <= 2; k++) line(c, hx + k * 6, hy - 9, hx + k * 7, hy - r - 2 + Math.abs(k) * 2.5);
+        c.strokeStyle = INK; c.lineWidth = 3;
+        c.fillStyle = col.dark; rrect(c, hx - r - 2, hy - 11, 2 * r + 4, 8, 3); c.fill(); c.stroke();
+        c.fillStyle = '#ffffff'; circle(c, hx, hy - r - 7, 6); c.fill(); c.stroke(); break;
+      case 'helmet': // a yellow hard hat with a ridge and a peak
+        c.beginPath(); c.arc(hx, hy - 4, r + 2, Math.PI, TAU); c.closePath();
+        c.fillStyle = '#f2c230'; c.fill(); c.stroke();
+        c.fillStyle = '#ffde6a'; rrect(c, hx - 3, hy - r - 6, 6, r + 2, 3); c.fill(); c.stroke();
+        c.fillStyle = '#f2c230'; rrect(c, hx - r - 4, hy - 7, 2 * r + 16, 6, 3); c.fill(); c.stroke(); break;
+      case 'bunny': // two long ears, pink inside
+        for (k = -1; k <= 1; k += 2) {
+          c.beginPath(); c.ellipse(hx + k * 8 - 2, hy - r - 16, 6.5, 18, k * 0.22, 0, TAU);
+          c.fillStyle = '#ffffff'; c.fill(); c.stroke();
+          c.beginPath(); c.ellipse(hx + k * 8 - 2, hy - r - 15, 3, 12, k * 0.22, 0, TAU); c.fillStyle = '#f7a8c8'; c.fill();
+        }
+        break;
+      case 'wizard': // a tall bent cone with a star
+        c.fillStyle = '#6f4bc4';
+        c.beginPath(); c.ellipse(hx, hy - r + 4, r + 13, 5.5, 0, 0, TAU); c.fill(); c.stroke();
+        c.beginPath(); c.moveTo(hx - 14, hy - r + 3); c.quadraticCurveTo(hx - 4, hy - r - 26, hx - 20, hy - r - 44);
+        c.quadraticCurveTo(hx + 6, hy - r - 26, hx + 14, hy - r + 3); c.closePath(); c.fill(); c.stroke();
+        c.fillStyle = '#ffd23f'; star(c, hx, hy - r - 12, 5.5); c.fill(); break;
+      case 'pirate': // a black hat with a skull and crossbones
+        c.beginPath(); c.moveTo(hx - r - 9, hy - r + 7); c.quadraticCurveTo(hx, hy - r - 36, hx + r + 9, hy - r + 7);
+        c.quadraticCurveTo(hx, hy - r - 2, hx - r - 9, hy - r + 7); c.closePath();
+        c.fillStyle = '#2b2b2b'; c.fill(); c.stroke();
+        c.strokeStyle = '#ffffff'; c.lineWidth = 2.5; line(c, hx - 6, hy - r - 4, hx + 6, hy - r - 14); line(c, hx - 6, hy - r - 14, hx + 6, hy - r - 4);
+        c.fillStyle = '#ffffff'; circle(c, hx, hy - r - 11, 4.5); c.fill(); break;
+      case 'grad': // a graduation cap: a flat board and a tassel
+        c.fillStyle = '#2b2b2b'; rrect(c, hx - 13, hy - r - 6, 26, 11, 3); c.fill(); c.stroke();
+        c.beginPath(); c.moveTo(hx - 25, hy - r - 7); c.lineTo(hx, hy - r - 15); c.lineTo(hx + 25, hy - r - 7); c.lineTo(hx, hy - r + 1); c.closePath(); c.fill(); c.stroke();
+        c.strokeStyle = '#f2c230'; c.lineWidth = 2.5; c.beginPath(); c.moveTo(hx, hy - r - 7); c.lineTo(hx - 16, hy - r - 3); c.lineTo(hx - 16, hy - r + 9); c.stroke();
+        c.fillStyle = '#f2c230'; circle(c, hx - 16, hy - r + 10, 3); c.fill(); break;
+      case 'horns': // two little red devil horns
+        c.fillStyle = '#e8463c';
+        for (k = -1; k <= 1; k += 2) {
+          c.beginPath(); c.moveTo(hx + k * 13 - 1, hy - r + 7); c.quadraticCurveTo(hx + k * 19, hy - r - 4, hx + k * 14, hy - r - 20);
+          c.quadraticCurveTo(hx + k * 8, hy - r - 6, hx + k * 2 - 1, hy - r + 3); c.closePath(); c.fill(); c.stroke();
+        }
+        break;
+      case 'tophat': // a magician's tall black hat, with a band in the team colour
+        c.fillStyle = '#2b2b2b';
+        c.beginPath(); c.ellipse(hx, hy - r + 3, r + 9, 5, 0, 0, TAU); c.fill(); c.stroke();
+        rrect(c, hx - 13, hy - r - 30, 26, 32, 3); c.fill(); c.stroke();
+        c.fillStyle = col.main; c.fillRect(hx - 11.5, hy - r - 7, 23, 6); break;
     }
   }
   function face(c, kind, hx, hy) {
@@ -2560,6 +2748,39 @@
         for (k = 0; k <= 6; k++) c.lineTo(x + k * w / 6, y + h - (k % 2 ? 26 : 12));
         c.lineTo(x + w, y + h); c.closePath(); c.fill(); break;
       case 'number': textOutlined(c, String(num), x + w / 2, y + h / 2 - 2, 22, '#ffffff', col.dark); break;
+      case 'checker': // squares in the darker team colour
+        c.fillStyle = col.dark;
+        for (var cy = 0; cy * 8 < h; cy++) for (var cx = 0; cx * 8 < w; cx++) if ((cx + cy) % 2) c.fillRect(x + cx * 8, y + cy * 8, 8, 8);
+        break;
+      case 'cow': // white patches with dark spots (the team colour still shows between them)
+        c.fillStyle = '#ffffff';
+        c.beginPath(); c.ellipse(x + 8, y + 14, 10, 8, 0.4, 0, TAU); c.fill();
+        c.beginPath(); c.ellipse(x + w - 6, y + 34, 9, 11, -0.3, 0, TAU); c.fill();
+        c.beginPath(); c.ellipse(x + 10, y + h - 10, 9, 7, 0.2, 0, TAU); c.fill();
+        c.fillStyle = INK; circle(c, x + 7, y + 14, 3); c.fill(); circle(c, x + w - 7, y + 36, 3.5); c.fill(); circle(c, x + w / 2 + 2, y + 22, 2.5); c.fill(); break;
+      case 'heart': // one big heart
+        var hx0 = x + w / 2, hy0 = y + 20;
+        c.beginPath(); c.moveTo(hx0, hy0 + 15); c.bezierCurveTo(hx0 - 16, hy0 + 4, hx0 - 11, hy0 - 9, hx0, hy0 - 2);
+        c.bezierCurveTo(hx0 + 11, hy0 - 9, hx0 + 16, hy0 + 4, hx0, hy0 + 15); c.closePath();
+        c.fillStyle = '#ff5c8a'; c.fill(); c.lineWidth = 2; c.strokeStyle = '#ffffff'; c.stroke(); break;
+      case 'bolt': // a yellow lightning bolt across
+        c.beginPath(); c.moveTo(x + w * 0.62, y + 2); c.lineTo(x + w * 0.2, y + h * 0.52); c.lineTo(x + w * 0.5, y + h * 0.5);
+        c.lineTo(x + w * 0.3, y + h - 2); c.lineTo(x + w * 0.85, y + h * 0.4); c.lineTo(x + w * 0.55, y + h * 0.42); c.lineTo(x + w * 0.85, y + 2); c.closePath();
+        c.fillStyle = '#ffd23f'; c.fill(); c.lineWidth = 1.5; c.strokeStyle = INK; c.stroke(); break;
+      case 'galaxy': // a starry swirl over the team colour
+        var gg = c.createRadialGradient(x + w / 2, y + h * 0.45, 2, x + w / 2, y + h * 0.45, h * 0.6);
+        gg.addColorStop(0, 'rgba(255,170,240,0.85)'); gg.addColorStop(0.35, 'rgba(110,60,200,0.75)'); gg.addColorStop(1, 'rgba(25,20,70,0.25)');
+        c.fillStyle = gg; c.fillRect(x, y, w, h);
+        c.fillStyle = '#ffffff';
+        for (k = 0; k < 9; k++) { circle(c, x + 3 + hash(k * 3 + 1) * (w - 6), y + 4 + hash(k * 3 + 2) * (h - 8), k % 3 ? 1.2 : 2); c.fill(); }
+        break;
+      case 'diamond': // argyle diamonds and a gem
+        c.fillStyle = col.dark;
+        for (k = 0; k < 3; k++) { var dyy = y + 10 + k * 20; c.beginPath(); c.moveTo(x + w / 2, dyy - 10); c.lineTo(x + w / 2 + 9, dyy); c.lineTo(x + w / 2, dyy + 10); c.lineTo(x + w / 2 - 9, dyy); c.closePath(); c.fill(); }
+        c.strokeStyle = 'rgba(255,255,255,0.7)'; c.lineWidth = 1.2; line(c, x, y, x + w, y + h); line(c, x + w, y, x, y + h);
+        c.beginPath(); c.moveTo(x + w / 2 - 7, y + 26); c.lineTo(x + w / 2 + 7, y + 26); c.lineTo(x + w / 2 + 10, y + 30); c.lineTo(x + w / 2, y + 42); c.lineTo(x + w / 2 - 10, y + 30); c.closePath();
+        c.fillStyle = '#9ff0ff'; c.fill(); c.lineWidth = 1.5; c.strokeStyle = INK; c.stroke();
+        c.fillStyle = '#ffffff'; c.fillRect(x + w / 2 - 4, y + 28, 3, 3); break;
       default: c.fillStyle = 'rgba(255,255,255,0.85)'; c.fillRect(x + w / 2 - 3, y + 11, 6, 22);
     }
     c.restore();
@@ -2654,6 +2875,65 @@
         pentagon(c, 0, 0, R * 0.36, 0);
         for (var q = 0; q < 5; q++) { var a = q * TAU / 5 - Math.PI / 2; pentagon(c, Math.cos(a) * R * 0.98, Math.sin(a) * R * 0.98, R * 0.32, Math.PI / 5); }
         c.fillStyle = 'rgba(255,255,255,0.6)'; circle(c, -R * 0.35, -R * 0.4, R * 0.18); c.fill();
+        c.restore(); break;
+      case 'tennis':
+        c.fillStyle = '#d6e84a'; c.fill();
+        c.save(); c.clip(); c.strokeStyle = '#ffffff'; c.lineWidth = Math.max(2, R * 0.12);
+        c.beginPath(); c.arc(-R * 1.15, 0, R * 0.85, -1.1, 1.1); c.stroke();
+        c.beginPath(); c.arc(R * 1.15, 0, R * 0.85, Math.PI - 1.1, Math.PI + 1.1); c.stroke();
+        c.restore(); break;
+      case 'orange':
+        c.fillStyle = '#f5a524'; c.fill();
+        c.save(); c.clip(); c.fillStyle = 'rgba(190,100,0,0.35)';
+        for (k = 0; k < 14; k++) { circle(c, (hash(k) - 0.5) * 1.7 * R, (hash(k + 40) - 0.5) * 1.7 * R, R * 0.05); c.fill(); }
+        c.fillStyle = 'rgba(255,255,255,0.45)'; circle(c, -R * 0.35, -R * 0.4, R * 0.2); c.fill();
+        c.fillStyle = '#4cc36b'; c.beginPath(); c.ellipse(R * 0.18, -R * 0.72, R * 0.28, R * 0.13, -0.5, 0, TAU); c.fill();
+        c.fillStyle = '#6b4a2b'; circle(c, 0, -R * 0.78, R * 0.08); c.fill();
+        c.restore(); break;
+      case 'eight':
+        c.fillStyle = '#1f1f22'; c.fill();
+        c.fillStyle = '#ffffff'; circle(c, R * 0.12, -R * 0.12, R * 0.45); c.fill();
+        c.fillStyle = INK; c.font = '900 ' + Math.round(R * 0.62) + 'px ' + FONT; c.textAlign = 'center'; c.textBaseline = 'middle';
+        c.fillText('8', R * 0.12, -R * 0.08);
+        c.fillStyle = 'rgba(255,255,255,0.3)'; circle(c, -R * 0.45, -R * 0.5, R * 0.14); c.fill(); break;
+      case 'donut':
+        c.fillStyle = '#e0a35c'; c.fill();
+        c.save(); c.clip();
+        c.beginPath();
+        for (k = 0; k <= 24; k++) { var da = k * TAU / 24, dr = R * (0.8 + 0.07 * Math.sin(k * 2.7)); c[k ? 'lineTo' : 'moveTo'](Math.cos(da) * dr, Math.sin(da) * dr); }
+        c.closePath(); c.fillStyle = '#f37ac1'; c.fill();
+        var sc = ['#ffffff', '#ffd23f', '#3fb4ea', '#4cc36b'];
+        c.lineWidth = Math.max(1.5, R * 0.07); c.lineCap = 'round';
+        for (k = 0; k < 14; k++) { var sa = hash(k + 7) * TAU, sr = R * (0.4 + 0.33 * hash(k + 19)), sx = Math.cos(sa) * sr, sy = Math.sin(sa) * sr, so = hash(k + 3) * 3;
+          c.strokeStyle = sc[k % 4]; line(c, sx - Math.cos(so) * R * 0.08, sy - Math.sin(so) * R * 0.08, sx + Math.cos(so) * R * 0.08, sy + Math.sin(so) * R * 0.08); }
+        c.fillStyle = '#b97834'; circle(c, 0, 0, R * 0.3); c.fill(); c.fillStyle = '#8f5a24'; circle(c, 0, 0, R * 0.2); c.fill();
+        c.restore(); break;
+      case 'snow':
+        var sg = c.createRadialGradient(-R * 0.3, -R * 0.3, 1, 0, 0, R);
+        sg.addColorStop(0, '#ffffff'); sg.addColorStop(1, '#bfe3f5'); c.fillStyle = sg; c.fill();
+        c.strokeStyle = '#6fb6dc'; c.lineWidth = Math.max(1.5, R * 0.08); c.lineCap = 'round';
+        for (k = 0; k < 3; k++) { var fa = k * Math.PI / 3; line(c, -Math.cos(fa) * R * 0.55, -Math.sin(fa) * R * 0.55, Math.cos(fa) * R * 0.55, Math.sin(fa) * R * 0.55); }
+        for (k = 0; k < 6; k++) { var fb = k * Math.PI / 3, ex = Math.cos(fb) * R * 0.38, ey = Math.sin(fb) * R * 0.38;
+          line(c, ex, ey, ex + Math.cos(fb + 0.7) * R * 0.15, ey + Math.sin(fb + 0.7) * R * 0.15); line(c, ex, ey, ex + Math.cos(fb - 0.7) * R * 0.15, ey + Math.sin(fb - 0.7) * R * 0.15); }
+        break;
+      case 'eye':
+        c.fillStyle = '#ffffff'; c.fill();
+        c.save(); c.clip(); c.strokeStyle = 'rgba(220,60,60,0.6)'; c.lineWidth = 1.2;
+        for (k = 0; k < 6; k++) { var va = k * TAU / 6 + 0.4; c.beginPath(); c.moveTo(Math.cos(va) * R, Math.sin(va) * R);
+          c.quadraticCurveTo(Math.cos(va + 0.3) * R * 0.75, Math.sin(va + 0.3) * R * 0.75, Math.cos(va) * R * 0.55, Math.sin(va) * R * 0.55); c.stroke(); }
+        c.restore();
+        c.fillStyle = '#3fa0e0'; circle(c, R * 0.15, 0, R * 0.45); c.fill();
+        c.fillStyle = INK; circle(c, R * 0.2, 0, R * 0.22); c.fill();
+        c.fillStyle = '#ffffff'; circle(c, R * 0.05, -R * 0.15, R * 0.09); c.fill(); break;
+      case 'disco':
+        c.fillStyle = '#9aa3ad'; c.fill();
+        c.save(); c.clip();
+        var tl = R * 0.32;
+        for (var ty = -R; ty < R; ty += tl) for (var tx = -R; tx < R; tx += tl) {
+          var lv = Math.floor(150 + 105 * hash(Math.round(tx * 7 + ty * 13)));
+          c.fillStyle = 'rgb(' + lv + ',' + lv + ',' + Math.min(255, lv + 20) + ')'; c.fillRect(tx + 0.6, ty + 0.6, tl - 1.2, tl - 1.2);
+        }
+        c.fillStyle = 'rgba(255,255,255,0.85)'; star(c, -R * 0.4, -R * 0.42, R * 0.2); c.fill();
         c.restore(); break;
       default:
         c.fillStyle = '#ffffff'; c.fill();
@@ -3594,7 +3874,7 @@
   // "2 người": P1 and P2, each a whole side (two bodies in the side's kit, the name beside the score);
   // "4 người": P1-P4, one body each with the name tag over the head, in the 2 vs 2 kits or each in his own colour.
   // Every card is a small tall picture of the match look; tap one to dress that player.
-  var profSlot = 0, profPlayers = 2, profFour = 'team4', previewP = null;
+  var profSlot = 0, profPlayers = 2, profFour = 'team4', profTab = 'hat', previewP = null;
   function buildProfiles() {
     if (profSlot >= profPlayers) profSlot = 0;
     segSelect('profMode', profPlayers); segSelect('profFour', profFour);
@@ -3612,35 +3892,52 @@
         Meta.profile(i).name = v || ('P' + (i + 1)); Meta.save();
         drawCard(i); $('profFor').textContent = dressTitle();
       });
-      card.addEventListener('click', function (e) { if (e.target === inp || profSlot === i) return; profSlot = i; Snd.click(); buildDress(); markCards(); });
+      card.addEventListener('click', function (e) { if (e.target === inp || profSlot === i) return; profSlot = i; Snd.click(); if (profTab === 'ball') profTab = 'hat'; buildDress(); markCards(); drawCards(); });
       card.appendChild(cv); card.appendChild(inp); box.appendChild(card);
       drawCard(i);
     })(i);
     buildDress();
   }
   function markCards() { Array.prototype.forEach.call($('profCards').children, function (c, k) { c.classList.toggle('on', k === profSlot); }); }
-  function dressTitle() { return 'Trang phục của ' + slotLabel(profSlot); }
-  // the colours, hats, hair and shirts of the chosen player
+  var DRESS_TAB = { hat: 'Mũ', hair: 'Tóc', shirt: 'Áo', ball: 'Bóng' };
+  function dressTitle() { return profTab === 'ball' ? '⚽ Bóng dùng chung cho mọi người chơi' : DRESS_TAB[profTab] + ' của ' + slotLabel(profSlot); }
+  function dressOn(cat, id) { return cat === 'ball' ? Meta.D.ball === id : Meta.profile(profSlot)[cat] === id; }
+  // the chosen kind (hat, hair, shirt: of the chosen player; the ball: everybody's): what he has, and a way to the shop
   function buildDress() {
-    var pr = Meta.profile(profSlot);
+    var pr = Meta.profile(profSlot), cat = profTab, ball = cat === 'ball';
+    Array.prototype.forEach.call($('profTabs').children, function (b) { b.classList.toggle('on', b.dataset.tab === cat); });
     $('profFor').textContent = dressTitle();
-    $('profColorBox').classList.toggle('hidden', profPlayers !== 4);
+    $('profCards').classList.toggle('shared', ball);
+    $('profColorBox').classList.toggle('hidden', profPlayers !== 4 || cat !== 'shirt');
     var sw = $('profColors'); sw.innerHTML = '';
     Meta.COLORS.forEach(function (c, ci) {
       var b = document.createElement('button'); b.style.background = c.main; b.title = c.name; b.className = pr.color === ci ? 'on' : '';
       b.addEventListener('click', function () { pr.color = ci; Meta.save(); Snd.click(); if (profFour !== 'ffa') profFour = 'ffa'; buildProfiles(); });
       sw.appendChild(b);
     });
-    var items = $('profItems'); items.innerHTML = '';
-    ['hat', 'hair', 'shirt'].forEach(function (cat) {
-      Meta.SHOP[cat].forEach(function (it) {
-        if (!Meta.owns(cat, it.id)) return;
-        var b = document.createElement('button'); b.className = 'chip' + (pr[cat] === it.id ? ' on' : ''); b.textContent = it.icon + ' ' + it.name;
-        b.addEventListener('click', function () { Meta.equip(cat, it.id, profSlot); Snd.click(); buildDress(); for (var k = 0; k < profPlayers; k++) drawCard(k); });
-        items.appendChild(b);
-      });
+    var grid = $('profGrid'), left = 0; grid.innerHTML = '';
+    Meta.SHOP[cat].forEach(function (it) {
+      if (!Meta.owns(cat, it.id)) { left++; return; }
+      var on = dressOn(cat, it.id), card = document.createElement('div');
+      card.className = 'card' + (on ? ' eq' : ' owned'); card.dataset.id = it.id;
+      card.innerHTML = '<div class="ic">' + it.icon + '</div><div>' + it.name + '</div>' + (on ? '<div class="price">✔ Đang dùng</div>' : '');
+      card.addEventListener('click', function () { Meta.equip(cat, it.id, profSlot); Snd.click(); buildDress(); drawCards(); });
+      grid.appendChild(card);
     });
+    if (left) {
+      var more = document.createElement('div'); more.className = 'card more';
+      more.innerHTML = '<div class="ic">🛒</div><div>Mua thêm</div><div class="price">còn ' + left + ' món</div>';
+      more.addEventListener('click', function () { Snd.click(); openShop(); });
+      grid.appendChild(more);
+    }
   }
+  function drawCards() { for (var k = 0; k < profPlayers; k++) drawCard(k); }
+  // the shop from the player screen opens on the kind being chosen, for the player being dressed
+  function openShop() { shopTab = profTab; shopSlot = profSlot; G.shopFrom = 'profiles'; buildShop(); show('shop'); }
+  $('profTabs').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b || b.dataset.tab === profTab) return;
+    profTab = b.dataset.tab; Snd.click(); buildDress(); drawCards();
+  });
   $('profMode').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; profPlayers = +b.dataset.v; Snd.click(); buildProfiles(); });
   $('profFour').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; profFour = b.dataset.v; Snd.click(); buildProfiles(); });
   // one card: grass, the player's body (or the side's two bodies) as in a match, and his name as the match shows it
@@ -3662,6 +3959,12 @@
       D.player(c, p, { col: { main: col.main, dark: col.dark }, hat: pr.hat, hair: pr.hair, shirt: pr.shirt, num: two ? b.role + 1 : i + 1, face: 'happy',
         hairCol: b.id % 2 ? '#5b3a1f' : INK, armT: 0.6, mapId: 'soccer' });
     });
+    // choosing the ball: the same ball at everybody's feet
+    if (profTab === 'ball') {
+      var br = two ? 21 : 26, bx = Wc / 2 + face * (two ? 84 : 66);
+      c.fillStyle = 'rgba(0,0,0,0.16)'; c.beginPath(); c.ellipse(bx, gy + 2, br, 5, 0, 0, TAU); c.fill();
+      D.ball(c, { x: bx, y: gy - br, ang: 0.3 }, 'soccer', br, { skin: Meta.D.ball, t: 0 });
+    }
     c.font = '900 ' + fs + 'px ' + D.FONT; c.textAlign = 'center'; c.textBaseline = 'middle'; c.lineJoin = 'round';
     if (two) {
       // the top of the screen in a match: his score pill with the name beside it (toward the middle)
@@ -3725,7 +4028,7 @@
         settings = Object.assign({}, E.DEFAULT_SETTINGS);
         store('settings', settings); buildSettings(); break;
       case 'help': show('help'); break;
-      case 'shop': G.shopFrom = G.screen; buildShop(); show('shop'); break;
+      case 'shop': if (G.screen === 'profiles') openShop(); else { G.shopFrom = G.screen; buildShop(); show('shop'); } break;
       case 'profiles': G.dressThen = null; buildProfiles(); show('profiles'); break;
       case 'stats': buildStats(); show('stats'); break;
       case 'history': buildHistory(); show('history'); break;

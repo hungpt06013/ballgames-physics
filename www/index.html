@@ -149,9 +149,28 @@
   .card.owned { background: var(--ok-soft2); } .card.eq { background: var(--ok-strong); outline: calc(0.6 * var(--u)) solid var(--green-d); }
   .card.locked { opacity: 0.6; }
   .profTop { margin-top: 0; }
+  #profiles .panel { width: min(96vw, calc(176 * var(--u))); padding-top: calc(2.2 * var(--u)); }
+  #profiles h2 { font-size: calc(4.8 * var(--u)); margin-bottom: calc(1 * var(--u)); }
+  /* the cards on the left, the outfit on the right (one above the other on a tall screen) */
+  .profBody { display: flex; gap: calc(2.4 * var(--u)); align-items: flex-start; }
+  .profBody .profCards { flex: none; flex-wrap: nowrap; }
+  .profDress { flex: 1; min-width: 0; }
+  .profDress .tabs { margin-bottom: calc(0.8 * var(--u)); }
+  .profDress .tabs .chip { padding: calc(1 * var(--u)) calc(1 * var(--u)); white-space: nowrap; }
+  .profDress .sub { margin: 0 0 calc(1 * var(--u)); font-size: calc(3.4 * var(--u)); }
+  #profColorBox { margin-bottom: calc(1.2 * var(--u)); }
+  #profColorBox .hint { margin-bottom: calc(0.6 * var(--u)); }
+  .grid.dress { grid-template-columns: repeat(auto-fill, minmax(calc(18 * var(--u)), 1fr)); gap: calc(1 * var(--u)); }
+  .grid.dress .card { padding: calc(0.8 * var(--u)) calc(0.6 * var(--u)); font-size: calc(2.7 * var(--u)); gap: calc(0.3 * var(--u)); line-height: 1.15; }
+  .grid.dress .card .ic { font-size: calc(6 * var(--u)); }
+  .grid.dress .card .price { font-size: calc(2.5 * var(--u)); }
+  .card.more { background: var(--gold-soft); border-style: dashed; }
+  .profCards.shared .pcard.on { border-color: transparent; background: none; } /* the ball: nobody in particular */
+  @media (max-aspect-ratio: 1/1) { .profBody { flex-direction: column; align-items: stretch; } .profBody .profCards { justify-content: center; flex-wrap: wrap; } }
   .profCards { display: flex; justify-content: center; gap: calc(2 * var(--u)); flex-wrap: wrap; }
-  .pcard { width: calc(34 * var(--u)); display: flex; flex-direction: column; gap: calc(1 * var(--u)); padding: calc(0.8 * var(--u)); border-radius: calc(3.2 * var(--u)); border: calc(0.5 * var(--u)) solid transparent; cursor: pointer; }
-  .profCards.four .pcard { width: calc(26 * var(--u)); }
+  .pcard { width: calc(30 * var(--u)); display: flex; flex-direction: column; gap: calc(1 * var(--u)); padding: calc(0.8 * var(--u)); border-radius: calc(3.2 * var(--u)); border: calc(0.5 * var(--u)) solid transparent; cursor: pointer; }
+  .profCards.four .pcard { width: calc(21 * var(--u)); }
+  .profCards.four .pcard input.name { font-size: calc(3 * var(--u)); padding: calc(0.6 * var(--u)) calc(0.6 * var(--u)); }
   .pcard.on { border-color: var(--ink); background: var(--ok-soft); }
   .pcard canvas { position: static; width: 100%; aspect-ratio: 2 / 3; height: auto; border: calc(0.5 * var(--u)) solid var(--ink); border-radius: calc(2.4 * var(--u)); background: linear-gradient(#c9f0fc, #e9fbff); }
   .pcard input.name { font-size: calc(3.4 * var(--u)); padding: calc(0.8 * var(--u)) calc(1.2 * var(--u)); text-align: center; }
@@ -357,12 +376,17 @@
       <div class="seg" id="profMode"><button data-v="2">👥 Chơi 2 người</button><button data-v="4">🙋 Chơi 4 người</button></div>
       <div class="seg" id="profFour"><button data-v="team4">🤝 2 vs 2</button><button data-v="ffa">🙋 Mỗi người 1 đội</button></div>
     </div>
-    <!-- one tall card per player: how he looks in a match (kit, number, name), his name under it; tap one to dress him -->
-    <div class="profCards" id="profCards"></div>
-    <div class="sub" id="profFor"></div>
-    <div id="profColorBox"><div class="sub">Màu áo khi mỗi người 1 đội</div><div class="swatches" id="profColors"></div></div>
-    <div class="sub">Mũ · Tóc · Áo (mua thêm ở 🛒)</div>
-    <div class="chips" id="profItems"></div>
+    <div class="profBody">
+      <!-- one tall card per player: how he looks in a match (kit, number, name), his name under it; tap one to dress him -->
+      <div class="profCards" id="profCards"></div>
+      <!-- what he wears, one kind at a time; the ball is the same for everybody -->
+      <div class="profDress">
+        <div class="tabs" id="profTabs"><button class="chip" data-tab="hat">🎩 Mũ</button><button class="chip" data-tab="hair">💇 Tóc</button><button class="chip" data-tab="shirt">👕 Áo</button><button class="chip" data-tab="ball">⚽ Bóng</button></div>
+        <div class="sub" id="profFor"></div>
+        <div id="profColorBox"><div class="hint">Màu áo khi mỗi người 1 đội</div><div class="swatches" id="profColors"></div></div>
+        <div class="grid dress" id="profGrid"></div>
+      </div>
+    </div>
     <div class="tools"><button class="btn" data-act="shop">🛒 Cửa hàng</button><button class="btn green" data-act="back" id="profDone">✔ Xong</button></div>
   </div>
 </div>

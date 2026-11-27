@@ -24,7 +24,15 @@
       { id: 'santa', name: 'Mũ Noel', price: 150, icon: '🎅' },
       { id: 'viking', name: 'Mũ Viking', price: 200, icon: '🪓' },
       { id: 'halo', name: 'Vòng thiên thần', price: 250, icon: '😇' },
-      { id: 'crown', name: 'Vương miện', price: 300, icon: '👑' }
+      { id: 'crown', name: 'Vương miện', price: 300, icon: '👑' },
+      { id: 'beanie', name: 'Mũ len', price: 60, icon: '🧶' },
+      { id: 'helmet', name: 'Mũ bảo hiểm', price: 90, icon: '⛑️' },
+      { id: 'bunny', name: 'Tai thỏ', price: 110, icon: '🐰' },
+      { id: 'wizard', name: 'Mũ phù thủy', price: 160, icon: '🧙' },
+      { id: 'pirate', name: 'Mũ hải tặc', price: 180, icon: '🏴‍☠️' },
+      { id: 'grad', name: 'Mũ tốt nghiệp', price: 200, icon: '🎓' },
+      { id: 'horns', name: 'Sừng quỷ', price: 220, icon: '😈' },
+      { id: 'tophat', name: 'Mũ ảo thuật', price: 260, icon: '🎩' }
     ],
     hair: [
       { id: 'default', name: 'Tóc ngắn', price: 0, icon: '💇' },
@@ -33,7 +41,12 @@
       { id: 'afro', name: 'Tóc xù', price: 60, icon: '🦁' },
       { id: 'spiky', name: 'Tóc dựng', price: 70, icon: '⚡' },
       { id: 'pony', name: 'Tóc buộc', price: 70, icon: '🎀' },
-      { id: 'mohawk', name: 'Tóc mào gà', price: 80, icon: '🐓' }
+      { id: 'mohawk', name: 'Tóc mào gà', price: 80, icon: '🐓' },
+      { id: 'curly', name: 'Tóc xoăn', price: 70, icon: '🌀' },
+      { id: 'pigtails', name: 'Tóc hai bím', price: 80, icon: '👧' },
+      { id: 'bangs', name: 'Tóc mái dài', price: 80, icon: '💁' },
+      { id: 'bun', name: 'Tóc búi', price: 90, icon: '🍡' },
+      { id: 'rainbow', name: 'Tóc 7 màu', price: 150, icon: '🌈' }
     ],
     shirt: [
       { id: 'plain', name: 'Áo trơn', price: 0, icon: '👕' },
@@ -41,7 +54,13 @@
       { id: 'stripes', name: 'Sọc dọc', price: 60, icon: '🦓' },
       { id: 'hoops', name: 'Sọc ngang', price: 60, icon: '🐝' },
       { id: 'stars', name: 'Áo ngôi sao', price: 120, icon: '⭐' },
-      { id: 'flame', name: 'Áo lửa', price: 150, icon: '🔥' }
+      { id: 'flame', name: 'Áo lửa', price: 150, icon: '🔥' },
+      { id: 'checker', name: 'Áo caro', price: 80, icon: '🏁' },
+      { id: 'cow', name: 'Áo bò sữa', price: 90, icon: '🐄' },
+      { id: 'heart', name: 'Áo trái tim', price: 100, icon: '❤️' },
+      { id: 'bolt', name: 'Áo sấm sét', price: 130, icon: '🌩️' },
+      { id: 'galaxy', name: 'Áo thiên hà', price: 180, icon: '🌌' },
+      { id: 'diamond', name: 'Áo kim cương', price: 250, icon: '💎' }
     ],
     ball: [
       { id: 'classic', name: 'Bóng cổ điển', price: 0, icon: '⚽' },
@@ -50,9 +69,17 @@
       { id: 'rainbow', name: 'Cầu vồng', price: 120, icon: '🌈' },
       { id: 'fire', name: 'Bóng lửa', price: 150, icon: '☄️' },
       { id: 'planet', name: 'Hành tinh', price: 200, icon: '🪐' },
-      { id: 'gold', name: 'Bóng vàng', price: 400, icon: '🥇' }
+      { id: 'gold', name: 'Bóng vàng', price: 400, icon: '🥇' },
+      { id: 'tennis', name: 'Bóng tennis', price: 80, icon: '🎾' },
+      { id: 'orange', name: 'Quả cam', price: 100, icon: '🍊' },
+      { id: 'eight', name: 'Bi-a số 8', price: 120, icon: '🎱' },
+      { id: 'donut', name: 'Bánh donut', price: 130, icon: '🍩' },
+      { id: 'snow', name: 'Bóng tuyết', price: 140, icon: '❄️' },
+      { id: 'eye', name: 'Con mắt', price: 160, icon: '👁️' },
+      { id: 'disco', name: 'Bóng disco', price: 250, icon: '🪩' }
     ]
   };
+  Object.keys(SHOP).forEach(function (k) { var free = SHOP[k][0]; SHOP[k] = [free].concat(SHOP[k].slice(1).sort(function (a, b) { return a.price - b.price; })); });
   var SHOP_TABS = [{ id: 'hat', name: 'Mũ' }, { id: 'hair', name: 'Tóc' }, { id: 'shirt', name: 'Áo' }, { id: 'ball', name: 'Bóng' }];
 
   function defaultProfile(i) { return { name: 'P' + (i + 1), color: i, hat: 'none', hair: 'default', shirt: 'plain' }; }

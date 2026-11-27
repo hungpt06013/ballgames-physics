@@ -390,7 +390,7 @@
   // "2 người": P1 and P2, each a whole side (two bodies in the side's kit, the name beside the score);
   // "4 người": P1-P4, one body each with the name tag over the head, in the 2 vs 2 kits or each in his own colour.
   // Every card is a small tall picture of the match look; tap one to dress that player.
-  var profSlot = 0, profPlayers = 2, profFour = 'team4', previewP = null;
+  var profSlot = 0, profPlayers = 2, profFour = 'team4', profTab = 'hat', previewP = null;
   function buildProfiles() {
     if (profSlot >= profPlayers) profSlot = 0;
     segSelect('profMode', profPlayers); segSelect('profFour', profFour);
@@ -408,35 +408,52 @@
         Meta.profile(i).name = v || ('P' + (i + 1)); Meta.save();
         drawCard(i); $('profFor').textContent = dressTitle();
       });
-      card.addEventListener('click', function (e) { if (e.target === inp || profSlot === i) return; profSlot = i; Snd.click(); buildDress(); markCards(); });
+      card.addEventListener('click', function (e) { if (e.target === inp || profSlot === i) return; profSlot = i; Snd.click(); if (profTab === 'ball') profTab = 'hat'; buildDress(); markCards(); drawCards(); });
       card.appendChild(cv); card.appendChild(inp); box.appendChild(card);
       drawCard(i);
     })(i);
     buildDress();
   }
   function markCards() { Array.prototype.forEach.call($('profCards').children, function (c, k) { c.classList.toggle('on', k === profSlot); }); }
-  function dressTitle() { return 'Trang phục của ' + slotLabel(profSlot); }
-  // the colours, hats, hair and shirts of the chosen player
+  var DRESS_TAB = { hat: 'Mũ', hair: 'Tóc', shirt: 'Áo', ball: 'Bóng' };
+  function dressTitle() { return profTab === 'ball' ? '⚽ Bóng dùng chung cho mọi người chơi' : DRESS_TAB[profTab] + ' của ' + slotLabel(profSlot); }
+  function dressOn(cat, id) { return cat === 'ball' ? Meta.D.ball === id : Meta.profile(profSlot)[cat] === id; }
+  // the chosen kind (hat, hair, shirt: of the chosen player; the ball: everybody's): what he has, and a way to the shop
   function buildDress() {
-    var pr = Meta.profile(profSlot);
+    var pr = Meta.profile(profSlot), cat = profTab, ball = cat === 'ball';
+    Array.prototype.forEach.call($('profTabs').children, function (b) { b.classList.toggle('on', b.dataset.tab === cat); });
     $('profFor').textContent = dressTitle();
-    $('profColorBox').classList.toggle('hidden', profPlayers !== 4);
+    $('profCards').classList.toggle('shared', ball);
+    $('profColorBox').classList.toggle('hidden', profPlayers !== 4 || cat !== 'shirt');
     var sw = $('profColors'); sw.innerHTML = '';
     Meta.COLORS.forEach(function (c, ci) {
       var b = document.createElement('button'); b.style.background = c.main; b.title = c.name; b.className = pr.color === ci ? 'on' : '';
       b.addEventListener('click', function () { pr.color = ci; Meta.save(); Snd.click(); if (profFour !== 'ffa') profFour = 'ffa'; buildProfiles(); });
       sw.appendChild(b);
     });
-    var items = $('profItems'); items.innerHTML = '';
-    ['hat', 'hair', 'shirt'].forEach(function (cat) {
-      Meta.SHOP[cat].forEach(function (it) {
-        if (!Meta.owns(cat, it.id)) return;
-        var b = document.createElement('button'); b.className = 'chip' + (pr[cat] === it.id ? ' on' : ''); b.textContent = it.icon + ' ' + it.name;
-        b.addEventListener('click', function () { Meta.equip(cat, it.id, profSlot); Snd.click(); buildDress(); for (var k = 0; k < profPlayers; k++) drawCard(k); });
-        items.appendChild(b);
-      });
+    var grid = $('profGrid'), left = 0; grid.innerHTML = '';
+    Meta.SHOP[cat].forEach(function (it) {
+      if (!Meta.owns(cat, it.id)) { left++; return; }
+      var on = dressOn(cat, it.id), card = document.createElement('div');
+      card.className = 'card' + (on ? ' eq' : ' owned'); card.dataset.id = it.id;
+      card.innerHTML = '<div class="ic">' + it.icon + '</div><div>' + it.name + '</div>' + (on ? '<div class="price">✔ Đang dùng</div>' : '');
+      card.addEventListener('click', function () { Meta.equip(cat, it.id, profSlot); Snd.click(); buildDress(); drawCards(); });
+      grid.appendChild(card);
     });
+    if (left) {
+      var more = document.createElement('div'); more.className = 'card more';
+      more.innerHTML = '<div class="ic">🛒</div><div>Mua thêm</div><div class="price">còn ' + left + ' món</div>';
+      more.addEventListener('click', function () { Snd.click(); openShop(); });
+      grid.appendChild(more);
+    }
   }
+  function drawCards() { for (var k = 0; k < profPlayers; k++) drawCard(k); }
+  // the shop from the player screen opens on the kind being chosen, for the player being dressed
+  function openShop() { shopTab = profTab; shopSlot = profSlot; G.shopFrom = 'profiles'; buildShop(); show('shop'); }
+  $('profTabs').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b || b.dataset.tab === profTab) return;
+    profTab = b.dataset.tab; Snd.click(); buildDress(); drawCards();
+  });
   $('profMode').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; profPlayers = +b.dataset.v; Snd.click(); buildProfiles(); });
   $('profFour').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; profFour = b.dataset.v; Snd.click(); buildProfiles(); });
   // one card: grass, the player's body (or the side's two bodies) as in a match, and his name as the match shows it
@@ -458,6 +475,12 @@
       D.player(c, p, { col: { main: col.main, dark: col.dark }, hat: pr.hat, hair: pr.hair, shirt: pr.shirt, num: two ? b.role + 1 : i + 1, face: 'happy',
         hairCol: b.id % 2 ? '#5b3a1f' : INK, armT: 0.6, mapId: 'soccer' });
     });
+    // choosing the ball: the same ball at everybody's feet
+    if (profTab === 'ball') {
+      var br = two ? 21 : 26, bx = Wc / 2 + face * (two ? 84 : 66);
+      c.fillStyle = 'rgba(0,0,0,0.16)'; c.beginPath(); c.ellipse(bx, gy + 2, br, 5, 0, 0, TAU); c.fill();
+      D.ball(c, { x: bx, y: gy - br, ang: 0.3 }, 'soccer', br, { skin: Meta.D.ball, t: 0 });
+    }
     c.font = '900 ' + fs + 'px ' + D.FONT; c.textAlign = 'center'; c.textBaseline = 'middle'; c.lineJoin = 'round';
     if (two) {
       // the top of the screen in a match: his score pill with the name beside it (toward the middle)
@@ -521,7 +544,7 @@
         settings = Object.assign({}, E.DEFAULT_SETTINGS);
         store('settings', settings); buildSettings(); break;
       case 'help': show('help'); break;
-      case 'shop': G.shopFrom = G.screen; buildShop(); show('shop'); break;
+      case 'shop': if (G.screen === 'profiles') openShop(); else { G.shopFrom = G.screen; buildShop(); show('shop'); } break;
       case 'profiles': G.dressThen = null; buildProfiles(); show('profiles'); break;
       case 'stats': buildStats(); show('stats'); break;
       case 'history': buildHistory(); show('history'); break;

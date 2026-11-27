@@ -1,4 +1,4 @@
-# ⚽ Ballgames Physics – v3.8
+# ⚽ Ballgames Physics – v3.9
 
 Game thể thao ragdoll vui nhộn: 2 đội × 2 cầu thủ, mỗi đội chỉ **1 nút**.
 
@@ -41,7 +41,8 @@ Game thể thao ragdoll vui nhộn: 2 đội × 2 cầu thủ, mỗi đội ch�
 ## 🏆 Sau trận
 - 📊 Thống kê từng người + 🏅 MVP
 - 🎬 Highlight (bàn thắng, cứu thua, suýt vào) – tải về thành video MP4
-- 📜 Lịch sử trận · 🛒 Cửa hàng trang phục · ⚙️ Cài đặt vật lý · 🌙 Giao diện tối
+- 📜 Lịch sử trận · 🛒 Cửa hàng (18 mũ, 12 kiểu tóc, 12 áo, 14 quả bóng) · ⚙️ Cài đặt vật lý · 🌙 Giao diện tối
+- 👤 Người chơi: đổi tên, chọn đồ theo từng mục 🎩 Mũ · 💇 Tóc · 👕 Áo cho mỗi người, ⚽ Bóng dùng chung
 
 ## 🛠️ Cho người sửa game
 - Code nằm trong `www/`: `engine.js` (vật lý, bot), `game.js` (luồng game), `draw.js` (hình), `audio.js` (âm thanh). Mở `www/index.html` bằng Chrome là chơi được.
