@@ -12,7 +12,8 @@ VERSION_CODE="${VC_ENV:-$VERSION_CODE}"
 VERSION_NAME="${VN_ENV:-$VERSION_NAME}"
 OUT=build
 rm -rf "$OUT"; mkdir -p "$OUT/classes" "$OUT/assets/www"
-cp www/index.html www/engine.js www/audio.js www/meta.js www/draw.js www/highlights.js www/mp4.js www/game.js "$OUT/assets/www/"
+cp www/index.html www/engine.js www/audio.js www/meta.js www/draw.js www/highlights.js www/mp4.js www/net.js www/online.js www/game.js "$OUT/assets/www/"
+mkdir -p "$OUT/assets/www/vendor"; cp www/vendor/peerjs.min.js "$OUT/assets/www/vendor/"
 
 "$BT/aapt2" compile --dir android/res -o "$OUT/res.zip"
 "$BT/aapt2" link -o "$OUT/unsigned.apk" -I "$JAR" \

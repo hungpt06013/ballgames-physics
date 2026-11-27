@@ -986,6 +986,8 @@
       A.goalTop = top;
       A.segs[0].y1 = A.segs[1].y1 = top - 20; A.segs[0].y2 = A.segs[1].y2 = top;
     }
+    // the body parts come from the state alone (so a copied or received world steps exactly like the original)
+    for (i = 0; i < 4; i++) if (pl[i].active) shapes(pl[i]);
     for (i = 0; i < 4; i++) {
       p = pl[i];
       if (!p.active) continue;

@@ -3,6 +3,8 @@
     package="com.ballgames.physics">
 
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- online play (the devices connect to each other over the Internet) -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <!-- only Android 9 and older need it, to save highlight videos into Movies/Ballgames -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
 

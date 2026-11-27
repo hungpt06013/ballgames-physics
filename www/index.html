@@ -149,6 +149,27 @@
   .card.owned { background: var(--ok-soft2); } .card.eq { background: var(--ok-strong); outline: calc(0.6 * var(--u)) solid var(--green-d); }
   .card.locked { opacity: 0.6; }
   .profTop { margin-top: 0; }
+  /* online */
+  .btn.mode.wideMode { grid-column: 1 / -1; padding: calc(1.4 * var(--u)) calc(1 * var(--u)); font-size: calc(4.4 * var(--u)); }
+  .onIntro { font-weight: 700; font-size: calc(3.5 * var(--u)); line-height: 1.4; margin: 0 0 calc(1 * var(--u)); }
+  .onChoices { display: grid; grid-template-columns: 1fr 1fr; gap: calc(2 * var(--u)); align-items: stretch; margin-top: calc(1.4 * var(--u)); }
+  .onChoices .btn.big { margin: 0; }
+  .onJoin { display: flex; gap: calc(1 * var(--u)); }
+  .onJoin input { text-transform: uppercase; letter-spacing: 0.25em; text-align: center; font-size: calc(4.6 * var(--u)); font-weight: 900; min-width: 0; }
+  .onJoin .btn { flex: none; font-size: calc(3.8 * var(--u)); }
+  .onJoin input::placeholder { letter-spacing: 0.02em; text-transform: none; font-size: calc(3.6 * var(--u)); font-weight: 800; }
+  .onCode { font-size: calc(6 * var(--u)); letter-spacing: 0.18em; font-family: ui-monospace, Menlo, Consolas, monospace; vertical-align: middle; }
+  .onHead { margin-top: 0; }
+  .onSlots { display: grid; grid-template-columns: repeat(2, 1fr); gap: calc(1.2 * var(--u)); margin: calc(1 * var(--u)) 0; }
+  .onSlots.four { grid-template-columns: repeat(4, 1fr); }
+  .onSlot { border: calc(0.5 * var(--u)) solid var(--ink); border-radius: calc(2.6 * var(--u)); padding: calc(1 * var(--u)) calc(1.4 * var(--u)); background: var(--soft);
+    display: flex; flex-direction: column; gap: calc(0.3 * var(--u)); cursor: pointer; min-height: calc(15 * var(--u)); border-left-width: calc(2 * var(--u)); }
+  .onSlot .who { font-weight: 900; font-size: calc(3.6 * var(--u)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .onSlot .where { font-weight: 800; font-size: calc(2.7 * var(--u)); color: var(--muted); }
+  .onSlot .what { font-weight: 700; font-size: calc(2.6 * var(--u)); color: var(--muted); }
+  .onSlot.open { border-style: dashed; background: var(--paper); }
+  .onSlot.mine { background: var(--ok-soft); }
+  #onRules, #onHint { margin: calc(0.6 * var(--u)) 0; }
   #profiles .panel { width: min(96vw, calc(176 * var(--u))); padding-top: calc(2.2 * var(--u)); }
   #profiles h2 { font-size: calc(4.8 * var(--u)); margin-bottom: calc(1 * var(--u)); }
   /* the cards on the left, the outfit on the right (one above the other on a tall screen) */
@@ -279,6 +300,7 @@
       <button class="btn mode blue" data-act="setup" data-mode="bot">🤖 ĐẤU BOT<small>bạn vs máy</small></button>
       <button class="btn mode orange" data-act="setup" data-mode="ffa">🙋 4 NGƯỜI<small>mỗi người 1 con</small></button>
       <button class="btn mode green" data-act="setup" data-mode="team4">🤝 2 vs 2<small>đồng đội · bot</small></button>
+      <button class="btn mode purple wideMode" data-act="online">🌐 CHƠI ONLINE<small>với bạn bè ở máy khác · bằng mã phòng</small></button>
     </div>
     <div class="icons">
       <button class="btn" data-act="shop">🛒<small>Cửa hàng</small></button>
@@ -318,6 +340,35 @@
     <div class="tools">
       <button class="btn" data-act="back">← Quay lại</button>
       <button class="btn green" data-act="start">▶ BẮT ĐẦU</button>
+    </div>
+  </div>
+</div>
+
+<div id="online" class="overlay dim hidden">
+  <div class="panel wide">
+    <h2>🌐 Chơi online</h2>
+    <!-- not in a room yet: make one or join one with its code -->
+    <div id="onStart">
+      <p class="onIntro">Chơi với bạn bè ở máy khác qua Internet: một người <b>tạo phòng</b> rồi gửi <b>mã phòng</b> cho mọi người vào.</p>
+      <div class="row"><span>Tên của bạn: <b id="onName"></b></span><button class="chip" data-act="profiles">👤 Đổi tên / trang phục</button></div>
+      <div class="onChoices">
+        <button class="btn big green" id="onCreate">➕ Tạo phòng</button>
+        <div class="onJoin"><input id="onCode" class="name" maxlength="5" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Mã phòng" aria-label="Mã phòng"><button class="btn blue" id="onJoin">🔑 Vào phòng</button></div>
+      </div>
+      <p class="hint" id="onMsg"></p>
+    </div>
+    <!-- in a room: who plays where, the rules, start -->
+    <div id="onRoom" class="hidden">
+      <div class="row onHead"><span>Mã phòng <b class="onCode" id="onRoomCode">·····</b> <button class="chip" id="onCopy">📋 Chép mã</button></span><span class="hint" id="onStatus"></span></div>
+      <div class="row" id="onModeRow"><span>Chế độ</span><div class="seg" id="onMode"><button data-v="2p">👥 2 người</button><button data-v="ffa">🙋 4 người</button><button data-v="team4">🤝 2 vs 2</button></div></div>
+      <div class="onSlots" id="onSlots"></div>
+      <p class="hint" id="onHint"></p>
+      <p class="hint" id="onRules"></p>
+      <div class="tools">
+        <button class="btn" id="onLeave">← Rời phòng</button>
+        <button class="btn" id="onRulesBtn">⚙️ Luật trận</button>
+        <button class="btn green" id="onGo">▶ BẮT ĐẦU</button>
+      </div>
     </div>
   </div>
 </div>
@@ -485,6 +536,9 @@
 <script src="draw.js"></script>
 <script src="highlights.js"></script>
 <script src="mp4.js"></script>
+<script src="vendor/peerjs.min.js"></script>
+<script src="net.js"></script>
+<script src="online.js"></script>
 <script src="game.js"></script>
 </body>
 </html>
