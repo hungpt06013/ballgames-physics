@@ -13,7 +13,7 @@
   var FLASH_WORDS = { goal: 'VÀO! ✔', hoop: 'VÀO RỔ! ✔', posts: 'QUA CỘT! ✔', volley: 'CHẠM SÂN!', bomb: 'BÙM!' };
   var BOT_LOOK = { hat: 'none', hair: 'default', shirt: 'number' };
   var NO_SCORER = '#aab4bf';
-  var TOOL_SCREENS = ['menu', 'setup', 'settings', 'help', 'shop', 'profiles', 'stats', 'history', 'pause', 'over', 'vote', 'firstRun'];
+  var TOOL_SCREENS = ['menu', 'setup', 'settings', 'help', 'shop', 'profiles', 'stats', 'history', 'pause', 'over', 'vote', 'firstRun', 'online'];
   // weather & disasters: how often each comes (seconds, counted while nothing else is going on) and how long it lasts
   var WX = {
     fog: { name: 'Sương mù', icon: '🌫️', every: [5, 10], dur: 6 },
@@ -91,8 +91,10 @@
   function is4(mode) { return mode === 'ffa' || mode === 'team4'; }
   function soloish(mode) { return mode === 'bot' || mode === 'tutorial'; }
   function slotTeam(i) { return i < 2 ? 0 : 1; }
-  function slotColor(i) { return G.mode === 'ffa' ? Meta.color(i) : teamCol(slotTeam(i)); }
-  function nameOf(i) { return Meta.profile(i).name || ('P' + (i + 1)); }
+  function slotColor(i) { return G.mode === 'ffa' ? pCol(i) : teamCol(slotTeam(i)); }
+  function nameOf(i) { if (G.netNames) return G.netNames[i] || ('P' + (i + 1)); return Meta.profile(i).name || ('P' + (i + 1)); }
+  // a player's own jersey colour (4 players each on his own): in an online match the one he chose on his device
+  function pCol(i) { return G.netColors && G.netColors[i] ? G.netColors[i] : Meta.color(i); }
   function slotLabel(i) { var n = nameOf(i); return n === 'P' + (i + 1) ? n : 'P' + (i + 1) + ' · ' + n; }
 
   // ---------- canvas ----------
@@ -124,6 +126,7 @@
   function isBotSlot(i) { return !!G.bots[i]; }
   function keySlot(code) {
     if (code === 'Escape') return -1;
+    if (G.net && G.net.match) return G.net.slot;
     if (soloish(G.mode)) return 0;
     if (is4(G.mode)) { for (var i = 0; i < 4; i++) if (K4[i][code]) return redirect(i); return -1; }
     return P1K[code] ? redirect2(0) : (P2K[code] ? redirect2(1) : -1);
@@ -137,6 +140,7 @@
     return isBotSlot(o) ? -1 : o;
   }
   function pointSlot(x, y) {
+    if (G.net && G.net.match) return G.net.slot;
     if (soloish(G.mode)) return 0;
     var right = x >= window.innerWidth / 2;
     if (!is4(G.mode)) return redirect2(right ? 1 : 0);
@@ -390,7 +394,7 @@
   // "2 người": P1 and P2, each a whole side (two bodies in the side's kit, the name beside the score);
   // "4 người": P1-P4, one body each with the name tag over the head, in the 2 vs 2 kits or each in his own colour.
   // Every card is a small tall picture of the match look; tap one to dress that player.
-  var profSlot = 0, profPlayers = 2, profFour = 'team4', previewP = null;
+  var profSlot = 0, profPlayers = 2, profFour = 'team4', profTab = 'hat', previewP = null;
   function buildProfiles() {
     if (profSlot >= profPlayers) profSlot = 0;
     segSelect('profMode', profPlayers); segSelect('profFour', profFour);
@@ -408,35 +412,52 @@
         Meta.profile(i).name = v || ('P' + (i + 1)); Meta.save();
         drawCard(i); $('profFor').textContent = dressTitle();
       });
-      card.addEventListener('click', function (e) { if (e.target === inp || profSlot === i) return; profSlot = i; Snd.click(); buildDress(); markCards(); });
+      card.addEventListener('click', function (e) { if (e.target === inp || profSlot === i) return; profSlot = i; Snd.click(); if (profTab === 'ball') profTab = 'hat'; buildDress(); markCards(); drawCards(); });
       card.appendChild(cv); card.appendChild(inp); box.appendChild(card);
       drawCard(i);
     })(i);
     buildDress();
   }
   function markCards() { Array.prototype.forEach.call($('profCards').children, function (c, k) { c.classList.toggle('on', k === profSlot); }); }
-  function dressTitle() { return 'Trang phục của ' + slotLabel(profSlot); }
-  // the colours, hats, hair and shirts of the chosen player
+  var DRESS_TAB = { hat: 'Mũ', hair: 'Tóc', shirt: 'Áo', ball: 'Bóng' };
+  function dressTitle() { return profTab === 'ball' ? '⚽ Bóng dùng chung cho mọi người chơi' : DRESS_TAB[profTab] + ' của ' + slotLabel(profSlot); }
+  function dressOn(cat, id) { return cat === 'ball' ? Meta.D.ball === id : Meta.profile(profSlot)[cat] === id; }
+  // the chosen kind (hat, hair, shirt: of the chosen player; the ball: everybody's): what he has, and a way to the shop
   function buildDress() {
-    var pr = Meta.profile(profSlot);
+    var pr = Meta.profile(profSlot), cat = profTab, ball = cat === 'ball';
+    Array.prototype.forEach.call($('profTabs').children, function (b) { b.classList.toggle('on', b.dataset.tab === cat); });
     $('profFor').textContent = dressTitle();
-    $('profColorBox').classList.toggle('hidden', profPlayers !== 4);
+    $('profCards').classList.toggle('shared', ball);
+    $('profColorBox').classList.toggle('hidden', profPlayers !== 4 || cat !== 'shirt');
     var sw = $('profColors'); sw.innerHTML = '';
     Meta.COLORS.forEach(function (c, ci) {
       var b = document.createElement('button'); b.style.background = c.main; b.title = c.name; b.className = pr.color === ci ? 'on' : '';
       b.addEventListener('click', function () { pr.color = ci; Meta.save(); Snd.click(); if (profFour !== 'ffa') profFour = 'ffa'; buildProfiles(); });
       sw.appendChild(b);
     });
-    var items = $('profItems'); items.innerHTML = '';
-    ['hat', 'hair', 'shirt'].forEach(function (cat) {
-      Meta.SHOP[cat].forEach(function (it) {
-        if (!Meta.owns(cat, it.id)) return;
-        var b = document.createElement('button'); b.className = 'chip' + (pr[cat] === it.id ? ' on' : ''); b.textContent = it.icon + ' ' + it.name;
-        b.addEventListener('click', function () { Meta.equip(cat, it.id, profSlot); Snd.click(); buildDress(); for (var k = 0; k < profPlayers; k++) drawCard(k); });
-        items.appendChild(b);
-      });
+    var grid = $('profGrid'), left = 0; grid.innerHTML = '';
+    Meta.SHOP[cat].forEach(function (it) {
+      if (!Meta.owns(cat, it.id)) { left++; return; }
+      var on = dressOn(cat, it.id), card = document.createElement('div');
+      card.className = 'card' + (on ? ' eq' : ' owned'); card.dataset.id = it.id;
+      card.innerHTML = '<div class="ic">' + it.icon + '</div><div>' + it.name + '</div>' + (on ? '<div class="price">✔ Đang dùng</div>' : '');
+      card.addEventListener('click', function () { Meta.equip(cat, it.id, profSlot); Snd.click(); buildDress(); drawCards(); });
+      grid.appendChild(card);
     });
+    if (left) {
+      var more = document.createElement('div'); more.className = 'card more';
+      more.innerHTML = '<div class="ic">🛒</div><div>Mua thêm</div><div class="price">còn ' + left + ' món</div>';
+      more.addEventListener('click', function () { Snd.click(); openShop(); });
+      grid.appendChild(more);
+    }
   }
+  function drawCards() { for (var k = 0; k < profPlayers; k++) drawCard(k); }
+  // the shop from the player screen opens on the kind being chosen, for the player being dressed
+  function openShop() { shopTab = profTab; shopSlot = profSlot; G.shopFrom = 'profiles'; buildShop(); show('shop'); }
+  $('profTabs').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b || b.dataset.tab === profTab) return;
+    profTab = b.dataset.tab; Snd.click(); buildDress(); drawCards();
+  });
   $('profMode').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; profPlayers = +b.dataset.v; Snd.click(); buildProfiles(); });
   $('profFour').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; profFour = b.dataset.v; Snd.click(); buildProfiles(); });
   // one card: grass, the player's body (or the side's two bodies) as in a match, and his name as the match shows it
@@ -458,6 +479,12 @@
       D.player(c, p, { col: { main: col.main, dark: col.dark }, hat: pr.hat, hair: pr.hair, shirt: pr.shirt, num: two ? b.role + 1 : i + 1, face: 'happy',
         hairCol: b.id % 2 ? '#5b3a1f' : INK, armT: 0.6, mapId: 'soccer' });
     });
+    // choosing the ball: the same ball at everybody's feet
+    if (profTab === 'ball') {
+      var br = two ? 21 : 26, bx = Wc / 2 + face * (two ? 84 : 66);
+      c.fillStyle = 'rgba(0,0,0,0.16)'; c.beginPath(); c.ellipse(bx, gy + 2, br, 5, 0, 0, TAU); c.fill();
+      D.ball(c, { x: bx, y: gy - br, ang: 0.3 }, 'soccer', br, { skin: Meta.D.ball, t: 0 });
+    }
     c.font = '900 ' + fs + 'px ' + D.FONT; c.textAlign = 'center'; c.textBaseline = 'middle'; c.lineJoin = 'round';
     if (two) {
       // the top of the screen in a match: his score pill with the name beside it (toward the middle)
@@ -514,15 +541,15 @@
     Snd.init(); Snd.click();
     switch (b.dataset.act) {
       case 'setup': openSetup(b.dataset.mode); break;
-      case 'start': readFormat(true); readBomb(true); askDressThenStart(setupMode); break;
+      case 'start': readFormat(true); readBomb(true); if (G.netRules) netRulesDone(); else askDressThenStart(setupMode); break;
       case 'back': backFromScreen(); break;
       case 'settings': buildSettings(); show('settings'); break;
       case 'defaults':
         settings = Object.assign({}, E.DEFAULT_SETTINGS);
         store('settings', settings); buildSettings(); break;
       case 'help': show('help'); break;
-      case 'shop': G.shopFrom = G.screen; buildShop(); show('shop'); break;
-      case 'profiles': G.dressThen = null; buildProfiles(); show('profiles'); break;
+      case 'shop': if (G.screen === 'profiles') openShop(); else { G.shopFrom = G.screen; buildShop(); show('shop'); } break;
+      case 'profiles': G.dressThen = null; G.profFrom = G.screen; buildProfiles(); show('profiles'); break;
       case 'stats': buildStats(); show('stats'); break;
       case 'history': buildHistory(); show('history'); break;
       case 'hlWatch': if (G.lastHL) playHighlight(G.lastHL, 'over'); break;
@@ -534,11 +561,17 @@
       case 'resume': resume(); break;
       case 'restart': restart(); break;
       case 'toMenu': toMenu(); break;
+      case 'online': openOnline(); break;
+      case 'netRoom': netBackToRoom(); break;
+      case 'netLeave': netClose(); toMenu(); break;
     }
   });
   $('pauseBtn').addEventListener('click', function () { pauseGame(); });
   function backFromScreen() {
     if (G.screen === 'shop' && G.shopFrom === 'profiles') { buildProfiles(); show('profiles'); return; }
+    if (G.screen === 'setup' && G.netRules) { netRulesDone(); return; }
+    if (G.screen === 'profiles' && G.profFrom === 'online') { G.profFrom = null; netLookChanged(); openOnline(); return; }
+    if (G.screen === 'online' && G.net) { netAskLeave(); return; }
     // names / outfits changed on the way into a match: on to the match
     if (G.screen === 'profiles' && G.dressThen) { var m = G.dressThen; G.dressThen = null; show(null); startMatch({ mode: m }); return; }
     refreshMenu(); show('menu');
@@ -643,6 +676,7 @@
     if (is4(cfg.mode)) for (var i = 0; i < 4; i++) if (cfg.slots[i] === 'b') { G.botLv[i] = lvOf(cfg.levels, i); G.bots[i] = newBot(slotTeam(i), G.botLv[i], i); }
     if (cfg.mode === '2p') for (i = 0; i < 2; i++) if ((cfg.slots2 || [])[i] === 'b') { G.botLv[i] = lvOf(cfg.levels2, i); G.bots[i] = newBot(i, G.botLv[i], -1); }
     G.looks = matchLooks(); G.hlSettings = matchSettings();
+    if (G.net && G.net.host) netAnnounce();
     G.queue = makeQueue(true); G.qi = 0;
     clearInput();
     Snd.quiet = false;
@@ -652,6 +686,7 @@
   }
   function restart() {
     if (G.mode === 'tutorial') { startTutorial(); return; }
+    if (G.net && G.net.host) { netStartMatch(); return; } // (online: the room as it is now, bots for those who left)
     startMatch(G.cfg);
   }
   function startRound(serve) {
@@ -673,6 +708,8 @@
     for (var i = 0; i < 4; i++) { G.hold[i] = 0; latch[i] = false; }
     G.rec = new Recorder();
     Snd.setStyle(id); Snd.setCrowd(!!E.MAP_BY_ID[id].crowd);
+    G.view = null;
+    if (G.net && G.net.host && G.net.sess) netRound(id, mods);
   }
   function nextRound() {
     var last = G.queue[G.qi];
@@ -708,7 +745,7 @@
     var human = !soloish(G.mode) || team === G.me;
     G.scoreBefore = G.score.slice();
     if (G.mode === 'ffa') {
-      if (G.credit >= 0) { G.score[G.credit]++; col = Meta.color(G.credit); }
+      if (G.credit >= 0) { G.score[G.credit]++; col = pCol(G.credit); }
     } else if (G.mode === 'team4') {
       for (var i = 0; i < 4; i++) if (slotTeam(i) === team) G.score[i]++;
     } else G.score[team]++;
@@ -748,7 +785,7 @@
     if (people) { st.played++; st.byMode[mode] = (st.byMode[mode] || 0) + 1; }
     html = scoreHtml();
     if (mode === 'ffa') {
-      if (!draw) { txt = slotName(w) + ' THẮNG! 🏆'; color = textCol(Meta.color(w)); }
+      if (!draw) { txt = slotName(w) + ' THẮNG! 🏆'; color = textCol(pCol(w)); }
       reward += 5;
     } else if (mode === 'team4') {
       if (!draw) { var t = w < 2 ? 0 : 1; txt = 'ĐỘI ' + DEF_TEAM[t].name + ' THẮNG! 🏆'; color = textCol(teamCol(t)); }
@@ -784,6 +821,7 @@
     var tools = [['☰ Menu', 'toMenu']];
     if (hl) tools.push(['🎬 Xem highlight', 'hlWatch'], ['⬇️ Tải highlight', 'hlExport']);
     setOverButtons([['↻ CHƠI LẠI', 'restart']], tools);
+    if (G.net && G.net.host) { tools.splice(1, 0, ['🌐 Về phòng', 'netRoom']); setOverButtons([['↻ CHƠI LẠI', 'restart']], tools); netOver(txt, color, ms); }
     show('over');
     (prefs.hlAsked || !hl ? Promise.resolve() : askPolicy()).then(function () {
       return HL.addMatch(rec, hl, { mode: prefs.hlMode, keep: prefs.hlKeep });
@@ -817,21 +855,25 @@
     tools.forEach(function (x) { var b = document.createElement('button'); b.className = 'btn'; b.textContent = x[0]; b.dataset.act = x[1]; t.appendChild(b); });
   }
   function pauseGame() {
+    if (netGuest()) { netAskLeave(); return; } // (a guest can't stop everybody's match: he can leave it)
     if (!inGame() || G.state === 'replay') return;
     G.prev = G.state; G.state = 'paused'; clearInput();
+    if (netHosting()) G.net.sess.stop();
     show('pause');
   }
   function resume() {
     if (G.state !== 'paused') return;
     G.state = G.prev; G.acc = 0; clearInput();
+    if (netHosting() && G.state === 'play') G.net.sess.go(netRate());
     show(null);
   }
   function toMenu() {
+    netClose();
     G.state = 'menu'; resetBots(); G.mode = '2p'; G.hlm = null; G.hlw = null; G.ps = null;
     startDemo(); refreshMenu(); show('menu');
     G.fade = 1; G.fadeDir = -1;
   }
-  document.addEventListener('visibilitychange', function () { if (document.hidden) pauseGame(); });
+  document.addEventListener('visibilitychange', function () { if (document.hidden) { if (netGuest()) clearInput(); else pauseGame(); } });
   // Android back button (called from the native wrapper); returns true when handled
   window.__back = function () {
     if (dlg) { if (dlg.cancel !== undefined) dlg.close(dlg.cancel); return true; }
@@ -845,6 +887,543 @@
     if (G.screen && G.screen !== 'menu') { backFromScreen(); return true; }
     return false;
   };
+
+  // ---------- online ----------
+  // G.net: the room this device is in (null when not online).
+  //  host:  { host: true, room (BGOnline.Host), code, mode, slots: [{ who: 'host' | a guest's id | '', bot: '' | level }] x4,
+  //           me / people[id]: { name, hat, hair, shirt, color, ping }, match (a match is on), sess (BGNet.HostSession),
+  //           slot (this device's button) }
+  //  guest: { host: false, room (BGOnline.Guest), code, view (the room as the host sent it), match, sess
+  //           (BGNet.GuestSession), slot }
+  // In a match the host plays the real match (scores, weather, highlights); while a round is played every device shows
+  // its prediction (see net.js); between rounds the guests see the host's picture.
+  var NET_STATUS_MS = 100, NET_MIRROR_MS = 1000 / 30, NET_LOBBY_PING_MS = 700;
+  var NET_STATES = ['intro', 'play', 'scored', 'replay', 'paused'];
+  function netHosting() { return !!(G.net && G.net.host && G.net.match && G.net.sess); }
+  function netGuest() { return !!(G.net && !G.net.host && G.net.match && G.net.sess); }
+  function netSlots(mode) { return mode === '2p' ? 2 : 4; }
+  function netRate() { return (settings.speed || 1) * (G.world && G.world.arena.timeScale || 1); }
+  function netEdited() { if (netHosting()) G.net.sess.edited(); }
+  function cleanName(x) { return String(x == null ? '' : x).replace(/[<>]/g, '').slice(0, 10).trim(); }
+  function cleanText(x) { return String(x == null ? '' : x).slice(0, 80); }
+  function myLook() { var p = Meta.profile(0); return { name: cleanName(p.name) || 'P1', hat: p.hat, hair: p.hair, shirt: p.shirt, color: p.color }; }
+  // what a guest says he looks like: only things that exist
+  function cleanLook(l) {
+    l = l && typeof l === 'object' ? l : {};
+    var ok = function (cat, id, d) { return typeof id === 'string' && Meta.find(cat, id) ? id : d; };
+    var c = Math.floor(+l.color);
+    return { name: cleanName(l.name) || 'Khách', hat: ok('hat', l.hat, 'none'), hair: ok('hair', l.hair, 'default'), shirt: ok('shirt', l.shirt, 'plain'),
+      color: c >= 0 && c < Meta.COLORS.length ? c : 0, ping: 0 };
+  }
+  function netRulesText() {
+    var maps = prefs.maps.map(function (id) { return E.MAP_BY_ID[id] ? E.MAP_BY_ID[id].icon : ''; }).join('');
+    return 'Luật: ' + fmtFormat(fmtString()) + ' · ' + maps + (prefs.mods ? ' · 🎲 biến thể' : '') + (prefs.items ? ' · 🎁 vật phẩm' : '') +
+      (prefs.weather ? ' · ⛈️ thời tiết' : '') + (prefs.beginner ? ' · 🐣 người mới' : '');
+  }
+
+  // --- the online screen: make a room, join one, the room ---
+  function openOnline() {
+    if (!window.BGOnline || !window.BGNet || !BGOnline.available()) {
+      dialog('🌐 Chơi online', 'Máy này chưa chơi online được (trình duyệt cần hỗ trợ WebRTC). Hãy cập nhật trình duyệt / ứng dụng.', [['OK', 'ok']], 'ok');
+      return;
+    }
+    $('onName').textContent = myLook().name;
+    netShowRoom();
+    show('online');
+  }
+  $('onCreate').addEventListener('click', function () { Snd.init(); Snd.click(); if (!G.net) netCreate(); });
+  $('onJoin').addEventListener('click', function () { Snd.init(); Snd.click(); if (!G.net) netJoin($('onCode').value); });
+  $('onCode').addEventListener('input', function () { var v = BGOnline.cleanCode($('onCode').value); if (v !== $('onCode').value) $('onCode').value = v; $('onMsg').textContent = ''; });
+  $('onCode').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); if (!G.net) netJoin($('onCode').value); } });
+  $('onLeave').addEventListener('click', function () { Snd.click(); netAskLeave(); });
+  $('onCopy').addEventListener('click', function () {
+    Snd.click();
+    var code = G.net && G.net.code;
+    if (!code) return;
+    try { navigator.clipboard.writeText(code).then(function () { toast('Đã chép mã phòng ' + code); }, function () { toast('Mã phòng: ' + code); }); } catch (e) { toast('Mã phòng: ' + code); }
+  });
+  $('onMode').addEventListener('click', function (e) {
+    var b = e.target.closest('button'), n = G.net;
+    if (!b || !n || !n.host || n.match) return;
+    Snd.click(); netSetMode(b.dataset.v);
+  });
+  $('onRulesBtn').addEventListener('click', function () {
+    var n = G.net; if (!n || !n.host) return;
+    Snd.click(); G.netRules = true; openSetup(n.mode);
+    $('rowSlots').classList.add('hidden'); $('setupTitle').textContent = '⚙️ Luật trận online';
+    document.querySelector('#setup [data-act="start"]').textContent = '✔ Xong';
+  });
+  $('onGo').addEventListener('click', function () { var n = G.net; if (!n || !n.host || !n.code) return; Snd.init(); Snd.click(); netStartMatch(); });
+  function netRulesDone() {
+    G.netRules = false;
+    document.querySelector('#setup [data-act="start"]').textContent = '▶ BẮT ĐẦU';
+    if (G.net && G.net.host) netBroadcastRoom();
+    openOnline();
+  }
+  // the room on screen: the host's from its own data, a guest's from what the host sent
+  function netShowRoom() {
+    var n = G.net;
+    $('onStart').classList.toggle('hidden', !!n);
+    $('onRoom').classList.toggle('hidden', !n);
+    if (!n) return;
+    var v = n.host ? netHostView(null) : n.view;
+    $('onRoomCode').textContent = n.code || '·····';
+    $('onStatus').textContent = n.status || '';
+    $('onRulesBtn').classList.toggle('hidden', !n.host);
+    $('onGo').classList.toggle('hidden', !n.host);
+    $('onGo').disabled = !n.code;
+    $('onMode').classList.toggle('locked', !n.host);
+    var box = $('onSlots'); box.innerHTML = '';
+    if (!v) { $('onHint').textContent = 'Đang vào phòng…'; $('onRules').textContent = ''; return; }
+    segSelect('onMode', v.mode);
+    var ns = netSlots(v.mode), four = ns === 4;
+    box.classList.toggle('four', four);
+    for (var i = 0; i < ns; i++) (function (i) {
+      var s = v.slots[i] || {}, card = document.createElement('div'), col = four ? (v.mode === 'ffa' ? null : teamCol(slotTeam(i))) : teamCol(i);
+      card.className = 'onSlot' + (s.kind === 'open' ? ' open' : '') + (s.mine ? ' mine' : '');
+      var where = four ? 'P' + (i + 1) + ' · ' + (v.mode === 'ffa' ? 'mỗi người 1 đội' : (i < 2 ? 'đội đỏ' : 'đội xanh')) : (i === 0 ? '◀ bên trái (đỏ)' : 'bên phải (xanh) ▶');
+      var who = s.kind === 'open' ? '⏳ Đang chờ người vào…' : (s.kind === 'bot' ? '🤖 Bot ' + (LEVEL_LABEL[s.bot] || '') : (s.kind === 'host' ? '👑 ' : '🙋 ') + s.name + (s.mine ? ' (bạn)' : ''));
+      var what = s.kind === 'host' ? 'chủ phòng' : (s.kind === 'guest' ? (s.ping ? 'ping ' + s.ping + ' ms' : 'đã vào') :
+        (n.host ? 'chạm để đổi: trống → bot Dễ → Thường → Khó' : (s.kind === 'open' ? 'chạm để vào chỗ này' : 'bot đá chỗ này')));
+      [['where', where], ['who', who], ['what', what]].forEach(function (x) { var e = document.createElement('div'); e.className = x[0]; e.textContent = x[1]; card.appendChild(e); });
+      if (col) card.style.borderLeftColor = col.main;
+      else if (s.color >= 0 && Meta.COLORS[s.color]) card.style.borderLeftColor = Meta.COLORS[s.color].main;
+      card.addEventListener('click', function () {
+        if (n.host) { if (s.kind === 'open' || s.kind === 'bot') { Snd.click(); netCycleBot(i); } }
+        else if (s.kind === 'open') { Snd.click(); n.room.send({ t: 'want', slot: i }, true); }
+      });
+      box.appendChild(card);
+    })(i);
+    $('onHint').textContent = n.host ? (n.code ? 'Gửi mã phòng cho bạn bè để họ vào. Chỗ còn trống khi bắt đầu sẽ do bot đá.' : 'Đang mở phòng…') :
+      (v.playing ? 'Trận đang đá – chờ chút nhé.' : 'Chờ chủ phòng bắt đầu…');
+    $('onRules').textContent = v.rules || '';
+  }
+  // the room as a guest (forId) or the host (null) sees it
+  function netHostView(forId) {
+    var n = G.net, slots = [];
+    for (var i = 0; i < 4; i++) {
+      var s = n.slots[i], p = s.who === 'host' ? n.me : (s.who ? n.people[s.who] : null);
+      slots.push({ kind: s.who === 'host' ? 'host' : (s.who ? 'guest' : (s.bot ? 'bot' : 'open')), name: p ? p.name : '', bot: s.bot || '', color: p ? p.color : -1,
+        ping: p && s.who !== 'host' ? p.ping || 0 : 0, mine: forId ? s.who === forId : s.who === 'host' });
+    }
+    return { mode: n.mode, slots: slots, rules: netRulesText(), playing: !!n.match };
+  }
+  function netBroadcastRoom() {
+    var n = G.net;
+    if (!n || !n.host) return;
+    for (var id in n.people) n.room.send(id, { t: 'room', code: n.code, v: netHostView(id) }, true);
+    if (G.screen === 'online') netShowRoom();
+  }
+  function netSetMode(mode) {
+    var n = G.net, ns = netSlots(mode), who = [];
+    n.slots.forEach(function (s) { if (s.who) who.push(s.who); });
+    if (who.length > ns) { toast('Phòng đang có ' + who.length + ' người – chế độ này chỉ ' + ns + ' người'); return; }
+    n.mode = mode; prefs.onlineMode = mode; savePrefs();
+    for (var i = 0; i < 4; i++) { n.slots[i].who = who[i] || ''; if (who[i]) n.slots[i].bot = ''; }
+    netBroadcastRoom();
+  }
+  function netCycleBot(i) { var s = G.net.slots[i]; s.bot = { '': 'easy', easy: 'normal', normal: 'hard', hard: '' }[s.bot || '']; netBroadcastRoom(); }
+  function netFreeSlot() { var n = G.net, ns = netSlots(n.mode); for (var i = 0; i < ns; i++) if (!n.slots[i].who) return i; return -1; }
+  function netSlotOf(id) { var n = G.net; for (var i = 0; i < 4; i++) if (n.slots[i].who === id) return i; return -1; }
+
+  // --- the host ---
+  function netCreate() {
+    var mode = ['2p', 'ffa', 'team4'].indexOf(prefs.onlineMode) >= 0 ? prefs.onlineMode : '2p';
+    var n = G.net = { host: true, code: '', mode: mode, slots: [], people: {}, me: myLook(), status: 'Đang mở phòng…', match: false, sess: null, slot: 0 };
+    for (var i = 0; i < 4; i++) n.slots.push({ who: i === 0 ? 'host' : '', bot: '' });
+    n.room = new BGOnline.Host({
+      ready: function (code) { if (G.net !== n) return; n.code = code; n.status = 'Phòng đã mở'; netShowRoom(); },
+      join: function () { /* (he says who he is first: 'hello') */ },
+      message: function (id, m) { if (G.net === n) netHostMessage(id, m); },
+      leave: function (id) { if (G.net === n) netHostLeave(id); },
+      error: function (type) { if (G.net === n) netFail('Không mở được phòng (' + type + '). Kiểm tra mạng rồi thử lại.'); }
+    });
+    netShowRoom();
+  }
+  function netFail(msg) {
+    var n = G.net;
+    G.net = null; G.netNames = null; G.netColors = null; G.view = null;
+    try { if (n && n.room) n.room.close(); } catch (e) { /* gone */ }
+    if (G.state !== 'menu') toMenu();
+    openOnline();
+    $('onMsg').textContent = msg;
+  }
+  function netHostMessage(id, m) {
+    var n = G.net;
+    if (!m || typeof m !== 'object') return;
+    if (m.t === 'hello') {
+      if (m.v !== BGNet.VERSION) { n.room.send(id, { t: 'nope', why: 'version' }, true); return; }
+      if (n.match) { n.room.send(id, { t: 'nope', why: 'busy' }, true); return; }
+      var free = netFreeSlot();
+      if (free < 0) { n.room.send(id, { t: 'nope', why: 'full' }, true); return; }
+      n.people[id] = cleanLook(m.look);
+      n.slots[free].who = id; n.slots[free].bot = '';
+      toast('🙋 ' + n.people[id].name + ' đã vào phòng'); Snd.coin();
+      netBroadcastRoom();
+      return;
+    }
+    var p = n.people[id];
+    if (!p) return;
+    if (m.t === 'want') {
+      var k = Math.floor(+m.slot);
+      if (!n.match && k >= 0 && k < netSlots(n.mode) && !n.slots[k].who) {
+        n.slots.forEach(function (s) { if (s.who === id) s.who = ''; });
+        n.slots[k].who = id; n.slots[k].bot = '';
+        netBroadcastRoom();
+      }
+    } else if (m.t === 'ping') { p.ping = Math.max(0, Math.min(9999, Math.round(+m.ms) || 0)); netBroadcastRoom(); }
+    else if (m.t === 'look') { var l = cleanLook(m.look); l.ping = p.ping; n.people[id] = l; netBroadcastRoom(); }
+    else if (m.t === 'bye') n.room.drop(id);
+    else if (n.sess) n.sess.onMessage(id, m);
+    else if (m.t === 'pi') n.room.send(id, { t: 'po', i: m.i, T: 0, k: 1, r: -1, p: 0 }, false);
+  }
+  function netHostLeave(id) {
+    var n = G.net, p = n.people[id];
+    if (!p) return;
+    delete n.people[id];
+    for (var i = 0; i < 4; i++) if (n.slots[i].who === id) {
+      n.slots[i].who = '';
+      if (n.match && n.sess && i < n.sess.ns) {
+        // a bot plays on in his place
+        var ns = n.sess.ns;
+        n.slots[i].bot = 'normal'; G.botLv[i] = 'normal'; G.bots[i] = newBot(ns === 2 ? i : slotTeam(i), 'normal', ns === 2 ? -1 : i);
+        G.note = '👋 ' + p.name + ' đã rời phòng · bot đá thay'; G.noteT = 2.6;
+      }
+    }
+    if (n.sess) n.sess.removePeer(id);
+    toast('👋 ' + p.name + ' đã rời phòng');
+    netBroadcastRoom();
+  }
+  // ▶ BẮT ĐẦU in the room: a match for the people in it, bots in the other places
+  function netStartMatch() {
+    var n = G.net, ns = netSlots(n.mode), slots = [], levels = [];
+    for (var i = 0; i < 4; i++) { var s = n.slots[i]; slots.push(i < ns && s.who ? 'h' : 'b'); levels.push(s.bot || 'normal'); }
+    n.slot = netSlotOf('host');
+    var cfg = { mode: n.mode, online: true };
+    if (ns === 2) { cfg.slots2 = slots.slice(0, 2); cfg.levels2 = levels.slice(0, 2); } else { cfg.slots = slots; cfg.levels = levels; }
+    G.netNames = n.slots.map(function (x) { return x.who === 'host' ? n.me.name : (x.who && n.people[x.who] ? n.people[x.who].name : ''); });
+    G.netColors = n.slots.map(function (x, k) { var p = x.who === 'host' ? n.me : n.people[x.who]; return Meta.COLORS[p ? p.color : k] || Meta.COLORS[k]; });
+    show(null);
+    startMatch(cfg);
+  }
+  // (from startMatch) a match starts: its session, and every guest learns his button, the names and the looks
+  function netAnnounce() {
+    var n = G.net, ns = netSlots(G.mode), id;
+    n.match = true; n.statusT = 0; n.mirrorT = 0; n.lastSt = ''; n.viewW = E.emptyWorld();
+    n.sess = new BGNet.HostSession(ns, n.slot, function (pid, m, rel) { n.room.send(pid, m, rel); });
+    for (id in n.people) { var k = netSlotOf(id); n.sess.addPeer(id, k < ns ? k : -1); }
+    for (id in n.people) n.room.send(id, { t: 'start', ns: ns, you: netSlotOf(id), mode: G.mode, fmt: G.cfg.fmt, level: G.cfg.level, target: G.target, clock: G.clock,
+      score: G.score, looks: G.looks, names: G.netNames, colors: G.netColors, bots: G.bots.map(Boolean), botLv: G.botLv }, true);
+    netBroadcastRoom();
+  }
+  function netLooks() {
+    var n = G.net, four = is4(G.mode), out = [];
+    for (var i = 0; i < 4; i++) {
+      var team = slotTeam(i), k = four ? i : team, s = n.slots[k], p = s.who === 'host' ? n.me : (s.who ? n.people[s.who] : null);
+      var prof = p && !G.bots[k] ? p : BOT_LOOK, col = G.mode === 'ffa' ? pCol(i) : teamCol(team);
+      out.push({ hat: prof.hat, hair: prof.hair, shirt: prof.shirt, col: { main: col.main, dark: col.dark }, mark: { main: col.main, dark: col.dark }, label: four ? slotName(i) : '' });
+    }
+    return { four: four, ffa: G.mode === 'ffa', p: out, ball: Meta.D.ball };
+  }
+  // (from startRound) a new round for everybody
+  function netRound(id, mods) {
+    var n = G.net;
+    n.sess.round(G.round, G.world, { map: id, mods: mods, settings: matchSettings(), rate: netRate(), modName: G.modName });
+    n.statusT = 0;
+  }
+  // a frame of a round being played: the real match goes on as far as everybody's buttons are known; this device
+  // shows its prediction of the present
+  function netHostPlay(dt) {
+    var n = G.net, s = n.sess;
+    s.rate = netRate();
+    G.netPress = n.slot >= 0 ? humanPress(n.slot, G.world) : false;
+    s.frame(dt, G.netPress, netHostStep);
+    if (G.state === 'play' && s.world === G.world) {
+      G.view = s.view(dt, n.viewW);
+      var ev = s.pred.takeEvents();
+      for (var i = 0; i < ev.length; i++) eventFx(ev[i]);
+      pushTrails(G.view);
+    } else G.view = null;
+  }
+  // one real step: the bots choose (on the real match), then the step with everybody's official presses
+  function netHostStep(k) {
+    var w = G.world, s = G.net.sess;
+    for (var i = 0; i < s.ns; i++) if (G.bots[i]) s.botPress(i, updateBot(G.bots[i], w), k);
+    physicsStep(w, s.inputs(k), false, true);
+    return G.state !== 'play';
+  }
+  // every frame while in a room
+  function netTick() {
+    var n = G.net, now = performance.now();
+    if (n.host) {
+      if (!n.match || !n.sess) return;
+      var st = G.state;
+      if (NET_STATES.indexOf(st) < 0) return;
+      if (st !== n.lastSt || now - n.statusT >= NET_STATUS_MS) { n.statusT = now; n.lastSt = st; netSendStatus(st); }
+      // between rounds (the intro, after a point, the replay): the picture
+      if ((st === 'intro' || st === 'scored' || st === 'replay') && G.world && now - n.mirrorT >= NET_MIRROR_MS) {
+        n.mirrorT = now;
+        n.sess.each({ t: 'mf', r: G.round, d: BGNet.toText(BGNet.encode(G.world)) }, false);
+      }
+    } else if (!n.match && n.room && n.room.ok && now - (n.pingT || 0) >= NET_LOBBY_PING_MS) {
+      n.pingT = now; n.pingN = (n.pingN || 0) + 1; n.pings = n.pings || {}; n.pings[n.pingN] = now;
+      n.room.send({ t: 'pi', i: n.pingN }, false);
+    }
+  }
+  function netSendStatus(st) {
+    var n = G.net, wv = G.wxv || {};
+    if (G.note !== n.lastNote) { n.lastNote = G.note; n.noteId = (n.noteId || 0) + 1; }
+    n.sess.each({ t: 'st', s: st, sc: G.score, cl: Math.round(G.clock * 10) / 10, gd: G.golden ? 1 : 0, rd: G.round, mn: G.modName || '',
+      scr: G.scorer, cr: G.credit, gb: G.goalBall | 0, w: G.word || '', sb: G.sub || '', np: G.noPoint ? 1 : 0, ni: n.noteId || 0, nt: G.note || '', nT: G.noteT || 0,
+      wx: { f: wv.fog || 0, b: wv.bolt ? [wv.bolt.x, wv.bolt.y, wv.bolt.age] : 0, w: wv.warn ? [wv.warn.x, wv.warn.t] : 0, z: wv.zap || 0, zb: wv.zapBall | 0, bg: wv.bombGone ? 1 : 0 },
+      bt: G.bots.map(Boolean), bl: G.botLv }, false);
+  }
+  // (from endMatch) the result for the guests
+  function netOver(txt, color, ms) {
+    var n = G.net;
+    if (!n.sess) return;
+    n.sess.stop();
+    n.sess.each({ t: 'over', txt: txt || '', col: color || '', sc: G.score,
+      ms: ms ? { mvp: ms.mvp, list: ms.list.map(function (x) { return { n: x.n, g: x.g, s: x.s, sh: x.sh, t: x.t, o: x.o, r: x.r }; }) } : null }, true);
+  }
+  // 🌐 Về phòng: from the result back to the room (everybody)
+  function netBackToRoom() {
+    var n = G.net;
+    if (!n) { toMenu(); return; }
+    if (n.host) for (var id in n.people) n.room.send(id, { t: 'lobby' }, true);
+    netLobbyScreen();
+    netBroadcastRoom();
+  }
+  function netLobbyScreen() {
+    if (G.net) { G.net.match = false; G.net.sess = null; }
+    G.state = 'menu'; resetBots(); G.mode = '2p'; G.hlm = null; G.hlw = null; G.ps = null; G.view = null; G.netNames = null; G.netColors = null;
+    startDemo(); refreshMenu(); openOnline();
+    G.fade = 1; G.fadeDir = -1;
+  }
+  // leaving the room (and the match): the others are told
+  function netClose() {
+    var n = G.net;
+    if (!n) return;
+    G.net = null; G.netNames = null; G.netColors = null; G.view = null;
+    try {
+      if (n.host) { for (var id in n.people) n.room.send(id, { t: 'bye' }, true); }
+      else n.room.send({ t: 'bye' }, true);
+    } catch (e) { /* gone */ }
+    setTimeout(function () { try { n.room.close(); } catch (e) { /* gone */ } }, 300);
+  }
+  function netAskLeave() {
+    var n = G.net;
+    if (!n) { toMenu(); return; }
+    var txt = n.host ? (n.match ? 'Trận online sẽ dừng với mọi người.' : 'Phòng sẽ đóng lại với mọi người.') : (n.match ? 'Bạn sẽ rời trận này (bot đá thay bạn).' : 'Bạn sẽ rời phòng này.');
+    dialog('🌐 Rời phòng?', txt, [['Ở lại', 'stay'], ['🚪 Rời phòng', 'leave', 'red']], 'stay').then(function (v) { if (v === 'leave') { netClose(); toMenu(); } });
+  }
+  // my name / outfit changed (in the player screen, from the room)
+  function netLookChanged() {
+    var n = G.net;
+    if (!n) return;
+    if (n.host) { n.me = myLook(); netBroadcastRoom(); } else n.room.send({ t: 'look', look: myLook() }, true);
+  }
+
+  // --- a guest ---
+  function netJoin(code) {
+    code = BGOnline.cleanCode(code);
+    if (code.length !== BGOnline.CODE_LEN) { $('onMsg').textContent = 'Mã phòng gồm ' + BGOnline.CODE_LEN + ' ký tự (chữ và số).'; return; }
+    var n = G.net = { host: false, code: code, view: null, status: 'Đang vào phòng ' + code + '…', match: false, sess: null, slot: -1 };
+    n.room = new BGOnline.Guest(code, {
+      open: function () { if (G.net !== n) return; n.status = 'Đã vào phòng'; n.room.send({ t: 'hello', v: BGNet.VERSION, look: myLook() }, true); netShowRoom(); },
+      message: function (m) { if (G.net === n) netGuestMessage(m); },
+      close: function (why) { if (G.net === n) netGuestClosed(why); }
+    });
+    netShowRoom();
+  }
+  function netGuestClosed(why) {
+    var n = G.net;
+    G.net = null; G.netNames = null; G.netColors = null; G.view = null;
+    var msg = n.nope || (why === 'nohost' ? 'Không có phòng ' + n.code + ' – kiểm tra lại mã phòng.' :
+      (why === 'timeout' ? 'Không kết nối được tới phòng ' + n.code + '. Kiểm tra mạng rồi thử lại.' : 'Mất kết nối với chủ phòng (hoặc chủ phòng đã đóng phòng).'));
+    var wasIn = n.match || !!n.view;
+    if (G.state !== 'menu') toMenu();
+    openOnline();
+    $('onMsg').textContent = msg;
+    if (wasIn) dialog('🌐 Chơi online', msg, [['OK', 'ok']], 'ok');
+  }
+  function netGuestMessage(m) {
+    var n = G.net, now = performance.now();
+    if (!m || typeof m !== 'object') return;
+    switch (m.t) {
+      case 'room':
+        if (m.v && typeof m.v === 'object' && Array.isArray(m.v.slots)) {
+          n.view = { mode: ['2p', 'ffa', 'team4'].indexOf(m.v.mode) >= 0 ? m.v.mode : '2p', rules: cleanText(m.v.rules), playing: !!m.v.playing,
+            slots: m.v.slots.slice(0, 4).map(function (x) { x = x || {}; return { kind: ['host', 'guest', 'bot', 'open'].indexOf(x.kind) >= 0 ? x.kind : 'open',
+              name: cleanName(x.name), bot: okLevel(x.bot) ? x.bot : '', ping: Math.round(+x.ping) || 0, color: Math.floor(+x.color), mine: !!x.mine }; }) };
+          if (typeof m.code === 'string') n.code = BGOnline.cleanCode(m.code);
+          if (G.screen === 'online') netShowRoom();
+        }
+        break;
+      case 'nope':
+        n.nope = m.why === 'full' ? 'Phòng đã đủ người.' : (m.why === 'busy' ? 'Phòng đang đá – chờ trận xong rồi vào lại nhé.' : 'Game của bạn khác phiên bản với chủ phòng – hãy cập nhật game.');
+        n.room.close();
+        break;
+      case 'bye': n.room.close(); break;
+      case 'start': netGuestStart(m); break;
+      case 'st': if (netGuest()) netGuestStatus(m); break;
+      case 'mf':
+        if (netGuest() && m.r === n.sess.r && n.mirW && typeof m.d === 'string') {
+          try { BGNet.decode(n.mirW, BGNet.fromText(m.d)); n.mirOk = true; } catch (e) { /* a broken message */ }
+        }
+        break;
+      case 'over': if (netGuest()) netGuestOver(m); break;
+      case 'lobby': netLobbyScreen(); break;
+      case 'po':
+        if (m.r === -1 || !n.sess) {
+          var t0 = n.pings && n.pings[m.i];
+          if (t0) { delete n.pings[m.i]; n.room.send({ t: 'ping', ms: Math.round(now - t0) }, false); }
+          break;
+        }
+        n.sess.onMessage(m, now);
+        break;
+      default:
+        if (!n.sess) break;
+        try { n.sess.onMessage(m, now); } catch (e) { break; } // (a broken message)
+        if (m.t === 'round' && n.sess.r === m.r && n.sess.base) netGuestRound(m);
+    }
+  }
+  function netMakeWorld(info) {
+    var map = info && E.MAP_BY_ID[info.map] ? info.map : 'soccer';
+    var w = E.createWorld(map, info && info.settings ? info.settings : null, 1, info && info.mods && typeof info.mods === 'object' ? info.mods : {});
+    w.events = null;
+    return w;
+  }
+  function netGuestStart(m) {
+    var n = G.net, ns = m.ns === 2 ? 2 : 4, you = Math.floor(+m.you);
+    n.match = true; n.slot = you >= 0 && you < ns ? you : -1; n.mirOk = false; n.dispOk = false; n.noteId = -1; n.mirW = null; n.dispW = null;
+    n.sess = new BGNet.GuestSession(ns, n.slot, function (msg, rel) { n.room.send(msg, rel); }, netMakeWorld);
+    n.viewW = E.emptyWorld();
+    G.mode = ['2p', 'ffa', 'team4'].indexOf(m.mode) >= 0 ? m.mode : '2p';
+    G.cfg = { mode: G.mode, fmt: /^[pt]\d+$/.test(m.fmt) ? m.fmt : 'p5', level: okLevel(m.level) ? m.level : 'normal', maps: [], online: true };
+    G.demo = false; G.round = 0; G.earned = 0; G.golden = false; G.matchT = 0; G.roundT = 0;
+    G.score = Array.isArray(m.score) ? m.score.slice(0, 4).map(Number) : (is4(G.mode) ? [0, 0, 0, 0] : [0, 0]);
+    G.target = +m.target || 0; G.clock = +m.clock || 0;
+    G.netNames = (Array.isArray(m.names) ? m.names : []).slice(0, 4).map(cleanName);
+    G.netColors = [0, 1, 2, 3].map(function (k) { var c = Array.isArray(m.colors) ? m.colors[k] : null; return c && /^#[0-9a-f]{6}$/i.test(c.main) && /^#[0-9a-f]{6}$/i.test(c.dark) ? { main: c.main, dark: c.dark } : Meta.COLORS[k]; });
+    resetBots();
+    (Array.isArray(m.bots) ? m.bots : []).slice(0, 4).forEach(function (b, i) { if (b) { G.bots[i] = { reset: function () {} }; G.botLv[i] = okLevel((m.botLv || [])[i]) ? m.botLv[i] : 'normal'; } });
+    G.looks = netCleanLooks(m.looks);
+    G.hlm = null; G.hlw = null; G.ps = null; G.rec = null; G.cf = null; G.lastHL = null; G.replay = null;
+    G.state = 'intro'; G.view = null; G.trails = [[], []]; G.flash = null; G.noPoint = ''; G.scorer = -1; G.credit = -1; G.note = ''; G.noteT = 0;
+    G.wxv = { fog: 0, bolt: null, warn: null, zap: 0, bombGone: false };
+    clearInput(); Snd.quiet = false;
+    show(null);
+    G.fade = 1; G.fadeDir = -1;
+  }
+  function netCleanLooks(L) {
+    var out = [], ok = function (cat, id, d) { return typeof id === 'string' && Meta.find(cat, id) ? id : d; };
+    var hex = function (c, d) { return typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c) ? c : d; };
+    for (var i = 0; i < 4; i++) {
+      var x = L && Array.isArray(L.p) && L.p[i] ? L.p[i] : {}, tc = teamCol(slotTeam(i));
+      var col = { main: hex(x.col && x.col.main, tc.main), dark: hex(x.col && x.col.dark, tc.dark) };
+      out.push({ hat: ok('hat', x.hat, 'none'), hair: ok('hair', x.hair, 'default'), shirt: ok('shirt', x.shirt, 'plain'), col: col,
+        mark: { main: hex(x.mark && x.mark.main, col.main), dark: hex(x.mark && x.mark.dark, col.dark) }, label: cleanName(x.label) });
+    }
+    return { four: is4(G.mode), ffa: G.mode === 'ffa', p: out, ball: L && typeof L.ball === 'string' && Meta.find('ball', L.ball) ? L.ball : 'classic' };
+  }
+  function netGuestRound(m) {
+    var n = G.net, info = m.info || {};
+    n.mirW = netMakeWorld(info); n.dispW = netMakeWorld(info); n.mirOk = false; n.dispOk = false;
+    try { BGNet.decode(n.mirW, BGNet.fromText(m.d)); n.mirOk = true; } catch (e) { /* a broken message */ }
+    G.world = n.sess.base; G.view = null; G.round = m.r;
+    G.modName = cleanText(info.modName); G.trails = [[], []]; G.roundT = 0;
+    G.wxv = { fog: 0, bolt: null, warn: null, zap: 0, bombGone: false };
+    var map = E.MAP_BY_ID[info.map] ? info.map : 'soccer';
+    Snd.setStyle(map); Snd.setCrowd(!!E.MAP_BY_ID[map].crowd);
+    G.fade = 1; G.fadeDir = -1;
+  }
+  function netGuestStatus(m) {
+    var n = G.net, prev = G.state, s = m.s;
+    if (NET_STATES.indexOf(s) < 0) return;
+    G.state = s;
+    if (Array.isArray(m.sc)) G.score = m.sc.slice(0, 4).map(Number);
+    G.clock = +m.cl || 0; G.golden = !!m.gd; G.modName = cleanText(m.mn);
+    G.scorer = m.scr === 0 || m.scr === 1 ? m.scr : -1; G.credit = Math.floor(+m.cr); G.goalBall = m.gb === 1 ? 1 : 0;
+    G.word = cleanText(m.w); G.sub = cleanText(m.sb); G.noPoint = m.np ? 'x' : '';
+    if (m.ni !== n.noteId) { n.noteId = m.ni; G.note = cleanText(m.nt); G.noteT = Math.min(5, +m.nT || 0); }
+    var wx = m.wx || {}, bolt = Array.isArray(wx.b) ? { x: +wx.b[0], y: +wx.b[1], age: +wx.b[2] } : null;
+    if (bolt && (!G.wxv.bolt || bolt.age < G.wxv.bolt.age)) { Snd.thunder(); G.screenFlash = 0.7; G.shake = Math.max(G.shake, 0.6); sparks(bolt.x, bolt.y, 16, '#fff6a0'); }
+    G.wxv = { fog: +wx.f || 0, bolt: bolt, warn: Array.isArray(wx.w) ? { x: +wx.w[0], t: +wx.w[1] } : null, zap: +wx.z || 0, zapBall: wx.zb === 1 ? 1 : 0, bombGone: !!wx.bg };
+    if (Array.isArray(m.bt)) m.bt.slice(0, 4).forEach(function (b, i) { if (b && !G.bots[i]) { G.bots[i] = { reset: function () {} }; G.botLv[i] = okLevel((m.bl || [])[i]) ? m.bl[i] : 'normal'; } });
+    if (prev === s) return;
+    if (s === 'play' && prev === 'intro') Snd.whistle();
+    if (s === 'scored' && prev === 'play') {
+      Snd.whistle();
+      if (G.scorer >= 0) {
+        Snd.cheer(); G.shake = 1; G.excite = 1;
+        var b = G.world && (G.world.balls[G.goalBall] || G.world.ball);
+        if (b) confetti(b.x, b.y, G.scorer, G.mode === 'ffa' && G.credit >= 0 ? pCol(G.credit) : null);
+      }
+    }
+    if (s === 'paused') toast('⏸ Chủ phòng đang tạm dừng');
+  }
+  // a guest's frame in a match: his button, then the prediction while a round is played, otherwise the host's picture
+  function netGuestUpdate(dt) {
+    var n = G.net, s = n.sess, now = performance.now();
+    var press = G.netPress = n.slot >= 0 && G.state === 'play' && G.world ? humanPress(n.slot, G.world) : false;
+    s.frame(dt, now, press);
+    if (G.state === 'paused' || G.state === 'over') return; // (the picture stands still)
+    if (G.state === 'play' && s.playing && s.base && n.viewW) {
+      G.view = s.view(dt, n.viewW); G.world = G.view;
+      var ev = s.pred.takeEvents();
+      for (var i = 0; i < ev.length; i++) eventFx(ev[i]);
+      if (n.dispW) { E.copyWorld(n.dispW, G.view); n.dispOk = true; } // (after a point the picture moves on from here)
+      G.roundT += dt; G.matchT += dt;
+      redropTick();
+    } else if (n.mirOk && n.dispW) {
+      netFollow(dt);
+      G.world = n.dispW; G.view = null;
+    }
+    if (G.world) pushTrails(G.world);
+  }
+  // between rounds: the picture follows the host's (about 30 a second) smoothly
+  function netFollow(dt) {
+    var n = G.net, a = n.dispW, b = n.mirW, k = Math.min(1, dt * 16), i;
+    if (!n.dispOk) { E.copyWorld(a, b); n.dispOk = true; for (i = 0; i < 4; i++) if (a.players[i].active) E.shapes(a.players[i]); return; }
+    var old = [], nb = a.balls.length;
+    a.players.forEach(function (p) { old.push(p.x, p.y, p.a, p.leg); });
+    a.balls.forEach(function (q) { old.push(q.x, q.y); });
+    E.copyWorld(a, b);
+    for (i = 0; i < 4; i++) {
+      var p = a.players[i], o = i * 4, dx = p.x - old[o], dy = p.y - old[o + 1];
+      if (dx * dx + dy * dy < 250 * 250) {
+        var da = p.a - old[o + 2];
+        while (da > Math.PI) da -= TAU;
+        while (da < -Math.PI) da += TAU;
+        p.x = old[o] + dx * k; p.y = old[o + 1] + dy * k; p.a = old[o + 2] + da * k; p.leg = old[o + 3] + (p.leg - old[o + 3]) * k;
+      }
+      if (p.active) E.shapes(p);
+    }
+    if (a.balls.length === nb) for (i = 0; i < nb; i++) {
+      var q = a.balls[i], j = 16 + i * 2, bx = q.x - old[j], by = q.y - old[j + 1];
+      if (bx * bx + by * by < 250 * 250) { q.x = old[j] + bx * k; q.y = old[j + 1] + by * k; }
+    }
+  }
+  function netGuestOver(m) {
+    G.state = 'over'; G.view = null;
+    Snd.setCrowd(false); Snd.whistle();
+    if (Array.isArray(m.sc)) G.score = m.sc.slice(0, 4).map(Number);
+    $('resultText').textContent = cleanText(m.txt);
+    $('resultText').style.color = typeof m.col === 'string' && /^#[0-9a-f]{6}$/i.test(m.col) ? m.col : '';
+    $('resultScore').innerHTML = scoreHtml();
+    var st = Meta.stats(); st.played++; st.byMode.online = (st.byMode.online || 0) + 1; Meta.save();
+    Meta.addCoins(5); Snd.coin();
+    $('resultReward').textContent = '+5 🪙';
+    var box = $('resultStats'); box.innerHTML = '';
+    if (m.ms && Array.isArray(m.ms.list) && m.ms.list.length) {
+      var list = m.ms.list.slice(0, 4).map(function (x) { x = x || {}; return { n: cleanName(x.n) || '?', g: x.g | 0, s: x.s | 0, sh: x.sh | 0, t: x.t | 0, o: x.o | 0, r: +x.r || 0 }; });
+      var mvp = Math.floor(+m.ms.mvp);
+      box.appendChild(statsTable({ list: list, mvp: mvp >= 0 && mvp < list.length ? mvp : 0 }, G.mode));
+    }
+    setOverButtons([['⏳ Chờ chủ phòng chơi lại…', 'noop']], [['🚪 Rời phòng', 'netLeave']]);
+    show('over');
+  }
 
   // ---------- tutorial ----------
   var TUT = [
@@ -1042,7 +1621,7 @@
   // in the replay, the moment the ball goes in gets a burst around the ball and a small label
   function goalFlash() {
     var w = G.world, b = w.balls[G.goalBall] || w.ball;
-    var col = G.noPoint ? ZAP_COL : (G.mode === 'ffa' && G.credit >= 0 ? Meta.color(G.credit) : teamCol(G.scorer));
+    var col = G.noPoint ? ZAP_COL : (G.mode === 'ffa' && G.credit >= 0 ? pCol(G.credit) : teamCol(G.scorer));
     burst(b.x, b.y, G.noPoint ? '⚡ SÉT!' : (FLASH_WORDS[w.arena.type] || 'VÀO!'), col, w.arena.P.ballR);
   }
   // rings, sparks and a short label around the ball (the moment of a goal or a save in a replay or highlight)
@@ -1052,7 +1631,7 @@
     sparks(x, y, 14, '#ffd23f');
     sfx('star', 0);
   }
-  function skipReplay() { if (G.state === 'replay') endReplay(); }
+  function skipReplay() { if (G.state === 'replay' && !netGuest()) endReplay(); }
   function endReplay() {
     G.replay = null; G.state = 'scored'; G.timer = 0; G.flash = null;
     if (matchWinner() >= 0) endMatch(); else { G.fadeDir = 1; show(null); }
@@ -1079,6 +1658,7 @@
   function startPhenomenon(w, id) {
     var wx = G.wx;
     wx.active[id] = WX[id].dur;
+    netEdited();
     if (id === 'quake') { E.startQuake(w, WX.quake.dur); Snd.rumble(); wx.rumbleT = 1.4; w.events.push({ t: 'rumble' }); }
     else if (id === 'tornado') { E.startTornado(w, Math.floor(Math.random() * 4) * W / 4 + W / 8, WX.tornado.dur); Snd.whoosh(); w.events.push({ t: 'whoosh' }); }
     else if (id === 'lightning') {
@@ -1092,6 +1672,7 @@
   }
   function doStrike(w, x) {
     var wx = G.wx, hit = E.strike(w, x), i;
+    netEdited();
     wx.bolt = { x: hit.x, y: hit.y, age: 0 };
     wx.strikeK = G.rec ? G.rec.n : -1; wx.strikeT = w.time;
     G.screenFlash = 0.7; G.shake = Math.max(G.shake, 0.6);
@@ -1555,7 +2136,7 @@
     cols.forEach(function (c) { var h = el('span', 'ph', c[0]); h.title = c[2]; box.appendChild(h); });
     ms.list.forEach(function (x, i) {
       var mvp = i === ms.mvp, nm = el('span', 'pn' + (mvp ? ' mvp' : ''), (mvp ? '🏅 ' : '') + x.n);
-      nm.style.color = textCol(mode === 'ffa' ? Meta.color(i) : teamCol(mode === 'team4' ? slotTeam(i) : i));
+      nm.style.color = textCol(mode === 'ffa' ? pCol(i) : teamCol(mode === 'team4' ? slotTeam(i) : i));
       box.appendChild(nm);
       cols.forEach(function (c) { box.appendChild(el('span', 'pv' + (mvp ? ' mvp' : '') + (c[1] === 'r' ? ' pr' : ''), c[1] === 'r' ? fmtRating(x.r) : String(x[c[1]]))); });
     });
@@ -1739,9 +2320,9 @@
     if (G.mode === '2p') return [0, 1].filter(function (i) { return !G.bots[i]; });
     return [0, 1, 2, 3].filter(function (i) { return !G.bots[i]; });
   }
-  function voterCol(id) { return G.mode === 'ffa' ? Meta.color(id) : teamCol(G.mode === '2p' ? id : (G.mode === 'bot' ? G.me : slotTeam(id))); }
+  function voterCol(id) { return G.mode === 'ffa' ? pCol(id) : teamCol(G.mode === '2p' ? id : (G.mode === 'bot' ? G.me : slotTeam(id))); }
   function scoreHtml() {
-    if (G.mode === 'ffa') return [0, 1, 2, 3].map(function (i) { return scoreSpan(Meta.color(i), esc(nameOf(i)) + ': ' + G.score[i]); }).join(' · ');
+    if (G.mode === 'ffa') return [0, 1, 2, 3].map(function (i) { return scoreSpan(pCol(i), esc(nameOf(i)) + ': ' + G.score[i]); }).join(' · ');
     if (G.mode === 'team4') return '<span class="r">' + esc(nameOf(0) + '+' + nameOf(1)) + ' ' + G.score[0] + '</span> – <span class="b">' + G.score[2] + ' ' + esc(nameOf(2) + '+' + nameOf(3)) + '</span>';
     if (G.mode === '2p') return '<span class="r">' + G.score[0] + '</span> – <span class="b">' + G.score[1] + '</span>';
     return scoreSpan(teamCol(0), G.score[0]) + ' – ' + scoreSpan(teamCol(1), G.score[1]);
@@ -2314,30 +2895,41 @@
         if (G.me) { pr[0] = pr[1] = bl; pr[2] = pr[3] = r; } else { pr[0] = pr[1] = r; pr[2] = pr[3] = bl; }
       }
       if (celebrate) for (k = 0; k < 4; k++) pr[k] = w.players[k].team === G.scorer ? ((w.time * 1.5 + k * 0.37) % 1) < 0.12 : false;
-      if (G.cf && G.hlw && G.state === 'play' && !celebrate) G.cf.push(w, pr); // (to replay the last seconds without a save's press)
-      var sc = E.stepPlayers(w, pr);
-      // when each player last did something (saves): a press that counts - not one that only woke him, nor a button
-      // held down past its time
-      if (!celebrate && G.hlw) for (k = 0; k < 4; k++) if (w.players[k].press) G.pressT[k] = w.time;
-      handleEvents(w);
-      if (!G.demo) weatherStep(w);
-      if (G.mode === 'tutorial') tutorialTick(DT, w);
-      if (!G.demo && G.rec && (G.state === 'play' || G.state === 'scored')) G.rec.push(w);
-      if (G.hlw && G.state === 'play') watchSaves(w);
-      if (G.ps && G.state === 'play') countTouches(w);
-      for (var bi = 0; bi < w.balls.length && bi < 2; bi++) {
-        var tr = G.trails[bi]; tr.push(w.balls[bi].x, w.balls[bi].y);
-        if (tr.length > 20) tr.splice(0, 2);
-      }
-      w.events.length = 0;
-      if (sc >= 0 && (G.state === 'play' || G.demo) && G.mode !== 'tutorial') onScore(sc);
+      physicsStep(w, pr, celebrate, false);
       if (G.state !== 'play' && G.state !== 'scored' && !G.demo) break;
     }
     if (n >= 10) G.acc = 0;
   }
+  // one physics step of the match with these presses, and everything that follows from it (sounds, weather, the
+  // recording, saves, the score). quiet: an online host's real match - its sounds and ball trails come from what
+  // is shown (the prediction), not from here.
+  function physicsStep(w, pr, celebrate, quiet) {
+    var k;
+    if (G.cf && G.hlw && G.state === 'play' && !celebrate) G.cf.push(w, pr); // (to replay the last seconds without a save's press)
+    var sc = E.stepPlayers(w, pr);
+    // when each player last did something (saves): a press that counts - not one that only woke him, nor a button
+    // held down past its time
+    if (!celebrate && G.hlw) for (k = 0; k < 4; k++) if (w.players[k].press) G.pressT[k] = w.time;
+    handleEvents(w, quiet);
+    if (!G.demo) weatherStep(w);
+    if (G.mode === 'tutorial') tutorialTick(DT, w);
+    if (!G.demo && G.rec && (G.state === 'play' || G.state === 'scored')) G.rec.push(w);
+    if (G.hlw && G.state === 'play') watchSaves(w);
+    if (G.ps && G.state === 'play') countTouches(w);
+    if (!quiet) pushTrails(w);
+    w.events.length = 0;
+    if (sc >= 0 && (G.state === 'play' || G.demo) && G.mode !== 'tutorial') onScore(sc);
+  }
+  function pushTrails(w) {
+    for (var bi = 0; bi < w.balls.length && bi < 2; bi++) {
+      var tr = G.trails[bi]; tr.push(w.balls[bi].x, w.balls[bi].y);
+      if (tr.length > 20) tr.splice(0, 2);
+    }
+  }
 
   // the screen has gone fully white: what comes next depends on the state the fade was started from
   function fadedOut() {
+    if (netGuest()) { G.fadeDir = -1; return; }
     if (G.state === 'scored' || G.state === 'replay') nextRound();
     else if (G.state === 'highlight') hlAdvance();
     else G.fadeDir = -1; // nothing to switch to: the picture just comes back
@@ -2359,6 +2951,8 @@
     if (G.noteT > 0) G.noteT -= dt;
     if (G.state === 'play' || G.state === 'scored' || playback()) weatherFrame(dt);
     updateParticles(dt);
+    if (G.net) netTick();
+    if (netGuest()) { netGuestUpdate(dt); return; }
     switch (G.state) {
       case 'menu':
         runPhysics(dt);
@@ -2366,7 +2960,7 @@
         return;
       case 'intro':
         G.timer -= dt;
-        if (G.timer <= 0) { G.state = 'play'; Snd.whistle(); }
+        if (G.timer <= 0) { G.state = 'play'; Snd.whistle(); if (netHosting()) G.net.sess.go(netRate()); }
         return;
       case 'scored':
         G.timer -= dt;
@@ -2401,11 +2995,12 @@
           if (G.clock === 0 && before > 0) {
             Snd.buzzer();
             if (uniqueLeader() >= 0) { endMatch(); return; }
-            startVote(); return;
+            if (G.net) { G.golden = true; G.note = '⭐ BÀN VÀNG – ai ghi trước thì thắng!'; G.noteT = 2.4; } // (online: no vote, golden goal)
+            else { startVote(); return; }
           }
         }
         if (G.state !== 'play') return;
-        runPhysics(dt);
+        if (netHosting()) netHostPlay(dt); else runPhysics(dt);
         redropTick();
         // on slow phones fall back to cheaper planners instead of dropping frames
         G.botWin += dt;
@@ -2488,11 +3083,11 @@
       case 'whoosh': sfx('whoosh'); break;
     }
   }
-  function handleEvents(w) {
+  function handleEvents(w, quiet) {
     var ev = w.events;
     for (var i = 0; i < ev.length; i++) {
       var e = ev[i];
-      eventFx(e);
+      if (!quiet) eventFx(e);
       if (e.t === 'pickup' && !G.demo) { var info = E.ITEMS[e.type]; G.note = info.icon + ' ' + whoName(e.id) + ': ' + info.name + '!'; G.noteT = 1.4; }
       if (e.t === 'respawn' && !G.demo && G.state === 'play') { G.note = 'TUNG BÓNG!'; G.noteT = 1.2; sfx('whistle'); }
     }
@@ -2521,6 +3116,7 @@
   // ---------- drawing ----------
   // what each player of a match looks like, taken when it starts and kept with its highlights
   function matchLooks() {
+    if (G.net && G.net.host) return netLooks();
     var four = is4(G.mode), out = [];
     for (var i = 0; i < 4; i++) {
       var team = slotTeam(i), prof, col;
@@ -2768,7 +3364,14 @@
     // buttons sit in the corners, partly off-screen like the original
     var pad = Math.max(10, 3 * u);
     c.globalAlpha = 0.92;
-    if (is4(G.mode)) {
+    if (G.net && G.net.match) {
+      // online: one button per device (anywhere on the screen), drawn on its own side
+      var ms = G.net.slot, r1 = Math.max(34, 12.5 * u);
+      if (ms >= 0) {
+        var right = is4(G.mode) ? ms >= 2 : ms === 1, top4 = is4(G.mode) && ms % 2 === 1, bx1 = right ? v.cw - r1 * 0.82 : r1 * 0.82, by1 = top4 ? r1 * 0.82 : v.ch - r1 * 0.82;
+        drawButton(c, slotColor(is4(G.mode) ? ms : ms * 2), is4(G.mode) ? 'P' + (ms + 1) : String(G.score[ms]), bx1, by1, r1, !!G.netPress, right ? -1 : 1, top4 ? 1 : -1);
+      }
+    } else if (is4(G.mode)) {
       var r4 = Math.max(30, 10.5 * u), o = r4 * 0.8;
       var lab = function (i) { return G.bots[i] ? '🤖' : 'P' + (i + 1); };
       drawButton(c, slotColor(0), lab(0), o, v.ch - o, r4, G.pressed[0], 1, -1);
@@ -2801,7 +3404,7 @@
       banner(c, u, cx, v.ch * 0.36, title, subTxt, sc);
     } else if (G.state === 'scored' && (G.scorer >= 0 || G.noPoint)) {
       var t2 = Math.min(1, (1.9 - G.timer) / 0.4), s2 = easeBack(t2);
-      var wcol = G.noPoint ? '#ffd23f' : (G.mode === 'ffa' && G.credit >= 0 ? Meta.color(G.credit).main : teamCol(G.scorer).main);
+      var wcol = G.noPoint ? '#ffd23f' : (G.mode === 'ffa' && G.credit >= 0 ? pCol(G.credit).main : teamCol(G.scorer).main);
       var sub = G.sub;
       if (G.noPoint) { /* nobody scores */ }
       else if (G.mode === 'ffa') sub = (G.credit >= 0 ? nameOf(G.credit) + ' +1' : 'Không ai được điểm') + (G.sub ? ' · ' + G.sub : '');
@@ -2855,14 +3458,14 @@
     var ty = barTextY(u), by = v.ch - ty;
     barText(c, '🎬 PHÁT LẠI', pad, ty, 3.8 * u, '#ff5050', 'left');
     if (G.replay && G.replay.speed < 0.7) barText(c, SLOW_TXT, pad, by, 3.4 * u, '#ffd23f', 'left');
-    var tw = barText(c, 'Chạm để bỏ qua ⏭', v.cw - pad, by, 3.2 * u, '#ffffff', 'right');
+    var tw = netGuest() ? 0 : barText(c, 'Chạm để bỏ qua ⏭', v.cw - pad, by, 3.2 * u, '#ffffff', 'right'); // (only the host can skip it)
     barMiddle(c, u, by, G.noPoint ? G.word : (G.sub || G.word), v.cw - 2 * (Math.max(textW(SLOW_TXT, 3.4 * u), tw) + pad) - 4 * u);
   }
 
   // ---------- render ----------
   var lastT = 0, clock = 0;
   function render(dt) {
-    var v = view, c = ctx, w = G.world, A = w ? w.arena : null, m = A ? A.map : E.MAPS[0];
+    var v = view, c = ctx, w = G.view || G.world, A = w ? w.arena : null, m = A ? A.map : E.MAPS[0];
     clock += dt;
     c.setTransform(v.dpr, 0, 0, v.dpr, 0, 0);
     var gy = v.oy + GROUND * v.s;

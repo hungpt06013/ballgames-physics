@@ -1,4 +1,4 @@
-# ⚽ Ballgames Physics – v3.8
+# ⚽ Ballgames Physics – v4.0
 
 Game thể thao ragdoll vui nhộn: 2 đội × 2 cầu thủ, mỗi đội chỉ **1 nút**.
 
@@ -21,7 +21,7 @@ Game thể thao ragdoll vui nhộn: 2 đội × 2 cầu thủ, mỗi đội ch�
 | ↗️ **Mẹo** | bấm lúc người nghiêng về trước để lao lên |
 | 🦵 **Giữ nút quá 5 giây** | chân mỏi, tự hạ xuống |
 
-**Chạm:** đấu bot – đâu cũng được · 2 người – nửa trái / phải · 4 người – mỗi người 1 góc.
+**Chạm:** đấu bot – đâu cũng được · 2 người – nửa trái / phải · 4 người – mỗi người 1 góc · online – đâu cũng được.
 **Bàn phím:** Đỏ `A` `W` `Space` · Xanh `L` `↑` `Enter` · 4 người `A` `G` `K` `↑` · `Esc` tạm dừng.
 
 ## 🏟️ 8 môn
@@ -32,6 +32,7 @@ Game thể thao ragdoll vui nhộn: 2 đội × 2 cầu thủ, mỗi đội ch�
 - Ở 2 người / 4 người / 2 vs 2, chạm vào ô từng người để đổi: người → bot Dễ → Thường → Khó. Mỗi bot một độ khó riêng; để tất cả là bot thì ngồi xem
 - Thắng khi đủ điểm hoặc hết giờ; hết giờ mà hoà thì chọn 🤝 hoà hay ⭐ bàn vàng
 - 🎓 Hướng dẫn 3 bước cho người mới
+- 🌐 **Chơi online** với bạn bè ở máy khác: một người **tạo phòng**, gửi **mã phòng 5 ký tự** cho mọi người **vào phòng**; chơi 👥 2 người / 🙋 4 người / 🤝 2 vs 2, chỗ trống để bot. Miễn phí, không cần tài khoản. Bấm là thấy ngay trên máy mình (game tự đoán trước rồi sửa êm khi biết nút của người khác), và mọi máy luôn ra đúng một trận như nhau
 
 ## ✨ Trong trận (bật / tắt khi tạo trận)
 - 🎁 **Vật phẩm:** 🔥 siêu sút · 🛡️ khiên · 🧲 nam châm · ❄️ đóng băng · 🍄 phóng to
@@ -41,11 +42,12 @@ Game thể thao ragdoll vui nhộn: 2 đội × 2 cầu thủ, mỗi đội ch�
 ## 🏆 Sau trận
 - 📊 Thống kê từng người + 🏅 MVP
 - 🎬 Highlight (bàn thắng, cứu thua, suýt vào) – tải về thành video MP4
-- 📜 Lịch sử trận · 🛒 Cửa hàng trang phục · ⚙️ Cài đặt vật lý · 🌙 Giao diện tối
+- 📜 Lịch sử trận · 🛒 Cửa hàng (18 mũ, 12 kiểu tóc, 12 áo, 14 quả bóng) · ⚙️ Cài đặt vật lý · 🌙 Giao diện tối
+- 👤 Người chơi: đổi tên, chọn đồ theo từng mục 🎩 Mũ · 💇 Tóc · 👕 Áo cho mỗi người, ⚽ Bóng dùng chung
 
 ## 🛠️ Cho người sửa game
-- Code nằm trong `www/`: `engine.js` (vật lý, bot), `game.js` (luồng game), `draw.js` (hình), `audio.js` (âm thanh). Mở `www/index.html` bằng Chrome là chơi được.
-- Kiểm tra: `node test/sanity2.cjs`; các bài dùng Playwright như `node test/cases.cjs`.
+- Code nằm trong `www/`: `engine.js` (vật lý, bot), `game.js` (luồng game), `draw.js` (hình), `audio.js` (âm thanh), `net.js` + `online.js` (chơi online). Mở `www/index.html` bằng Chrome là chơi được.
+- Kiểm tra: `node test/sanity2.cjs`; các bài dùng Playwright như `node test/cases.cjs`; chơi online: `node test/netsync.cjs` (mạng giả lập) và `node test/online.cjs` (trình duyệt thật).
 - **APK:** GitHub tự build và ký mỗi khi đẩy code (khoá nằm trong secret `KEYSTORE_B64`, không có trong repo). Ra bản mới thì tăng `VERSION_CODE` trong `android/version.env`.
 - File HTML chơi offline: `python3 build_html.py dist/BallgamesPhysics.html`
 - Mọi luật chính xác và ghi chú kỹ thuật: [CHI_TIET.md](CHI_TIET.md)

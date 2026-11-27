@@ -304,9 +304,34 @@
         c.beginPath(); c.moveTo(hx - 14, hy - 12);
         for (k = 0; k < 5; k++) { var px = hx - 14 + k * 7; c.lineTo(px + 3, hy - r - 14); c.lineTo(px + 7, hy - r + 2); }
         c.closePath(); c.fill(); return;
+      case 'curly': // a ring of little curls over the top
+        capHair(c, hx, hy, r);
+        for (k = 0; k < 8; k++) { var ca = Math.PI * (0.88 + k * 0.155); circle(c, hx - 1 + Math.cos(ca) * (r + 1), hy - 2 + Math.sin(ca) * (r + 1), 6.5); c.fill(); }
+        return;
+      case 'pigtails': // tied up on both sides, with a ribbon each
+        capHair(c, hx, hy, r);
+        c.beginPath(); c.ellipse(hx - r - 7, hy - 4, 6, 13, 0.7, 0, TAU); c.fill();
+        c.beginPath(); c.ellipse(hx + r - 4, hy - r + 1, 5, 11, -0.9, 0, TAU); c.fill();
+        c.fillStyle = '#f37ac1'; circle(c, hx - r - 1, hy - 10, 3.5); c.fill(); circle(c, hx + r - 9, hy - r + 6, 3.2); c.fill(); return;
+      case 'bangs': // a long fringe swept over the forehead
+        c.beginPath(); c.arc(hx - 1, hy - 2, r + 2, Math.PI * 0.85, Math.PI * 1.98);
+        c.quadraticCurveTo(hx + r + 6, hy + 8, hx + 17, hy + 3); c.quadraticCurveTo(hx + 6, hy - 8, hx - r - 2, hy + 14); c.closePath(); c.fill(); return;
+      case 'bun': // a round bun on top
+        capHair(c, hx, hy, r);
+        circle(c, hx - 5, hy - r - 7, 9); c.fill(); return;
+      case 'rainbow': // the short cut in seven colours
+        var rc = ['#ef5b5b', '#f5a524', '#f2d33a', '#4cc36b', '#3fb4ea', '#5b6ee8', '#a66bea'];
+        c.save(); capHair(c, hx, hy, r, true); c.clip();
+        for (k = 0; k < 7; k++) { c.fillStyle = rc[k]; c.fillRect(hx - r - 4, hy - r - 4 + k * 4, 2 * r + 8, 4.5); }
+        c.restore(); return;
       default:
-        c.beginPath(); c.arc(hx - 1, hy - 2, r + 1, Math.PI * 0.9, Math.PI * 2.04); c.closePath(); c.fill();
+        capHair(c, hx, hy, r);
     }
+  }
+  // the short cut every style starts from (pathOnly: just its outline, e.g. to clip to)
+  function capHair(c, hx, hy, r, pathOnly) {
+    c.beginPath(); c.arc(hx - 1, hy - 2, r + 1, Math.PI * 0.9, Math.PI * 2.04); c.closePath();
+    if (!pathOnly) c.fill();
   }
   function hat(c, kind, hx, hy, r, col) {
     c.lineWidth = 3; c.strokeStyle = INK; c.lineJoin = 'round';
@@ -350,6 +375,55 @@
         c.lineTo(hx + 8, hy - r - 6); c.lineTo(hx + 15, hy - r - 14); c.lineTo(hx + 15, hy - r + 2); c.closePath();
         c.fillStyle = '#ffd23f'; c.fill(); c.stroke();
         c.fillStyle = '#ef5b5b'; circle(c, hx, hy - r - 4, 3); c.fill(); break;
+      case 'beanie': // knitted, in the team colour, with a folded edge and a pompom
+        c.beginPath(); c.arc(hx, hy - 4, r + 1, Math.PI * 1.02, Math.PI * 1.98); c.closePath();
+        c.fillStyle = col.main; c.fill(); c.stroke();
+        c.strokeStyle = 'rgba(0,0,0,0.25)'; c.lineWidth = 2;
+        for (var k = -2; k <= 2; k++) line(c, hx + k * 6, hy - 9, hx + k * 7, hy - r - 2 + Math.abs(k) * 2.5);
+        c.strokeStyle = INK; c.lineWidth = 3;
+        c.fillStyle = col.dark; rrect(c, hx - r - 2, hy - 11, 2 * r + 4, 8, 3); c.fill(); c.stroke();
+        c.fillStyle = '#ffffff'; circle(c, hx, hy - r - 7, 6); c.fill(); c.stroke(); break;
+      case 'helmet': // a yellow hard hat with a ridge and a peak
+        c.beginPath(); c.arc(hx, hy - 4, r + 2, Math.PI, TAU); c.closePath();
+        c.fillStyle = '#f2c230'; c.fill(); c.stroke();
+        c.fillStyle = '#ffde6a'; rrect(c, hx - 3, hy - r - 6, 6, r + 2, 3); c.fill(); c.stroke();
+        c.fillStyle = '#f2c230'; rrect(c, hx - r - 4, hy - 7, 2 * r + 16, 6, 3); c.fill(); c.stroke(); break;
+      case 'bunny': // two long ears, pink inside
+        for (k = -1; k <= 1; k += 2) {
+          c.beginPath(); c.ellipse(hx + k * 8 - 2, hy - r - 16, 6.5, 18, k * 0.22, 0, TAU);
+          c.fillStyle = '#ffffff'; c.fill(); c.stroke();
+          c.beginPath(); c.ellipse(hx + k * 8 - 2, hy - r - 15, 3, 12, k * 0.22, 0, TAU); c.fillStyle = '#f7a8c8'; c.fill();
+        }
+        break;
+      case 'wizard': // a tall bent cone with a star
+        c.fillStyle = '#6f4bc4';
+        c.beginPath(); c.ellipse(hx, hy - r + 4, r + 13, 5.5, 0, 0, TAU); c.fill(); c.stroke();
+        c.beginPath(); c.moveTo(hx - 14, hy - r + 3); c.quadraticCurveTo(hx - 4, hy - r - 26, hx - 20, hy - r - 44);
+        c.quadraticCurveTo(hx + 6, hy - r - 26, hx + 14, hy - r + 3); c.closePath(); c.fill(); c.stroke();
+        c.fillStyle = '#ffd23f'; star(c, hx, hy - r - 12, 5.5); c.fill(); break;
+      case 'pirate': // a black hat with a skull and crossbones
+        c.beginPath(); c.moveTo(hx - r - 9, hy - r + 7); c.quadraticCurveTo(hx, hy - r - 36, hx + r + 9, hy - r + 7);
+        c.quadraticCurveTo(hx, hy - r - 2, hx - r - 9, hy - r + 7); c.closePath();
+        c.fillStyle = '#2b2b2b'; c.fill(); c.stroke();
+        c.strokeStyle = '#ffffff'; c.lineWidth = 2.5; line(c, hx - 6, hy - r - 4, hx + 6, hy - r - 14); line(c, hx - 6, hy - r - 14, hx + 6, hy - r - 4);
+        c.fillStyle = '#ffffff'; circle(c, hx, hy - r - 11, 4.5); c.fill(); break;
+      case 'grad': // a graduation cap: a flat board and a tassel
+        c.fillStyle = '#2b2b2b'; rrect(c, hx - 13, hy - r - 6, 26, 11, 3); c.fill(); c.stroke();
+        c.beginPath(); c.moveTo(hx - 25, hy - r - 7); c.lineTo(hx, hy - r - 15); c.lineTo(hx + 25, hy - r - 7); c.lineTo(hx, hy - r + 1); c.closePath(); c.fill(); c.stroke();
+        c.strokeStyle = '#f2c230'; c.lineWidth = 2.5; c.beginPath(); c.moveTo(hx, hy - r - 7); c.lineTo(hx - 16, hy - r - 3); c.lineTo(hx - 16, hy - r + 9); c.stroke();
+        c.fillStyle = '#f2c230'; circle(c, hx - 16, hy - r + 10, 3); c.fill(); break;
+      case 'horns': // two little red devil horns
+        c.fillStyle = '#e8463c';
+        for (k = -1; k <= 1; k += 2) {
+          c.beginPath(); c.moveTo(hx + k * 13 - 1, hy - r + 7); c.quadraticCurveTo(hx + k * 19, hy - r - 4, hx + k * 14, hy - r - 20);
+          c.quadraticCurveTo(hx + k * 8, hy - r - 6, hx + k * 2 - 1, hy - r + 3); c.closePath(); c.fill(); c.stroke();
+        }
+        break;
+      case 'tophat': // a magician's tall black hat, with a band in the team colour
+        c.fillStyle = '#2b2b2b';
+        c.beginPath(); c.ellipse(hx, hy - r + 3, r + 9, 5, 0, 0, TAU); c.fill(); c.stroke();
+        rrect(c, hx - 13, hy - r - 30, 26, 32, 3); c.fill(); c.stroke();
+        c.fillStyle = col.main; c.fillRect(hx - 11.5, hy - r - 7, 23, 6); break;
     }
   }
   function face(c, kind, hx, hy) {
@@ -389,6 +463,39 @@
         for (k = 0; k <= 6; k++) c.lineTo(x + k * w / 6, y + h - (k % 2 ? 26 : 12));
         c.lineTo(x + w, y + h); c.closePath(); c.fill(); break;
       case 'number': textOutlined(c, String(num), x + w / 2, y + h / 2 - 2, 22, '#ffffff', col.dark); break;
+      case 'checker': // squares in the darker team colour
+        c.fillStyle = col.dark;
+        for (var cy = 0; cy * 8 < h; cy++) for (var cx = 0; cx * 8 < w; cx++) if ((cx + cy) % 2) c.fillRect(x + cx * 8, y + cy * 8, 8, 8);
+        break;
+      case 'cow': // white patches with dark spots (the team colour still shows between them)
+        c.fillStyle = '#ffffff';
+        c.beginPath(); c.ellipse(x + 8, y + 14, 10, 8, 0.4, 0, TAU); c.fill();
+        c.beginPath(); c.ellipse(x + w - 6, y + 34, 9, 11, -0.3, 0, TAU); c.fill();
+        c.beginPath(); c.ellipse(x + 10, y + h - 10, 9, 7, 0.2, 0, TAU); c.fill();
+        c.fillStyle = INK; circle(c, x + 7, y + 14, 3); c.fill(); circle(c, x + w - 7, y + 36, 3.5); c.fill(); circle(c, x + w / 2 + 2, y + 22, 2.5); c.fill(); break;
+      case 'heart': // one big heart
+        var hx0 = x + w / 2, hy0 = y + 20;
+        c.beginPath(); c.moveTo(hx0, hy0 + 15); c.bezierCurveTo(hx0 - 16, hy0 + 4, hx0 - 11, hy0 - 9, hx0, hy0 - 2);
+        c.bezierCurveTo(hx0 + 11, hy0 - 9, hx0 + 16, hy0 + 4, hx0, hy0 + 15); c.closePath();
+        c.fillStyle = '#ff5c8a'; c.fill(); c.lineWidth = 2; c.strokeStyle = '#ffffff'; c.stroke(); break;
+      case 'bolt': // a yellow lightning bolt across
+        c.beginPath(); c.moveTo(x + w * 0.62, y + 2); c.lineTo(x + w * 0.2, y + h * 0.52); c.lineTo(x + w * 0.5, y + h * 0.5);
+        c.lineTo(x + w * 0.3, y + h - 2); c.lineTo(x + w * 0.85, y + h * 0.4); c.lineTo(x + w * 0.55, y + h * 0.42); c.lineTo(x + w * 0.85, y + 2); c.closePath();
+        c.fillStyle = '#ffd23f'; c.fill(); c.lineWidth = 1.5; c.strokeStyle = INK; c.stroke(); break;
+      case 'galaxy': // a starry swirl over the team colour
+        var gg = c.createRadialGradient(x + w / 2, y + h * 0.45, 2, x + w / 2, y + h * 0.45, h * 0.6);
+        gg.addColorStop(0, 'rgba(255,170,240,0.85)'); gg.addColorStop(0.35, 'rgba(110,60,200,0.75)'); gg.addColorStop(1, 'rgba(25,20,70,0.25)');
+        c.fillStyle = gg; c.fillRect(x, y, w, h);
+        c.fillStyle = '#ffffff';
+        for (k = 0; k < 9; k++) { circle(c, x + 3 + hash(k * 3 + 1) * (w - 6), y + 4 + hash(k * 3 + 2) * (h - 8), k % 3 ? 1.2 : 2); c.fill(); }
+        break;
+      case 'diamond': // argyle diamonds and a gem
+        c.fillStyle = col.dark;
+        for (k = 0; k < 3; k++) { var dyy = y + 10 + k * 20; c.beginPath(); c.moveTo(x + w / 2, dyy - 10); c.lineTo(x + w / 2 + 9, dyy); c.lineTo(x + w / 2, dyy + 10); c.lineTo(x + w / 2 - 9, dyy); c.closePath(); c.fill(); }
+        c.strokeStyle = 'rgba(255,255,255,0.7)'; c.lineWidth = 1.2; line(c, x, y, x + w, y + h); line(c, x + w, y, x, y + h);
+        c.beginPath(); c.moveTo(x + w / 2 - 7, y + 26); c.lineTo(x + w / 2 + 7, y + 26); c.lineTo(x + w / 2 + 10, y + 30); c.lineTo(x + w / 2, y + 42); c.lineTo(x + w / 2 - 10, y + 30); c.closePath();
+        c.fillStyle = '#9ff0ff'; c.fill(); c.lineWidth = 1.5; c.strokeStyle = INK; c.stroke();
+        c.fillStyle = '#ffffff'; c.fillRect(x + w / 2 - 4, y + 28, 3, 3); break;
       default: c.fillStyle = 'rgba(255,255,255,0.85)'; c.fillRect(x + w / 2 - 3, y + 11, 6, 22);
     }
     c.restore();
@@ -483,6 +590,65 @@
         pentagon(c, 0, 0, R * 0.36, 0);
         for (var q = 0; q < 5; q++) { var a = q * TAU / 5 - Math.PI / 2; pentagon(c, Math.cos(a) * R * 0.98, Math.sin(a) * R * 0.98, R * 0.32, Math.PI / 5); }
         c.fillStyle = 'rgba(255,255,255,0.6)'; circle(c, -R * 0.35, -R * 0.4, R * 0.18); c.fill();
+        c.restore(); break;
+      case 'tennis':
+        c.fillStyle = '#d6e84a'; c.fill();
+        c.save(); c.clip(); c.strokeStyle = '#ffffff'; c.lineWidth = Math.max(2, R * 0.12);
+        c.beginPath(); c.arc(-R * 1.15, 0, R * 0.85, -1.1, 1.1); c.stroke();
+        c.beginPath(); c.arc(R * 1.15, 0, R * 0.85, Math.PI - 1.1, Math.PI + 1.1); c.stroke();
+        c.restore(); break;
+      case 'orange':
+        c.fillStyle = '#f5a524'; c.fill();
+        c.save(); c.clip(); c.fillStyle = 'rgba(190,100,0,0.35)';
+        for (k = 0; k < 14; k++) { circle(c, (hash(k) - 0.5) * 1.7 * R, (hash(k + 40) - 0.5) * 1.7 * R, R * 0.05); c.fill(); }
+        c.fillStyle = 'rgba(255,255,255,0.45)'; circle(c, -R * 0.35, -R * 0.4, R * 0.2); c.fill();
+        c.fillStyle = '#4cc36b'; c.beginPath(); c.ellipse(R * 0.18, -R * 0.72, R * 0.28, R * 0.13, -0.5, 0, TAU); c.fill();
+        c.fillStyle = '#6b4a2b'; circle(c, 0, -R * 0.78, R * 0.08); c.fill();
+        c.restore(); break;
+      case 'eight':
+        c.fillStyle = '#1f1f22'; c.fill();
+        c.fillStyle = '#ffffff'; circle(c, R * 0.12, -R * 0.12, R * 0.45); c.fill();
+        c.fillStyle = INK; c.font = '900 ' + Math.round(R * 0.62) + 'px ' + FONT; c.textAlign = 'center'; c.textBaseline = 'middle';
+        c.fillText('8', R * 0.12, -R * 0.08);
+        c.fillStyle = 'rgba(255,255,255,0.3)'; circle(c, -R * 0.45, -R * 0.5, R * 0.14); c.fill(); break;
+      case 'donut':
+        c.fillStyle = '#e0a35c'; c.fill();
+        c.save(); c.clip();
+        c.beginPath();
+        for (k = 0; k <= 24; k++) { var da = k * TAU / 24, dr = R * (0.8 + 0.07 * Math.sin(k * 2.7)); c[k ? 'lineTo' : 'moveTo'](Math.cos(da) * dr, Math.sin(da) * dr); }
+        c.closePath(); c.fillStyle = '#f37ac1'; c.fill();
+        var sc = ['#ffffff', '#ffd23f', '#3fb4ea', '#4cc36b'];
+        c.lineWidth = Math.max(1.5, R * 0.07); c.lineCap = 'round';
+        for (k = 0; k < 14; k++) { var sa = hash(k + 7) * TAU, sr = R * (0.4 + 0.33 * hash(k + 19)), sx = Math.cos(sa) * sr, sy = Math.sin(sa) * sr, so = hash(k + 3) * 3;
+          c.strokeStyle = sc[k % 4]; line(c, sx - Math.cos(so) * R * 0.08, sy - Math.sin(so) * R * 0.08, sx + Math.cos(so) * R * 0.08, sy + Math.sin(so) * R * 0.08); }
+        c.fillStyle = '#b97834'; circle(c, 0, 0, R * 0.3); c.fill(); c.fillStyle = '#8f5a24'; circle(c, 0, 0, R * 0.2); c.fill();
+        c.restore(); break;
+      case 'snow':
+        var sg = c.createRadialGradient(-R * 0.3, -R * 0.3, 1, 0, 0, R);
+        sg.addColorStop(0, '#ffffff'); sg.addColorStop(1, '#bfe3f5'); c.fillStyle = sg; c.fill();
+        c.strokeStyle = '#6fb6dc'; c.lineWidth = Math.max(1.5, R * 0.08); c.lineCap = 'round';
+        for (k = 0; k < 3; k++) { var fa = k * Math.PI / 3; line(c, -Math.cos(fa) * R * 0.55, -Math.sin(fa) * R * 0.55, Math.cos(fa) * R * 0.55, Math.sin(fa) * R * 0.55); }
+        for (k = 0; k < 6; k++) { var fb = k * Math.PI / 3, ex = Math.cos(fb) * R * 0.38, ey = Math.sin(fb) * R * 0.38;
+          line(c, ex, ey, ex + Math.cos(fb + 0.7) * R * 0.15, ey + Math.sin(fb + 0.7) * R * 0.15); line(c, ex, ey, ex + Math.cos(fb - 0.7) * R * 0.15, ey + Math.sin(fb - 0.7) * R * 0.15); }
+        break;
+      case 'eye':
+        c.fillStyle = '#ffffff'; c.fill();
+        c.save(); c.clip(); c.strokeStyle = 'rgba(220,60,60,0.6)'; c.lineWidth = 1.2;
+        for (k = 0; k < 6; k++) { var va = k * TAU / 6 + 0.4; c.beginPath(); c.moveTo(Math.cos(va) * R, Math.sin(va) * R);
+          c.quadraticCurveTo(Math.cos(va + 0.3) * R * 0.75, Math.sin(va + 0.3) * R * 0.75, Math.cos(va) * R * 0.55, Math.sin(va) * R * 0.55); c.stroke(); }
+        c.restore();
+        c.fillStyle = '#3fa0e0'; circle(c, R * 0.15, 0, R * 0.45); c.fill();
+        c.fillStyle = INK; circle(c, R * 0.2, 0, R * 0.22); c.fill();
+        c.fillStyle = '#ffffff'; circle(c, R * 0.05, -R * 0.15, R * 0.09); c.fill(); break;
+      case 'disco':
+        c.fillStyle = '#9aa3ad'; c.fill();
+        c.save(); c.clip();
+        var tl = R * 0.32;
+        for (var ty = -R; ty < R; ty += tl) for (var tx = -R; tx < R; tx += tl) {
+          var lv = Math.floor(150 + 105 * hash(Math.round(tx * 7 + ty * 13)));
+          c.fillStyle = 'rgb(' + lv + ',' + lv + ',' + Math.min(255, lv + 20) + ')'; c.fillRect(tx + 0.6, ty + 0.6, tl - 1.2, tl - 1.2);
+        }
+        c.fillStyle = 'rgba(255,255,255,0.85)'; star(c, -R * 0.4, -R * 0.42, R * 0.2); c.fill();
         c.restore(); break;
       default:
         c.fillStyle = '#ffffff'; c.fill();

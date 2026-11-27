@@ -23,8 +23,12 @@
   for (ri = 0; ri < LEG.length; ri++) RAD[NB + ri] = LEG[ri][1];
   var P_MASS = 5, P_INERTIA = 2600;
   var LEG_REST = -0.12, LEG_KICK = 1.95, KICK_REACH = 12;
-  // two players touching for longer than STICK_T s are eased apart, sideways, at up to STICK_PUSH px/s
-  var STICK_T = 0.35, STICK_PUSH = 120, STICK_GAP = 3, MATE_STEP = 2, PAIR = [[0, 0, 1, 2], [0, 0, 3, 4], [0, 0, 0, 5]];
+  // two players touching for longer than STICK_T s are eased apart, sideways, at up to STICK_V px/s
+  var STICK_T = 0.3, STICK_V = 200, STICK_GAP = 3, PAIR = [[0, 0, 1, 2], [0, 0, 3, 4], [0, 0, 0, 5]];
+  // two players overlapping: up to PP_SLOP px is left alone (bodies resting against each other don't shake); deeper
+  // overlaps are worked out mostly through speed (moving apart at up to PP_SEP_V px/s, as smoothly as any other motion)
+  // and only a little by moving the bodies (at most PP_STEP px per pass), so nobody jumps from one frame to the next
+  var PP_SLOP = 1.5, PP_SEP_K = 20, PP_SEP_V = 400, PP_POS_K = 0.2, PP_STEP = 0.5, PP_E = 0.2;
   var POP_TIME = 0.16, POP_REACH = 6, POP_SIN = Math.sin(1.3), POP_COS = Math.cos(1.3);
   var GETUP_DELAY = 0.3, RISE_TIME = 2;
   // standing sway: aimed this far forward so that, with gravity, the body leans as far forward as back (even sway);
@@ -205,7 +209,7 @@
       id: id, team: team, role: role, f: team === 0 ? 1 : -1, active: true,
       x: 0, y: 0, vx: 0, vy: 0, a: 0, w: 0, leg: LEG_REST, legW: 0, ls: 1,
       phase: 0, prev: false, press: false, gT: 1, cT: 1, jumpCd: 0, jumpT: 0, popT: 0, downT: 0, riseT: 0, air: false, slide: 0,
-      holdT: 0,
+      holdT: 0, blk: 0,
       sc: 1, baseSc: 1, invM: 0, invI: 0, rad: new Float64Array(NS),
       sx: new Float64Array(NS), sy: new Float64Array(NS),
       ex: new Float64Array(NS), ey: new Float64Array(NS)
@@ -239,7 +243,7 @@
       players: [makePlayer(0, 0, 0), makePlayer(0, 1, 1), makePlayer(1, 0, 2), makePlayer(1, 1, 3)],
       balls: [makeBall()], events: [], seed: (seed >>> 0) || 12345,
       item: makeItem(), fx: makeFx(), hz: makeHz(), itemT: 6, bombT: A.bombTime,
-      credit: -1, scoreBall: 0, stick: new Float64Array(6)
+      credit: -1, scoreBall: 0, stick: new Float64Array(6), side: new Int8Array(6)
     };
     if (mods && mods.twoBalls) w.balls.push(makeBall());
     w.ball = w.balls[0];
@@ -303,7 +307,7 @@
     var fx = w.fx; fx.kick[0] = fx.kick[1] = fx.shield[0] = fx.shield[1] = fx.freeze[0] = fx.freeze[1] = 0;
     fx.big[0] = fx.big[1] = fx.big[2] = fx.big[3] = 0; fx.magnetT = 0; fx.magnetId = -1;
     w.bombT = A.bombTime; w.credit = -1; w.scoreBall = 0;
-    if (w.stick) for (i = 0; i < 6; i++) w.stick[i] = 0;
+    if (w.stick) for (i = 0; i < 6; i++) { w.stick[i] = 0; w.side[i] = 0; }
     var hz = w.hz; hz.quakeT = hz.torT = 0; hz.craters.length = 0; hz.stun[0] = hz.stun[1] = hz.stun[2] = hz.stun[3] = 0;
   }
 
@@ -499,6 +503,8 @@
       p.vx += jt * tx * p.invM; p.vy += jt * ty * p.invM; p.w += rt * jt * p.invI;
     }
     shiftPlayer(p, nx * pen * 0.7, ny * pen * 0.7);
+    if (nx > 0.6) p.blk |= 1; else if (nx < -0.6) p.blk |= 2; // a wall / post on his left (1) or right (2),
+    if (ny < -0.6) p.blk |= 4; // the ground (or a crossbar) under him (4)
     if (ny < -0.6) { p.cT = 0; if (j === 0 || j === NS - 1) p.gT = 0; }
   }
 
@@ -572,58 +578,114 @@
     }
   }
 
-  // Two players bump into each other (every part of them, legs too). Team-mates never knock each other about: they are
-  // only pushed apart sideways, whichever way they touch (one lying or flying on top of the other slides off), so a
-  // team-mate jumping right behind can't launch the one in front, and nobody jumps off a team-mate. Two players who
-  // stay in touch (leaning on each other, legs caught together, piled up) are eased apart, more and more after
-  // STICK_T s. `k`: the pair (w.stick[k] how long it has been touching), `part`: the share of a step of this call.
+  // can p not be pushed along (nx, ny)? (a wall / post that way, or the ground under him when pushed down)
+  function blocked(p, nx, ny) { return (nx < -0.3 && (p.blk & 1)) || (nx > 0.3 && (p.blk & 2)) || (ny > 0.5 && (p.blk & 4)); }
+  // A and B move apart along (nx, ny) by dv more (A one way, B the other; shA / shB: how it is shared). Team-mates are
+  // only pushed sideways, and the one in front is never sent off faster: first whoever runs into the other is slowed
+  // down, then the one behind steps back (the one in front moves only when the one behind can't, and only on the
+  // ground), so a team-mate can't launch another
+  function separate(A, B, nx, ny, dv, shA, shB, mates) {
+    if (!mates) { A.vx -= nx * dv * shA; A.vy -= ny * dv * shA; B.vx += nx * dv * shB; B.vy += ny * dv * shB; return; }
+    var a = shA > 0 ? Math.min(dv * shA, Math.max(0, A.vx * nx)) : 0, b = shB > 0 ? Math.min(dv * shB, Math.max(0, -B.vx * nx)) : 0;
+    var rest = dv - a - b;
+    if (rest > 0) {
+      var backA = nx * A.f > 0; // B is in front of A: A is the one behind
+      var shBk = backA ? shA : shB, fr = backA ? B : A, shFr = backA ? shB : shA;
+      var toBk = shBk > 0 ? rest : 0, toFr = shBk > 0 ? 0 : (shFr > 0 && (fr.blk & 4) ? rest : 0);
+      if (backA) { a += toBk; b += toFr; } else { b += toBk; a += toFr; }
+    }
+    A.vx -= nx * a; B.vx += nx * b;
+  }
+  // Two players bump into each other (every part of them, legs too). All the parts touching are taken together as one
+  // contact (one push for the pair, not one per touching part: those added up into jumps and shaking). Parts caught
+  // inside each other (a raised leg around the other's body, legs hooked) push both ways at once and cancel out: then
+  // they are pushed apart sideways. Team-mates never knock each other about: they are only pushed apart sideways,
+  // whichever way they touch (one lying or flying on top of the other slides off), so a team-mate jumping right behind
+  // can't launch the one in front, and nobody jumps off a team-mate. Two players who stay in touch (leaning on each
+  // other, piled up) are eased apart sideways after STICK_T s, always the same way, and when one of them is against
+  // a wall or a post the other one moves. `k`: the pair (w.stick[k] how long it has been touching, w.side[k] the way
+  // they are eased apart), `part`: the share of a step of this call.
   function playerPlayer(w, k, A, B, part) {
     var dx = B.x - A.x, dy = B.y - A.y, lim = 115 * (A.sc + B.sc);
-    if (dx * dx + dy * dy > lim * lim) { w.stick[k] = 0; return; }
-    var mates = A.team === B.team, side = dx > 0 || (dx === 0 && A.id < B.id) ? 1 : -1, touch = false, deepest = 0;
-    for (var i = 0; i < NS; i++) {
-      for (var j = 0; j < NS; j++) {
+    if (dx * dx + dy * dy > lim * lim) { w.stick[k] = 0; w.side[k] = 0; return; }
+    var mates = A.team === B.team, touch = false;
+    var side = w.side[k] || (dx > 0 || (dx === 0 && A.id < B.id) ? 1 : -1);
+    var snx = 0, sny = 0, sum = 0, deepest = 0, pcx = 0, pcy = 0, ia = 0, jb = 0, onA = false, onB = false, i, j;
+    for (i = 0; i < NS; i++) {
+      for (j = 0; j < NS; j++) {
         var nx = B.sx[j] - A.sx[i], ny = B.sy[j] - A.sy[i], rr = A.rad[i] + B.rad[j];
         var d2 = nx * nx + ny * ny, rt = rr + STICK_GAP;
         if (d2 >= rt * rt || d2 < 1e-9) continue;
         touch = true; // (pressed against each other counts as touching, even with no overlap left)
         if (d2 >= rr * rr) continue;
-        var d = Math.sqrt(d2);
+        var d = Math.sqrt(d2), pen = rr - d;
         nx /= d; ny /= d;
-        var pen = rr - d, c = pen * 0.35;
-        if (mates) { if (pen > deepest) deepest = pen; continue; }
-        var cx = A.sx[i] + nx * A.rad[i], cy = A.sy[i] + ny * A.rad[i];
-        var rax = cx - A.x, ray = cy - A.y, rbx = cx - B.x, rby = cy - B.y;
-        var vax = A.vx - A.w * ray + A.ex[i], vay = A.vy + A.w * rax + A.ey[i];
-        var vbx = B.vx - B.w * rby + B.ex[j], vby = B.vy + B.w * rbx + B.ey[j];
-        var vn = (vbx - vax) * nx + (vby - vay) * ny;
-        if (vn < 0) {
-          var rna = rax * ny - ray * nx, rnb = rbx * ny - rby * nx;
-          var jn = -1.2 * vn / (A.invM + B.invM + rna * rna * A.invI + rnb * rnb * B.invI);
-          A.vx -= jn * nx * A.invM; A.vy -= jn * ny * A.invM; A.w -= rna * jn * A.invI;
-          B.vx += jn * nx * B.invM; B.vy += jn * ny * B.invM; B.w += rnb * jn * B.invI;
-        }
-        shiftPlayer(A, -nx * c, -ny * c);
-        shiftPlayer(B, nx * c, ny * c);
-        if (ny > 0.6) A.cT = 0; else if (ny < -0.6) B.cT = 0;
+        snx += nx * pen; sny += ny * pen; sum += pen;
+        pcx += (A.sx[i] + nx * A.rad[i]) * pen; pcy += (A.sy[i] + ny * A.rad[i]) * pen;
+        if (pen > deepest) { deepest = pen; ia = i; jb = j; }
+        if (ny > 0.6) onA = true; else if (ny < -0.6) onB = true;
       }
     }
-    // team-mates: one sideways push for the deepest overlap (not one per touching part: they added up into jumps),
-    // a few px at most each time, so they slide apart smoothly
-    if (deepest > 0) {
-      var m = Math.min(deepest * 0.35, MATE_STEP); shiftPlayer(A, -side * m, 0); shiftPlayer(B, side * m, 0);
-      // and they don't run into each other: the sideways speed towards each other is taken out
-      // (only the one running into the other is held back: the other keeps his own speed, nobody is pushed on)
-      var into = (A.vx - B.vx) * side;
-      if (into > 0) { if (A.vx * side > -B.vx * side) A.vx -= side * into; else B.vx += side * into; }
+    if (sum > 0) {
+      // the way they are pushed apart (from A towards B)
+      var cnx, cny;
+      if (mates) { cnx = side; cny = 0; } else {
+        var hook = 1 - Math.sqrt(snx * snx + sny * sny) / sum; // 0: all the parts agree, 1: they cancel out
+        cnx = snx / sum + side * hook; cny = sny / sum;
+        var cl = Math.sqrt(cnx * cnx + cny * cny);
+        if (cl > 1e-6) { cnx /= cl; cny /= cl; } else { cnx = side; cny = 0; }
+      }
+      // a wall / post behind one of them, or the ground under the one below: the other one gives way
+      var shA = A.invM / (A.invM + B.invM), shB = 1 - shA;
+      if (blocked(B, cnx, cny)) { shA = 1; shB = 0; } else if (blocked(A, -cnx, -cny)) { shA = 0; shB = 1; }
+      var cx = pcx / sum, cy = pcy / sum, rax = cx - A.x, ray = cy - A.y, rbx = cx - B.x, rby = cy - B.y;
+      if (mates) {
+        // team-mates don't run into each other: the sideways speed towards each other is taken out (only the one
+        // running into the other is held back: the other keeps his own speed, nobody is pushed on)
+        var into = (A.vx - B.vx) * side;
+        if (into > 0) { if (A.vx * side > -B.vx * side) A.vx -= side * into; else B.vx += side * into; }
+        // one coming down onto a team-mate standing on the ground stops on him instead of sinking into him (and then
+        // slides off sideways); the one below is not touched, so nobody is lifted
+        if (sny * sny > 0.36 * (snx * snx + sny * sny)) {
+          var up = sny > 0 ? A : B, lo = sny > 0 ? B : A;
+          if ((lo.blk & 4) && lo.vy > -50 && up.vy > lo.vy) up.vy = lo.vy;
+        }
+      } else {
+        // one bump at the middle of the touching parts (with the speed of a swinging leg there)
+        var vax = A.vx - A.w * ray + A.ex[ia], vay = A.vy + A.w * rax + A.ey[ia];
+        var vbx = B.vx - B.w * rby + B.ex[jb], vby = B.vy + B.w * rbx + B.ey[jb];
+        var vn = (vbx - vax) * cnx + (vby - vay) * cny;
+        if (vn < 0) {
+          var rna = rax * cny - ray * cnx, rnb = rbx * cny - rby * cnx;
+          var jn = -(1 + PP_E) * vn / (A.invM + B.invM + rna * rna * A.invI + rnb * rnb * B.invI);
+          A.vx -= jn * cnx * A.invM; A.vy -= jn * cny * A.invM; A.w -= rna * jn * A.invI;
+          B.vx += jn * cnx * B.invM; B.vy += jn * cny * B.invM; B.w += rnb * jn * B.invI;
+        }
+        if (onA) A.cT = 0; else if (onB) B.cT = 0;
+      }
+      var over = deepest - PP_SLOP;
+      if (over > 0) {
+        // overlapping: they move apart at a speed that grows with the overlap (no spin: nobody is tipped over)
+        var tgt = Math.min(PP_SEP_V, over * PP_SEP_K), vrel = (B.vx - A.vx) * cnx + (B.vy - A.vy) * cny;
+        if (vrel < tgt) separate(A, B, cnx, cny, tgt - vrel, shA, shB, mates);
+        // and a small nudge of the bodies
+        var c = Math.min(over * PP_POS_K, PP_STEP * (1 + over / 16)) * 2; // (a little more for a deep overlap)
+        shiftPlayer(A, -cnx * c * shA, -cny * c * shA); shiftPlayer(B, cnx * c * shB, cny * c * shB);
+      }
     }
     // (a moment apart doesn't start the count again: it only winds down, twice as fast)
-    if (!touch) { w.stick[k] = Math.max(0, w.stick[k] - 2 * DT * part); return; }
+    if (!touch) { w.stick[k] = Math.max(0, w.stick[k] - 2 * DT * part); if (w.stick[k] === 0) w.side[k] = 0; return; }
+    if (!w.side[k]) w.side[k] = side;
     w.stick[k] += DT * part;
-    var over = w.stick[k] - STICK_T;
-    if (over > 0) {
-      var push = Math.min(STICK_PUSH, over * STICK_PUSH * 3) * DT * part * 0.5; // (eased in, then a steady slow slide)
-      shiftPlayer(A, -side * push, 0); shiftPlayer(B, side * push, 0);
+    var late = w.stick[k] - STICK_T;
+    if (late > 0) {
+      // still in touch: they move apart sideways (eased in, then steadily), as real motion, not by moving the bodies
+      var sep = Math.min(STICK_V, late * STICK_V * 4), gap = (B.vx - A.vx) * side;
+      if (gap < sep) {
+        var pa = 0.5, pb = 0.5;
+        if (blocked(A, -side, 0)) { pa = 0; pb = 1; } else if (blocked(B, side, 0)) { pa = 1; pb = 0; }
+        separate(A, B, side, 0, sep - gap, pa, pb, mates);
+      }
     }
   }
 
@@ -924,6 +986,8 @@
       A.goalTop = top;
       A.segs[0].y1 = A.segs[1].y1 = top - 20; A.segs[0].y2 = A.segs[1].y2 = top;
     }
+    // the body parts come from the state alone (so a copied or received world steps exactly like the original)
+    for (i = 0; i < 4; i++) if (pl[i].active) shapes(pl[i]);
     for (i = 0; i < 4; i++) {
       p = pl[i];
       if (!p.active) continue;
@@ -967,6 +1031,7 @@
       b.ang += b.spin * dt;
       b.touchGround = false;
     }
+    for (i = 0; i < 4; i++) pl[i].blk = 0;
     for (var it = 0; it < nIt; it++) {
       for (i = 0; i < 4; i++) if (pl[i].active) { shapes(pl[i]); playerStatic(A, pl[i], hz.craters); }
       for (i = 0; i < 4; i++) {
@@ -1066,7 +1131,7 @@
     f.freeze[0] = g.freeze[0]; f.freeze[1] = g.freeze[1]; f.magnetT = g.magnetT; f.magnetId = g.magnetId;
     for (i = 0; i < 4; i++) f.big[i] = g.big[i];
     d.itemT = s.itemT; d.bombT = s.bombT;
-    for (i = 0; i < 6; i++) d.stick[i] = s.stick ? s.stick[i] : 0;
+    for (i = 0; i < 6; i++) { d.stick[i] = s.stick ? s.stick[i] : 0; d.side[i] = s.side ? s.side[i] : 0; }
     var h = d.hz, k = s.hz;
     h.quakeT = k.quakeT; h.quakeDur = k.quakeDur; h.torT = k.torT; h.torDur = k.torDur; h.torX0 = k.torX0; h.torX = k.torX;
     for (i = 0; i < 4; i++) h.stun[i] = k.stun[i];
@@ -1079,7 +1144,7 @@
     var w = { time: 0, arena: null, settings: null, seed: 1,
       players: [makePlayer(0, 0, 0), makePlayer(0, 1, 1), makePlayer(1, 0, 2), makePlayer(1, 1, 3)],
       balls: [makeBall()], events: null, item: makeItem(), fx: makeFx(), hz: makeHz(), itemT: 0, bombT: 0,
-      credit: -1, scoreBall: 0, stick: new Float64Array(6) };
+      credit: -1, scoreBall: 0, stick: new Float64Array(6), side: new Int8Array(6) };
     w.ball = w.balls[0];
     return w;
   }

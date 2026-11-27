@@ -146,6 +146,7 @@ const SH = path.resolve(__dirname, '../shots_v3');
   ui = await ev(() => ({ name: BGMeta.profile(1).name, title: document.getElementById('profFor').textContent }));
   check('typing a name on a card renames that player and picks him', ui.name === 'Lan Anh' && ui.title.indexOf('Lan Anh') >= 0, JSON.stringify(ui));
   await page.tap('#profMode button[data-v="4"]'); await page.waitForTimeout(200);
+  await page.tap('#profTabs button[data-tab="shirt"]'); await page.waitForTimeout(150); // (the colours are with the shirts)
   ui = await ev(() => ({ cards: document.querySelectorAll('#profCards .pcard').length, colors: !document.getElementById('profColorBox').classList.contains('hidden'),
     four: !document.getElementById('profFour').classList.contains('hidden') }));
   check('4 players: four cards, 2 vs 2 / each-alone choice and the colours', ui.cards === 4 && ui.colors && ui.four, JSON.stringify(ui));
