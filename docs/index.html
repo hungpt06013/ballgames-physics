@@ -579,9 +579,15 @@
   var PP_SLOP = 1.5, PP_SEP_K = 20, PP_SEP_V = 400, PP_POS_K = 0.2, PP_STEP = 0.5, PP_E = 0.2;
   var POP_TIME = 0.16, POP_REACH = 6, POP_SIN = Math.sin(1.3), POP_COS = Math.cos(1.3);
   var GETUP_DELAY = 0.3, RISE_TIME = 2;
+  // every press jumps: a press the player can't jump on yet (a moment before landing, just after a jump) is kept
+  // JUMP_KEEP s and jumps as soon as he can; a player who left the ground less than JUMP_GRACE s ago (a little
+  // bounce) can still jump
+  var JUMP_KEEP = 0.2, JUMP_GRACE = 0.12;
   // standing sway: aimed this far forward so that, with gravity, the body leans as far forward as back (even sway);
   // jumps are aimed JUMP_LEAN further forward than the body
-  var LEAN0 = -0.01, JUMP_LEAN = 0.11;
+  // and never tilted more than JUMP_TILT from straight up: a player leaning a lot still really jumps (it was a dive
+  // along the ground, more and more so up to about 57°, then lying down hopped straight up again)
+  var LEAN0 = -0.01, JUMP_LEAN = 0.11, JUMP_TILT = 0.6;
   // holding the button: after HOLD_TIRE s the raised leg tires (trembles and sinks), by HOLD_MAX s it is down and the
   // hold no longer counts (no kick, no turning in the air) until the button is let go
   var HOLD_TIRE = 1, HOLD_MAX = 5, LEG_SHAKE = 0.06;
@@ -759,7 +765,7 @@
     var p = {
       id: id, team: team, role: role, f: team === 0 ? 1 : -1, active: true,
       x: 0, y: 0, vx: 0, vy: 0, a: 0, w: 0, leg: LEG_REST, legW: 0, ls: 1,
-      phase: 0, prev: false, press: false, gT: 1, cT: 1, jumpCd: 0, jumpT: 0, popT: 0, downT: 0, riseT: 0, air: false, slide: 0,
+      phase: 0, prev: false, press: false, gT: 1, cT: 1, jumpCd: 0, jumpT: 0, jumpKeep: 0, popT: 0, downT: 0, riseT: 0, air: false, slide: 0,
       holdT: 0, blk: 0,
       sc: 1, baseSc: 1, invM: 0, invI: 0, rad: new Float64Array(NS),
       sx: new Float64Array(NS), sy: new Float64Array(NS),
@@ -833,7 +839,7 @@
       p.y = GROUND - COM_H * p.sc;
       p.vx = p.vy = 0; p.a = 0; p.w = 0;
       p.leg = LEG_REST; p.legW = 0; p.prev = p.press = false;
-      p.gT = p.cT = 0; p.jumpCd = 0; p.jumpT = 0; p.popT = 0; p.downT = 0; p.riseT = 0; p.air = false; p.slide = 0;
+      p.gT = p.cT = 0; p.jumpCd = 0; p.jumpT = 0; p.jumpKeep = 0; p.popT = 0; p.downT = 0; p.riseT = 0; p.air = false; p.slide = 0;
       p.holdT = 0;
       p.phase = (p.role === 0 ? 0 : 1.9) + (p.team === 0 ? 0 : 0.8) + rand(w) * 0.6;
       if (!p.active) { p.x = -2000 - i * 300; p.y = GROUND - COM_H; }
@@ -895,8 +901,8 @@
 
   function jump(w, p, P) {
     // a standing player jumps as if he leant JUMP_LEAN further forward: the sway is even around upright, and jumps
-    // go forward as often as they did when the sway itself leant forward
-    var ja = Math.abs(p.a) < 1.0 ? p.a + p.f * JUMP_LEAN : p.a;
+    // go forward as often as they did when the sway itself leant forward; a jump leans JUMP_TILT at most
+    var ja = Math.abs(p.a) < 1.0 ? Math.max(-JUMP_TILT, Math.min(JUMP_TILT, p.a + p.f * JUMP_LEAN)) : p.a;
     var jx = Math.sin(ja), jy = -Math.cos(ja);
     // jumping while lying down hops straight up and turns the player back onto the feet
     if (jy > -0.55) { jx *= 0.35; jy = -0.95; p.w -= p.a * 3; p.riseT = RISE_TIME; } else p.riseT = 0;
@@ -974,14 +980,19 @@
     p.holdT = press ? p.holdT + dt : 0;
     var edge = press && !p.prev;
     var act = press && p.holdT < HOLD_MAX; // the press counts (kick, jump, turning in the air)
+    // every press jumps: at once if he can (on something, or off it less than JUMP_GRACE s), else as soon as he can
+    // within JUMP_KEEP s (pressed a moment before landing, or just after a jump)
+    if (edge) p.jumpKeep = JUMP_KEEP; else if (p.jumpKeep > 0) p.jumpKeep -= dt;
     // the leg swings first and the hop follows a moment later, so the foot can
     // sweep a ball lying at the player's feet before the body leaves the ground
-    if (edge && touching && p.jumpCd <= 0 && p.jumpT <= 0) {
+    if (p.jumpKeep > 0 && p.cT < JUMP_GRACE && p.jumpCd <= 0 && p.jumpT <= 0) {
+      p.jumpKeep = 0;
       if (P.jumpDelay > 0) p.jumpT = P.jumpDelay; else jump(w, p, P);
     }
+    // ...and then it always comes (it was pressed on the ground: neither a little bounce nor getting up cancels it)
     if (p.jumpT > 0) {
       p.jumpT -= dt;
-      if (p.jumpT <= 0 && p.cT < 0.15) jump(w, p, P);
+      if (p.jumpT <= 0) jump(w, p, P);
     }
     p.prev = press; p.press = act;
     // a held leg tires after HOLD_TIRE s: it trembles and sinks, and is back down at HOLD_MAX s
@@ -1014,7 +1025,7 @@
         p.downT += dt;
         // lying: if the righting torque lifts the player off the ground, keep steering upright
         if (Math.abs(p.a) > 1.2) p.riseT = RISE_TIME;
-        if (p.downT > GETUP_DELAY) {
+        if (p.downT > GETUP_DELAY && !(p.jumpT > 0)) { // (not with a jump of his on its way: that gets him up)
           // lying (even upside down): hop up, spinning just enough to come down on the feet
           p.vy = -P.jump * 0.6; p.vx *= 0.3;
           p.w = Math.max(-12, Math.min(12, err * 5));
@@ -1544,6 +1555,7 @@
       if (!p.active) continue;
       if (hz.stun[i] > 0) hz.stun[i] -= dt;
       var frozen = fx.freeze[p.team] > 0 || hz.stun[i] > 0;
+      if (frozen) p.jumpKeep = p.jumpT = 0; // (a frozen / struck player doesn't jump, not even on a press from just before)
       control(w, p, frozen ? false : presses[i], P, dt);
       if (frozen) p.w *= 1 - 4 * dt;
       p.vy += P.g * dt;
@@ -1657,7 +1669,7 @@
   function copyPlayer(d, s) {
     d.x = s.x; d.y = s.y; d.vx = s.vx; d.vy = s.vy; d.a = s.a; d.w = s.w;
     d.leg = s.leg; d.legW = s.legW; d.phase = s.phase; d.prev = s.prev; d.press = s.press;
-    d.gT = s.gT; d.cT = s.cT; d.jumpCd = s.jumpCd; d.jumpT = s.jumpT; d.popT = s.popT; d.downT = s.downT; d.riseT = s.riseT; d.air = s.air; d.slide = s.slide;
+    d.gT = s.gT; d.cT = s.cT; d.jumpCd = s.jumpCd; d.jumpT = s.jumpT; d.jumpKeep = s.jumpKeep; d.popT = s.popT; d.downT = s.downT; d.riseT = s.riseT; d.air = s.air; d.slide = s.slide;
     d.holdT = s.holdT;
     d.active = s.active; d.role = s.role; d.baseSc = s.baseSc;
     if (d.sc !== s.sc) setScale(d, s.sc);
@@ -3643,8 +3655,9 @@
 
   var DT = E.DT;
   // raised whenever the game plays differently (physics, sports, bots): games of different versions do not play
-  // together online (the guest is told to update). 2: v4.2 (the giant ball's smaller goal, bots' bicycle kicks)
-  var VERSION = 2;
+  // together online (the guest is told to update). 2: v4.2 (the giant ball's smaller goal, bots' bicycle kicks);
+  // 3: v4.2.1 (every press jumps)
+  var VERSION = 3;
   // the longest the host waits for somebody's buttons (steps); a change arriving later is moved to the next open step
   var MAX_WAIT = 30;
   // the jump a rollback makes on screen fades out with this time constant (s); a jump bigger than SNAP px is not eased
@@ -3655,7 +3668,7 @@
   var ITEM_TYPES = [''].concat(Object.keys(E.ITEMS));
   // player fields (b: true/false)
   var PF = [['x'], ['y'], ['vx'], ['vy'], ['a'], ['w'], ['leg'], ['legW'], ['phase'], ['prev', 1], ['press', 1], ['gT'], ['cT'],
-    ['jumpCd'], ['jumpT'], ['popT'], ['downT'], ['riseT'], ['air', 1], ['slide'], ['holdT'], ['active', 1], ['role'], ['baseSc']];
+    ['jumpCd'], ['jumpT'], ['jumpKeep'], ['popT'], ['downT'], ['riseT'], ['air', 1], ['slide'], ['holdT'], ['active', 1], ['role'], ['baseSc']];
   var BF = [['x'], ['y'], ['vx'], ['vy'], ['ang'], ['spin'], ['outT'], ['stillT'], ['over'], ['prevX'], ['prevY'], ['touchGround', 1],
     ['lastTeam'], ['lastAng'], ['lastX'], ['lastPid'], ['lastAir', 1], ['lastLeg']];
   function n01(v) { return v ? 1 : 0; }

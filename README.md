@@ -1,4 +1,4 @@
-# ⚽ Ballgames Physics – v4.2
+# ⚽ Ballgames Physics – v4.2.1
 
 Game thể thao ragdoll vui nhộn: 2 đội × 2 cầu thủ, mỗi đội chỉ **1 nút**.
 
@@ -16,7 +16,7 @@ Game thể thao ragdoll vui nhộn: 2 đội × 2 cầu thủ, mỗi đội ch�
 ## 🎮 Cách chơi
 | | |
 |---|---|
-| 👆 **Bấm** | nhảy + vung chân sút |
+| 👆 **Bấm** | nhảy + vung chân sút – lúc nào cũng nhảy, kể cả đang nghiêng / nằm hay bấm sớm ngay trước khi chạm đất |
 | ✊ **Giữ khi đang bay** | lộn người – móc xe đạp |
 | ↗️ **Mẹo** | bấm lúc người nghiêng về trước để lao lên |
 | 🦵 **Giữ nút quá 5 giây** | chân mỏi, tự hạ xuống |
@@ -49,7 +49,7 @@ Game thể thao ragdoll vui nhộn: 2 đội × 2 cầu thủ, mỗi đội ch�
 
 ## 🛠️ Cho người sửa game
 - Code nằm trong `www/`: `engine.js` (vật lý, bot), `game.js` (luồng game), `draw.js` (hình), `audio.js` (âm thanh), `net.js` + `online.js` (chơi online). Mở `www/index.html` bằng Chrome là chơi được.
-- Kiểm tra: `node test/sanity2.cjs`; các bài dùng Playwright như `node test/cases.cjs`; cứu thua: `node test/sweep.cjs` (66.906 tình huống chấm lại bằng một trọng tài độc lập); thống kê trận + chặn bóng: `node test/stats.cjs` (2.505 tình huống, cũng có trọng tài độc lập); chơi online: `node test/netsync.cjs` (mạng giả lập) và `node test/online.cjs` (trình duyệt thật).
+- Kiểm tra: `node test/sanity2.cjs`; các bài dùng Playwright như `node test/cases.cjs`; cứu thua: `node test/sweep.cjs` (66.906 tình huống chấm lại bằng một trọng tài độc lập); thống kê trận + chặn bóng: `node test/stats.cjs` (2.505 tình huống, cũng có trọng tài độc lập); bấm là nhảy: `node test/jumpalways.cjs`; chơi online: `node test/netsync.cjs` (mạng giả lập) và `node test/online.cjs` (trình duyệt thật).
 - **APK:** GitHub tự build và ký mỗi khi đẩy code (khoá nằm trong secret `KEYSTORE_B64`, không có trong repo). Ra bản mới thì tăng `VERSION_CODE` trong `android/version.env`.
 - File HTML chơi offline: `python3 build_html.py dist/BallgamesPhysics.html`
 - Mọi luật chính xác và ghi chú kỹ thuật: [CHI_TIET.md](CHI_TIET.md)
