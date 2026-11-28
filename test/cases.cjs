@@ -68,6 +68,11 @@ const path = require('path');
           b.vx = M ? -r.vx : r.vx; b.vy = r.vy; b.lastTeam = rt; b.lastBy[rt] = rp; b.lastPid = rp; b.touchT[rt] = w.time; b.lastKind = 'head'; b.lastX = b.x;
           rbT = w.time;
         }
+        if (o.other && !o.otherDone && touch0 >= 0 && w.time - touch0 >= o.other.after) {
+          o.otherDone = true; const ob = w.balls[1 - (o.ballIndex || 0)], q = o.other, at = mt(1), ap = mb(3);
+          ob.x = ob.prevX = M ? WW - q.x : q.x; ob.y = ob.prevY = q.y; ob.vx = M ? -q.vx : q.vx; ob.vy = q.vy;
+          ob.lastTeam = at; ob.lastBy[at] = ap; ob.lastPid = ap; ob.touchT[at] = w.time; ob.lastKind = 'kick'; ob.lastX = ob.x;
+        }
         // o.pressR: presses timed from the rebound [[slot, after, duration]]
         if (rbT >= 0) (o.pressR || []).forEach(q => { if (Math.abs(w.time - rbT - q[1]) < 0.009) G.hold[slot(q[0])] = w.time + q[2]; });
         __api.step(1 / 60);
@@ -207,6 +212,46 @@ const path = require('path');
     grid([200, 215, 230, 245], [0.1, 0.15, 0.2, 0.25, 0.3, 0.35], (x, at) => ({ pl: [x], press: [[0, at, 0.2]] })),
     x => x.touched0 && x.score === '0-1');
   check('keeper touches it but it still goes in: no save (and the goal counts)', r.found && r.saves[0] === 0 && !/save/.test(r.clips), short(r));
+
+  console.log('--- video 4: saves the attackers then scored after (and the bugs the save sweep found) ---');
+  // H3 (21.04 s): a shot just under the bar headed over by a jumping player; the bot knocks the rebound in about a
+  // second later: the save counts, and the goal's clip shows it ("CỨU THUA!" then "VÀO!")
+  const inAfter = (after, rb, xs, extra) => { const out = []; (xs || [230, 260, 290]).forEach(x => [0.05, 0.1, 0.15, 0.2, 0.25].forEach(at =>
+    out.push(Object.assign({ pl: [x], press: [[0, at, 0.3]], rebound: Object.assign({ after }, rb), fmt: 'p1', secs: 2.5 + after }, extra || {})))); return out; };
+  const RB_IN = { team: 1, pid: 3, x: 420, y: 650, vx: -1400, vy: -150 };
+  r = await find({ ball: HEAD.replace('g.goalD + 555', '720') }, inAfter(0.9, RB_IN), x => x.touched0 && x.rebounded && x.score === '0-1');
+  check('video 4 (H3): header over the bar, rebound knocked in 0.9 s later = save, inside the goal\'s clip', r.found && r.saves[0] === 1 && /goal\[save\+goal\]/.test(r.clips), short(r));
+  fl = await flashes();
+  check('...the highlight flashes "CỨU THUA!" then "VÀO!"', fl.length >= 2 && fl[0].indexOf('CỨU THUA') >= 0 && /VÀO/.test(fl[fl.length - 1]), JSON.stringify(fl));
+  // H5 (51.28 s): a header that would fly in over a keeper standing at the post; he jumps and deflects it over;
+  // the bot heads the rebound in 1.7 s later
+  r = await find({ ball: 'g => ({ x: 560, y: 470, vx: -900, vy: 40 })' }, inAfter(1.7, RB_IN, [200, 225, 250]), x => x.touched0 && x.rebounded && x.score === '0-1');
+  check('video 4 (H5): keeper deflects a header over, rebound headed in 1.7 s later = save', r.found && r.saves[0] === 1 && /save/.test(r.clips), short(r));
+  r = await find({ mirror: true, ball: HEAD.replace('g.goalD + 555', '720') }, inAfter(0.9, RB_IN), x => x.touched0 && x.rebounded && x.score === '0-1');
+  check('video 4, right goal: save, rebound knocked in = save, in the goal\'s clip', r.found && r.saves[0] === 1 && /goal\[save\+goal\]/.test(r.clips), short(r));
+  // a parry and an instant tap-in, before the game is sure of the save (0.25 s)
+  r = await find({ ball: HEAD.replace('g.goalD + 555', '720') }, inAfter(0.1, RB_IN), x => x.touched0 && x.rebounded && x.score === '0-1');
+  check('parried, tapped in 0.1 s later = the parry was a save', r.found && r.saves[0] === 1 && /save/.test(r.clips), short(r));
+  // the same save, then his own team-mate puts it in (the attackers never touch it again): it saved nothing
+  r = await find({ ball: HEAD.replace('g.goalD + 555', '720') }, inAfter(0.9, { team: 0, pid: 1, x: 420, y: 650, vx: -1400, vy: -150 }), x => x.touched0 && x.rebounded && x.score === '0-1');
+  check('save, then his team-mate puts it in his own goal = no save', r.found && r.saves[0] === 0 && !/save/.test(r.clips), short(r));
+  // two balls: a save with one ball, the other one goes in 0.1 s later - the save still counts
+  r = await find({ twoBalls: true, ballIndex: 1, fmt: 'p1', ball: HEAD.replace('g.goalD + 555', '720'), other: { after: 0.1, x: 420, y: 756, vx: -1400, vy: 0 } },
+    grid([230, 260, 290, 320], [0.05, 0.1, 0.15, 0.2, 0.25, 0.3], (x, at) => ({ pl: [x], press: [[0, at, 0.3]] })), x => x.touched0 && x.score === '0-1');
+  check('two balls: a save with one ball, the other goes in right after = still a save', r.found && r.saves[0] === 1, short(r));
+  // the ball bounces off the keeper standing there and he presses a step or two later: no save (the press came after
+  // the touch) - every such moment in the grid, low and high shots, both sides of the pitch
+  {
+    let seen = 0, wrong = [];
+    for (const m of [false, true]) for (const ball of ['g => ({ x: 720, y: g.GROUND - g.R - 60, vx: -1300, vy: -200 })', 'g => ({ x: 615, y: 572, vx: -1300, vy: 139 })', 'g => ({ x: 650, y: 700, vx: -1100, vy: -300 })'])
+      for (const x of [230, 260, 290, 305, 320]) for (let at = 0.15; at <= 0.46; at += 0.01) {
+        const v = { mirror: m, ball, pl: [x], press: [[0, +at.toFixed(3), 0.25]] }, q = await sc(v);
+        if (!(q.touched0 && q.firstTouch0 < at - 0.003 && q.firstTouch0 > at - 0.025)) continue;
+        seen++;
+        if (q.saves[0] !== 0) wrong.push(JSON.stringify({ v, saves: q.saves, dbg: q.dbg }));
+      }
+    check('ball bounces off him standing, he presses a step later = no save (' + seen + ' moments)', seen >= 5 && wrong.length === 0, wrong.slice(0, 2).join(' | '));
+  }
 
   console.log('--- NEAR MISSES that must count ---');
   // 17. shot just over the bar (the ball's bottom 15 px over it at the goal line)

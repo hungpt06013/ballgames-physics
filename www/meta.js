@@ -4,13 +4,18 @@
   function load(k, d) { try { var v = localStorage.getItem('bgp_' + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } }
   function save(k, v) { try { localStorage.setItem('bgp_' + k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } }
 
-  // jersey colours a player can pick (used for their own player in 4-player solo mode)
+  // shirt colours a player (or the bot) can pick: 16, no two alike - every pair at least 26 apart in CIEDE2000
+  // (about 20 is already 'clearly different'); the first 10 keep their places (saved profiles keep their colour), red
+  // and blue are the classic sides. In a match nobody wears the same colour as anyone else (game.js: personColors).
   var COLORS = [
-    { main: '#ef5b5b', dark: '#c63e44', name: 'Đỏ' }, { main: '#f5a524', dark: '#c98316', name: 'Cam' },
-    { main: '#3fb4ea', dark: '#2387bd', name: 'Xanh dương' }, { main: '#4cc36b', dark: '#2f9a4f', name: 'Xanh lá' },
-    { main: '#a66bea', dark: '#7c45c0', name: 'Tím' }, { main: '#f37ac1', dark: '#c94e96', name: 'Hồng' },
-    { main: '#f2d33a', dark: '#c4a612', name: 'Vàng' }, { main: '#2fc6b5', dark: '#1b968a', name: 'Ngọc' },
-    { main: '#5a5f6b', dark: '#373a42', name: 'Đen' }, { main: '#f4f4f4', dark: '#c4c4c4', name: 'Trắng' }
+    { main: '#ef5b5b', dark: '#c63e44', name: 'Đỏ' }, { main: '#f29a3f', dark: '#c87923', name: 'Cam' },
+    { main: '#3fb4ea', dark: '#2387bd', name: 'Xanh dương' }, { main: '#6ade5f', dark: '#4ab843', name: 'Xanh lá' },
+    { main: '#8b70f4', dark: '#6651c9', name: 'Tím' }, { main: '#ffa9e7', dark: '#d688c1', name: 'Hồng' },
+    { main: '#fee526', dark: '#d6c100', name: 'Vàng' }, { main: '#009f8b', dark: '#007c6a', name: 'Ngọc' },
+    { main: '#2b2b2b', dark: '#3c3c3c', name: 'Đen' }, { main: '#ffffff', dark: '#dadada', name: 'Trắng' },
+    { main: '#3222a1', dark: '#4c35b7', name: 'Xanh đậm' }, { main: '#8a5123', dark: '#653408', name: 'Nâu' },
+    { main: '#910042', dark: '#690026', name: 'Đỏ đô' }, { main: '#8d8a15', dark: '#6a6900', name: 'Xanh rêu' },
+    { main: '#8a888c', dark: '#69676b', name: 'Xám' }, { main: '#13631f', dark: '#004303', name: 'Xanh lá đậm' }
   ];
 
   var SHOP = {
@@ -82,7 +87,11 @@
   Object.keys(SHOP).forEach(function (k) { var free = SHOP[k][0]; SHOP[k] = [free].concat(SHOP[k].slice(1).sort(function (a, b) { return a.price - b.price; })); });
   var SHOP_TABS = [{ id: 'hat', name: 'Mũ' }, { id: 'hair', name: 'Tóc' }, { id: 'shirt', name: 'Áo' }, { id: 'ball', name: 'Bóng' }];
 
-  function defaultProfile(i) { return { name: 'P' + (i + 1), color: i, hat: 'none', hair: 'default', shirt: 'plain' }; }
+  // (P1 red and P2 blue, the classic sides; P3 green, P4 orange)
+  var DEFAULT_COLOR = [0, 2, 3, 1];
+  function defaultProfile(i) { return { name: 'P' + (i + 1), color: DEFAULT_COLOR[i], hat: 'none', hair: 'default', shirt: 'plain' }; }
+  // what the bots wear (every bot; a bot whose colour someone else already wears gets another one)
+  function defaultBot() { return { color: 2, hat: 'none', hair: 'default', shirt: 'number' }; }
   function defaultStats() {
     return { played: 0, byMode: {}, botWins: { easy: 0, normal: 0, hard: 0 }, botLosses: { easy: 0, normal: 0, hard: 0 }, botDraws: { easy: 0, normal: 0, hard: 0 },
       goals: 0, goalsBySport: {}, fastest: 0, streak: 0, bestStreak: 0, coinsEarned: 0 };
@@ -93,7 +102,14 @@
   D.owned = D.owned || {};
   SHOP_TABS.forEach(function (t) { D.owned[t.id] = D.owned[t.id] || {}; D.owned[t.id][SHOP[t.id][0].id] = 1; });
   D.profiles = D.profiles || [];
+  // profiles saved before v4.1 that still have the old colours (P1 red, P2 orange, P3 blue, P4 green, never changed)
+  // get the new ones, so P2 keeps the blue he always wore with 2 players
+  if (!D.colorsV && D.profiles.length === 4 && D.profiles.every(function (p, k) { return p && p.color === k; })) D.profiles.forEach(function (p, k) { p.color = DEFAULT_COLOR[k]; });
+  D.colorsV = 2;
   for (var i = 0; i < 4; i++) D.profiles[i] = Object.assign(defaultProfile(i), D.profiles[i] || {});
+  D.bot = Object.assign(defaultBot(), D.bot || {});
+  if (!(D.bot.color >= 0 && D.bot.color < COLORS.length)) D.bot.color = 2;
+  D.profiles.forEach(function (p, k) { if (!(p.color >= 0 && p.color < COLORS.length)) p.color = DEFAULT_COLOR[k]; });
   D.ball = D.ball || 'classic';
   D.stats = Object.assign(defaultStats(), D.stats || {});
   // data of removed features (challenges, tournament) from older versions
@@ -118,13 +134,14 @@
       if (!it || this.owns(cat, id) || D.coins < it.price) return false;
       D.coins -= it.price; D.owned[cat][id] = 1; persist(); return true;
     },
+    // slot: 0-3 (a player) or 'bot'
     equip: function (cat, id, slot) {
       if (!this.owns(cat, id)) return false;
-      if (cat === 'ball') D.ball = id; else D.profiles[slot][cat] = id;
+      if (cat === 'ball') D.ball = id; else this.profile(slot)[cat] = id;
       persist(); return true;
     },
-    profile: function (i) { return D.profiles[i]; },
-    color: function (i) { return COLORS[D.profiles[i].color] || COLORS[i]; },
+    profile: function (i) { return i === 'bot' ? D.bot : D.profiles[i]; },
+    color: function (i) { return COLORS[this.profile(i).color] || COLORS[0]; },
     stats: function () { return D.stats; },
     resetStats: function () { D.stats = defaultStats(); persist(); }
   };
