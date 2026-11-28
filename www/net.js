@@ -26,8 +26,9 @@
 
   var DT = E.DT;
   // raised whenever the game plays differently (physics, sports, bots): games of different versions do not play
-  // together online (the guest is told to update). 2: v4.2 (the giant ball's smaller goal, bots' bicycle kicks)
-  var VERSION = 2;
+  // together online (the guest is told to update). 2: v4.2 (the giant ball's smaller goal, bots' bicycle kicks);
+  // 3: v4.2.1 (every press jumps)
+  var VERSION = 3;
   // the longest the host waits for somebody's buttons (steps); a change arriving later is moved to the next open step
   var MAX_WAIT = 30;
   // the jump a rollback makes on screen fades out with this time constant (s); a jump bigger than SNAP px is not eased
@@ -38,7 +39,7 @@
   var ITEM_TYPES = [''].concat(Object.keys(E.ITEMS));
   // player fields (b: true/false)
   var PF = [['x'], ['y'], ['vx'], ['vy'], ['a'], ['w'], ['leg'], ['legW'], ['phase'], ['prev', 1], ['press', 1], ['gT'], ['cT'],
-    ['jumpCd'], ['jumpT'], ['popT'], ['downT'], ['riseT'], ['air', 1], ['slide'], ['holdT'], ['active', 1], ['role'], ['baseSc']];
+    ['jumpCd'], ['jumpT'], ['jumpKeep'], ['popT'], ['downT'], ['riseT'], ['air', 1], ['slide'], ['holdT'], ['active', 1], ['role'], ['baseSc']];
   var BF = [['x'], ['y'], ['vx'], ['vy'], ['ang'], ['spin'], ['outT'], ['stillT'], ['over'], ['prevX'], ['prevY'], ['touchGround', 1],
     ['lastTeam'], ['lastAng'], ['lastX'], ['lastPid'], ['lastAir', 1], ['lastLeg']];
   function n01(v) { return v ? 1 : 0; }
