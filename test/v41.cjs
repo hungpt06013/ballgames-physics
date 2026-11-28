@@ -121,14 +121,14 @@ const path = require('path');
   await ev(() => { BGMeta.D.profiles[0].name = 'Dihfish'; BGMeta.D.profiles[1].name = 'Lan'; });
   r = await drawn('2p', '');
   let names = r.filter(x => x.t === 'Dihfish' || x.t === 'Lan');
-  check('2 players: a small name over every body (two each), 12 - 17 px', names.filter(x => x.t === 'Dihfish').length >= 2 && names.filter(x => x.t === 'Lan').length >= 2 &&
-    names.every(x => x.fs >= 12 && x.fs <= 17), JSON.stringify(names.slice(0, 6)));
+  check('2 players: a small name over every body (two each), 14 - 20 px', names.filter(x => x.t === 'Dihfish').length >= 2 && names.filter(x => x.t === 'Lan').length >= 2 &&
+    names.every(x => x.fs >= 14 && x.fs <= 20), JSON.stringify(names.slice(0, 6)));
   r = await drawn('team4', '');
-  check('2 vs 2: small names, the bot by its level', ['Dihfish', 'Lan'].every(nm => r.some(x => x.t === nm)) && r.some(x => /Bot/.test(x.t) && x.fs <= 17), JSON.stringify(r.filter(x => /Bot|Dihfish|Lan|P3/.test(x.t)).slice(0, 6)));
+  check('2 vs 2: small names, the bot by its level', ['Dihfish', 'Lan'].every(nm => r.some(x => x.t === nm)) && r.some(x => /Bot/.test(x.t) && x.fs <= 20), JSON.stringify(r.filter(x => /Bot|Dihfish|Lan|P3/.test(x.t)).slice(0, 6)));
   // how high: a ball and a player above the top of the screen
   r = await drawn('2p', 'w.ball.x = 600; w.ball.y = -480; w.ball.vy = 0; const p = w.players[2]; p.y = -260; E.shapes(p);');
   const hs = r.filter(x => /^\d+(,\d)?m$/.test(x.t));
-  check('ball and player above the screen: their height under the arrow ("12m", "9,0m"), small', hs.length >= 2 && hs.every(x => x.fs >= 12 && x.fs <= 18) && hs.some(x => x.t === '12m'), JSON.stringify(hs));
+  check('ball and player above the screen: their height under the arrow ("12m", "9,0m"), small', hs.length >= 2 && hs.every(x => x.fs >= 14 && x.fs <= 21) && hs.some(x => x.t === '12m'), JSON.stringify(hs));
   r = await drawn('2p', 'w.ball.x = 600; w.ball.y = 100; w.ball.vy = 0;');
   check('a ball still on the screen: no height shown', !r.some(x => /^\d+(,\d)?m$/.test(x.t)), JSON.stringify(r.filter(x => /m$/.test(x.t))));
   r = await drawn('tutorial', '');

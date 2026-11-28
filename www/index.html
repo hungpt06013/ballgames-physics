@@ -266,6 +266,20 @@
   .empty { text-align: center; font-weight: 800; color: var(--muted); padding: calc(4 * var(--u)) 0; font-size: calc(3.6 * var(--u)); }
   /* player stats of a match */
   .pwrap { margin: calc(1 * var(--u)) 0 calc(1.6 * var(--u)); }
+  /* the sides' stats of a match */
+  .tstats { margin: calc(1 * var(--u)) 0; font-weight: 800; font-size: calc(3.1 * var(--u)); display: flex; flex-direction: column; gap: calc(0.35 * var(--u)); }
+  .tstats .th { text-align: center; font-weight: 900; font-size: calc(3.3 * var(--u)); }
+  .tstats .trow { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: calc(1.6 * var(--u)); align-items: center; }
+  .tstats .trow .tv { text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tstats .trow .tl, .tstats .tlab { text-align: center; color: var(--muted); font-size: calc(2.8 * var(--u)); white-space: nowrap; }
+  .tstats .names .tv { font-weight: 900; }
+  .tstats .tbar { display: flex; height: calc(4.4 * var(--u)); border: calc(0.45 * var(--u)) solid var(--ink); border-radius: calc(2.2 * var(--u)); overflow: hidden; }
+  .tstats .tseg { display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: calc(2.7 * var(--u)); flex-basis: 0; }
+  .tstats .tseg + .tseg { border-left: calc(0.45 * var(--u)) solid var(--ink); }
+  .tstats .tgrid { display: grid; grid-template-columns: auto repeat(4, minmax(0, 1fr)); gap: calc(0.35 * var(--u)) calc(1.4 * var(--u)); align-items: center; }
+  .tstats .tgrid .tl { text-align: left; color: var(--muted); font-size: calc(2.8 * var(--u)); white-space: nowrap; }
+  .tstats .tgrid .tv { text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tstats .tgrid .tn { font-weight: 900; }
   .pstats { display: grid; gap: calc(0.2 * var(--u)) calc(2.2 * var(--u)); align-items: center; font-weight: 800; font-size: calc(3.3 * var(--u)); }
   .pstats .ph { text-align: center; font-size: calc(3.2 * var(--u)); }
   .pstats .pv { text-align: center; }
