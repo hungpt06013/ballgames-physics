@@ -25,7 +25,9 @@
   'use strict';
 
   var DT = E.DT;
-  var VERSION = 1;
+  // raised whenever the game plays differently (physics, sports, bots): games of different versions do not play
+  // together online (the guest is told to update). 2: v4.2 (the giant ball's smaller goal, bots' bicycle kicks)
+  var VERSION = 2;
   // the longest the host waits for somebody's buttons (steps); a change arriving later is moved to the next open step
   var MAX_WAIT = 30;
   // the jump a rollback makes on screen fades out with this time constant (s); a jump bigger than SNAP px is not eased

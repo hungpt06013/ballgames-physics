@@ -80,7 +80,7 @@
       sky: ['#ffd9ec', '#fff6e8'], ground: '#62b84f', ground2: '#6dc35a', deco: 'grass',
       g: 2000, gBall: 1000, jump: 1050, legSpd: 15, mu: 0.9,
       ballR: 62, ballM: 0.75, ballE: 0.72, ballDrag: 0.15, ballRoll: 0.8, kickE: 0.7, lift: 0.6,
-      goalH: 400, goalD: 300 },
+      goalH: 300, goalD: 210 }, // (v4.2: smaller - it was 400 x 300)
     { id: 'bomb', name: 'Bóng bom', icon: '💣', type: 'bomb', ball: 'bomb',
       sky: ['#ffd7c2', '#fff0e3'], ground: '#8d6e4f', ground2: '#977757', deco: 'dirt',
       g: 2000, gBall: 1500, jump: 1050, legSpd: 16, mu: 0.9,
@@ -161,6 +161,9 @@
     var segs = A.segs;
     if (m.type === 'goal') {
       var gh = m.goalH * (beg ? 1.2 : 1);
+      // the ball is never taller than half the goal: a ball size from the settings that would make it bigger is
+      // quietly brought down to that (only the giant ball at its bigger sizes)
+      P.ballR = Math.min(P.ballR, gh / 4);
       // a goal only counts once the whole ball is past the goal line, so the goal is always deeper than
       // the ball is wide (with room to spare), whatever ball size the settings / beginner mode give
       var gd = Math.max(m.goalD, Math.round(2 * P.ballR + 70));
@@ -1251,6 +1254,15 @@
   };
 
   var NO_PRESS = [-1, 0];
+  // bicycle kicks: when the ball is in the air near one of its players (standing in the half it attacks), a bot now and
+  // then (per planning, by level) also tries long holds - a jump, then turning over in the air - looking further
+  // ahead; it goes for one only if its look ahead really ends in a bicycle kick sending the ball toward the other goal,
+  // and then holds on to the end of it (rare: the ball has to be just right)
+  // (the holds that turn into bicycle kicks: a little wait, then 0.9 - 1 s; chance per planning: hard bots plan
+  // every 0.067 s, easy ones every 0.3 s)
+  var BIKE_CANDS = [], BIKE_HORIZON = 1.25;
+  [0, 0.05, 0.1, 0.15, 0.2].forEach(function (d) { BIKE_CANDS.push([d, 0.9], [d, 1.0]); });
+  var BIKE_CHANCE = { easy: 0.1, normal: 0.15, hard: 0.3, hardLite: 0.3 };
   function pressAt(c, t) { return c[0] >= 0 && t >= c[0] && t < c[0] + c[1]; }
   function clamp1(v) { return v > 1 ? 1 : (v < -1 ? -1 : v); }
 
@@ -1338,7 +1350,7 @@
     this.seed = (this.seed * 1664525 + 1013904223) >>> 0;
     return this.seed / 4294967296;
   };
-  Bot.prototype.reset = function () { this.plan = NO_PRESS; this.planT = 0; this.job = null; };
+  Bot.prototype.reset = function () { this.plan = NO_PRESS; this.planT = 0; this.job = null; this.bikeUntil = -1; this.bikes = 0; };
   Bot.prototype.mine = function (i) { return this.slot < 0 ? this.base.players[i].team === this.team : i === this.slot; };
   // inputs for every player at time t of a rollout
   Bot.prototype.inputs = function (cand, t, oppModel) {
@@ -1350,17 +1362,34 @@
     }
     return pr;
   };
-  Bot.prototype.rollout = function (cand, oppModel) {
+  // bike: a long hold for a bicycle kick - looked at further ahead, and worth something only if it gets one
+  Bot.prototype.rollout = function (cand, oppModel, bike) {
     var sim = copyWorld(this.sim, this.base);
-    var team = this.team, n = Math.round(this.cfg.horizon / DT);
+    var team = this.team, n = Math.round((bike ? BIKE_HORIZON : this.cfg.horizon) / DT), d = team === 0 ? 1 : -1, b = sim.balls[0], got = false;
     for (var k = 0; k < n; k++) {
       var sc = stepPlayers(sim, this.inputs(cand, k * DT, oppModel), this.cfg.iters);
+      if (bike && !got && b.touchT[team] > this.base.time && isBicycle(b, team) && (this.slot < 0 || b.lastPid === this.slot)) got = d * b.vx > 0;
       if (sc >= 0) {
         var bonus = this.slot >= 0 && sc === team && sim.credit === this.slot ? 300 : 0;
+        if (bike && !got) return -1e9;
         return sc === team ? 9000 - k * 6 + bonus : -10000 + k * 6;
       }
     }
+    if (bike) return got ? evaluate(sim, team, this.slot) : -1e9;
     return evaluate(sim, team, this.slot);
+  };
+  // the ball in the air near one of its players standing in the half it attacks: a chance for a bicycle kick?
+  Bot.prototype.bikeChance = function (world) {
+    var b = world.balls[0], d = this.team === 0 ? 1 : -1;
+    if (!b || world.arena.type === 'bomb' || world.arena.type === 'volley') return false;
+    var h = GROUND - b.y;
+    if (h < 60 || h > 650 || d * (b.x - W / 2) < -100) return false;
+    for (var i = 0; i < 4; i++) {
+      var p = world.players[i];
+      if (!this.mine(i) || !p.active || p.gT > 0.07 || Math.abs(p.a) > 0.5 || Math.abs(b.x - p.x) > 240) continue;
+      return this.rand() < (BIKE_CHANCE[this.level] || 0);
+    }
+    return false;
   };
   Bot.prototype.startJob = function (world) {
     var cfg = this.cfg, i;
@@ -1374,31 +1403,38 @@
       for (i = 0; i < 4; i++) pr[i] = this.mine(i) ? me : this.prevs[i];
       if (stepPlayers(base, pr) >= 0) break;
     }
-    var total = cfg.cands.length * cfg.oppModels;
-    this.job = { applyAt: world.time + K * DT, i: 0, total: total, per: Math.ceil(total / K),
-      vals: new Array(cfg.cands.length), best: -1e18, bestC: cfg.cands[0] };
+    var cands = this.bikeChance(world) ? cfg.cands.concat(BIKE_CANDS) : cfg.cands, total = cands.length * cfg.oppModels;
+    this.job = { applyAt: world.time + K * DT, i: 0, total: total, per: Math.ceil(total / K), cands: cands,
+      vals: new Array(cands.length), best: -1e18, bestC: cfg.cands[0] };
   };
   Bot.prototype.work = function () {
     var cfg = this.cfg, job = this.job, nm = cfg.oppModels;
-    var ci = Math.floor(job.i / nm), om = job.i % nm, c = cfg.cands[ci];
-    var v = this.rollout(c, om);
+    var ci = Math.floor(job.i / nm), om = job.i % nm, c = job.cands[ci], bike = ci >= cfg.cands.length;
+    var v = this.rollout(c, om, bike);
     if (om === 0) job.vals[ci] = v;
     else { var v0 = job.vals[ci]; v = 0.6 * Math.min(v0, v) + 0.4 * (v0 + v) / 2; }
     job.i++;
     if (om === nm - 1) {
       if (c[0] >= 0) v -= 4; // tiny cost for pressing: don't waste jumps
-      if (v > job.best) { job.best = v; job.bestC = c; }
+      if (bike) { if (v > -1e8 && (!job.bike || v > job.bikeV)) { job.bike = c; job.bikeV = v; } }
+      else if (v > job.best) { job.best = v; job.bestC = c; }
     }
   };
   Bot.prototype.update = function (world) {
+    // going for a bicycle kick: holds on to the end of it
+    if (world.time < this.bikeUntil) return pressAt(this.plan, world.time - this.planT);
     if (!this.job) this.startJob(world);
     var job = this.job;
     for (var n = 0; n < job.per && job.i < job.total; n++) this.work();
     if (world.time >= job.applyAt - 1e-9) {
       while (job.i < job.total) this.work();
       var c = job.bestC, mistake = this.cfg.mistake + this.extraMistake;
-      if (mistake > 0 && this.rand() < mistake) c = this.cfg.cands[Math.floor(this.rand() * this.cfg.cands.length)];
+      // a bicycle kick it can see working: it goes for it (not when an ordinary press scores for sure)
+      var bike = !!job.bike && job.best < 8000;
+      if (bike) c = job.bike;
+      else if (mistake > 0 && this.rand() < mistake) c = this.cfg.cands[Math.floor(this.rand() * this.cfg.cands.length)];
       this.plan = c; this.planT = job.applyAt; this.lastValue = job.best;
+      if (bike) { this.bikeUntil = job.applyAt + c[0] + c[1]; this.bikes++; }
       this.job = null;
     }
     return pressAt(this.plan, world.time - this.planT);

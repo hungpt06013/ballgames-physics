@@ -720,7 +720,7 @@
       beginner: prefs.beginner, slots: prefs.slots.slice(), levels: prefs.slotLv.slice(), slots2: prefs.slots2.slice(), levels2: prefs.slotLv2.slice(),
       side: prefs.side }, cfg);
     G.cfg = cfg; G.mode = cfg.mode; G.demo = false; G.round = 0; G.earned = 0; G.golden = false;
-    G.matchT = 0; G.goalsLog = []; G.playedMaps = []; G.hlm = { clips: [], singles: [], misses: [] }; G.lastHL = null; G.ps = newStats();
+    G.matchT = 0; G.goalsLog = []; G.playedMaps = []; G.hlm = { clips: [], singles: [], misses: [] }; G.lastHL = null; G.ps = newStats(); G.ts = newTeamStats();
     G.score = is4(cfg.mode) ? [0, 0, 0, 0] : [0, 0];
     G.target = cfg.fmt[0] === 'p' ? +cfg.fmt.slice(1) : 0;
     G.clock = cfg.fmt[0] === 't' ? +cfg.fmt.slice(1) : 0;
@@ -752,6 +752,7 @@
     G.world = newWorld(id, serve, is4(G.mode) && G.round % 2 === 0, mods);
     var mk = Object.keys(mods)[0];
     G.modName = mk ? E.MODS[mk].icon + ' ' + E.MODS[mk].name : '';
+    if (G.ts && SHOT_TYPES[G.world.arena.type]) G.ts.shotRounds++; // (shots and clearances only where there is a goal to shoot at)
     G.roundMods = mods; G.clipDone = false; G.hlw = G.hlm ? newWatch() : null; G.psT = [-9, -9, -9, -9]; G.pressT = [-9, -9, -9, -9];
     G.cf = G.hlw ? new CfLog() : null;
     if (G.playedMaps && G.playedMaps.indexOf(id) < 0) G.playedMaps.push(id);
@@ -866,12 +867,15 @@
     $('resultScore').innerHTML = html;
     $('resultReward').textContent = reward > 0 ? '+' + reward + ' 🪙' : '';
     if (reward > 0) Snd.coin();
-    var ms = matchStats(w, draw), pbox = $('resultStats');
+    // (the highlight first: a shot still in the air, near misses still waiting, are counted before the tables)
+    var clips = finishHighlights(), ms = matchStats(w, draw), ts = teamStats(), pbox = $('resultStats');
     pbox.innerHTML = '';
+    if (ts) pbox.appendChild(teamPanel(ts, mode, null));
     if (ms) pbox.appendChild(statsTable(ms, mode));
     // the match goes into the history, with its highlight (kept or not as the player chose)
-    var clips = finishHighlights(), rec = matchRecord(w, draw);
+    var rec = matchRecord(w, draw);
     if (ms) { rec.ps = ms.list; rec.mvp = ms.mvp; }
+    if (ts) rec.ts = ts;
     var hl = clips ? { match: { id: rec.id, date: rec.date, mode: mode, fmt: G.cfg.fmt, settings: G.hlSettings, looks: G.looks, names: sideNames(),
       mvp: ms ? { n: ms.list[ms.mvp].n, r: ms.list[ms.mvp].r } : null }, clips: clips } : null;
     G.lastHL = hl;
@@ -1878,7 +1882,8 @@
     if (G.dbg) G.dbg.push({ r: went ? 'cf-in' : 'cf-out', t: at, round: G.round, by: by });
     return went;
   };
-  function newWatch() { return { tick: 0, threat: [null, null], cand: [], group: null, flight: [null, null], miss: [], lastT: [-1, -1], act: [null, null] }; }
+  function newWatch() { return { tick: 0, threat: [null, null], cand: [], group: null, flight: [null, null], miss: [], lastT: [-1, -1], act: [null, null],
+    sf: [null, null], futNow: [-1, -1], futPrev: [-1, -1], blocks: [] }; }
   // he did something when he touched it at t: pressed his button just before (whatever part of him the ball met: a
   // kick, a header, or his body as the jump starts), or he is in the air after his own jump or dive
   function activeTouch(b, pid, t) { return G.pressT[pid] >= t - SAVE_ACTIVE || (b.lastAir && G.pressT[pid] >= t - SAVE_JUMP); }
@@ -1910,6 +1915,7 @@
     // turned away for one step - go either way)
     for (var bi = 0; bi < w.balls.length && bi < 2; bi++) {
       var b = w.balls[bi], th = S.threat[bi], fut = E.ballFuture(A, b, SAVE_LOOK);
+      S.futPrev[bi] = S.futNow[bi]; S.futNow[bi] = fut ? fut.team : -1; // (the shots: going in, before / after a touch)
       // the danger is over - no longer going in, or now going in at the OTHER end (a big clearance up an empty
       // pitch): was it saved?
       if (th && (!fut || fut.team !== th.att)) { S.threat[bi] = null; endThreat(w, S, bi, b, th); th = null; }
@@ -1931,8 +1937,6 @@
       th.seen = w.time; th.danger = Math.max(th.danger, 1 - fut.t / SAVE_LOOK);
       th.pace = Math.max(th.pace || 0, Math.sqrt(b.vx * b.vx + b.vy * b.vy));
       if (b.touchT[att] > th.shot) th.shot = b.touchT[att];
-      // a shot on target: the attacking side's touch just now sent it goalwards (one per touch, dribbling counts once)
-      if (b.lastTeam === att && b.touchT[att] >= w.time - 0.5 && b.touchT[att] - (th.counted || -9) > 0.5) { th.counted = b.touchT[att]; statAdd(b.lastBy[att], 'shots'); }
     }
     for (i = S.cand.length - 1; i >= 0; i--) if (w.time - S.cand[i].t >= SAVE_CONFIRM - 1e-9) addSave(S.cand.splice(i, 1)[0]); // (0.425 - 0.175 is 0.2499999...)
     if (S.group && w.time - S.group.last > SAVE_CHAIN) closeGroup(true);
@@ -1943,19 +1947,25 @@
   function endThreat(w, S, bi, b, th) {
     var def = 1 - th.att, t = b.touchT[def], by = b.lastTeam === def ? b.lastPid : -1;
     if (by < 0 || t < Math.max(th.since, th.seen - 0.1)) return; // not turned away by a defender
-    var shot = th.shot >= th.since - 3 ? th.shot : th.since, x = b.lastX;
+    var shot = th.shot >= th.since - 3 ? th.shot : th.since, x = b.lastX, who = by, wx = x;
+    if (t - shot < SAVE_GAP) { why('scramble', bi, by, x); return; } // touched by both sides in a scramble: nothing
+    // not a save, but he (the one it hit) stopped a ball going in, in his own half: a block (if it stays out), unless
+    // the ball was hardly moving at all
+    var block = function (r) {
+      why(r, bi, who, wx);
+      if ((def === 0 ? wx <= W / 2 : wx >= W / 2) && (th.pace || 0) >= BLOCK_PACE) S.cand.push({ kind: 'block', bi: bi, att: th.att, def: def, t: t, by: who, shot: shot, th: th });
+    };
     // the ball was hardly moving (not in basketball: a soft ball dropping into the ring is a real danger too)
-    if ((th.pace || 0) < SAVE_PACE && w.arena.type !== 'hoop') { why('slow', bi, by, x); return; }
-    if (t - shot < SAVE_GAP) { why('scramble', bi, by, x); return; } // touched by both sides in a scramble
+    if ((th.pace || 0) < SAVE_PACE && w.arena.type !== 'hoop') { block('slow'); return; }
     // he did something (activeTouch); or a defender did something to it earlier in this danger and it ends here
     // (his deflection, then the ball dies against him or a team-mate): the save is his
     var ta = S.act[bi], active = ta && ta.t === t && ta.pid === by ? ta.on : activeTouch(b, by, t), at = t;
     if (!active && th.act !== undefined && th.actT > b.touchT[th.att]) { by = th.act; x = th.actX; at = th.actT; active = true; }
-    if (!active) { why('standing', bi, by, x); return; } // it hit him standing there
-    if (def === 0 ? x > W / 2 : x < W / 2) { why('their half', bi, by, x); return; } // not in his own half
+    if (!active) { block('standing'); return; } // it hit him standing there
+    if (def === 0 ? x > W / 2 : x < W / 2) { block('their half'); return; } // not in his own half
     // what he did has to be what kept it out: played again without his press, would it have gone in? A ball that
     // would have hit him (or a team-mate) anyway - it came straight at his feet - was no save, whatever he did
-    if (G.cf && !G.cf.goesInWithout(w, by, def, th.att, bi, at)) { why('anyway', bi, by, x); return; }
+    if (G.cf && !G.cf.goesInWithout(w, by, def, th.att, bi, at)) { block('anyway'); return; }
     why('save?', bi, by, x);
     S.cand.push({ bi: bi, att: th.att, def: def, t: t, by: by, shot: shot, danger: th.danger, th: th });
   }
@@ -1998,6 +2008,7 @@
   }
   function fileMiss(m) {
     if (G.dbg) G.dbg.push({ r: 'miss', t: m.at, round: G.round, by: m.by });
+    if (G.ts && m.by >= 0) G.ts.miss[m.by]++;
     var rec = G.rec, r = recRange();
     var beauty = m.close + (m.post ? 0.25 : 0) + (m.far ? 0.2 : 0) + (m.air ? 0.15 : 0) + 0.2 * Math.min(1, m.sp / 1800);
     var from = rec.frameAt(Math.max(m.shot, m.at - 3) - CLIP_PRE, r.oldest, r.newest);
@@ -2026,12 +2037,18 @@
   // (for the tests: why a touch that turned a shot away was taken as a save or not)
   function why(r, bi, by, x) { if (G.dbg) G.dbg.push({ r: r, t: G.world.time, round: G.round, bi: bi, by: by, x: Math.round(x), kind: G.world.balls[bi].lastKind, air: G.world.balls[bi].lastAir }); }
   function addSave(s) {
+    if (s.kind === 'block') { addBlock(s); return; }
     if (G.dbg) G.dbg.push({ r: 'save', t: s.t, round: G.round, by: s.by });
     var S = G.hlw, g = S.group;
     statAdd(s.by, 'saves');
     if (g && g.def === s.def && s.t - g.last <= SAVE_CHAIN) { g.saves.push(s); g.last = s.t; return; }
     closeGroup(true);
     S.group = { def: s.def, saves: [s], last: s.t };
+  }
+  // a block (no clip of its own: the shot was stopped by him being there)
+  function addBlock(s) {
+    if (G.dbg) G.dbg.push({ r: 'block', t: s.t, round: G.round, by: s.by });
+    statAdd(s.by, 'blocks'); G.hlw.blocks.push(s);
   }
   // a run of saves is over: from 3 s before the first shot to 1.5 s after the last save, slowed around each save
   function closeGroup(keep) {
@@ -2106,6 +2123,7 @@
     // shot was saved). A touch before the OTHER side scored, or on the other ball (two balls), kept its ball out.
     S.cand.forEach(function (c) { if (c.att !== team || c.bi !== sb || wonBack(c)) addSave(c); });
     S.cand = []; S.threat = [null, null];
+    endShots(S, team, sb);
     S.flight = [null, null]; // (a flight still going went in)
     // a 'near miss' of the side that has just scored was the start of this point (it went in in the end): not a miss
     S.miss.forEach(function (m) { if (m.team !== team) fileMiss(m); });
@@ -2120,12 +2138,18 @@
       return false;
     });
     if (g) closeGroup(g.saves.length > 0);
+    // the same for blocks: one after which the ball went in (within 3 s) untouched by the scorers stopped nothing
+    if (team >= 0) S.blocks.forEach(function (s) {
+      if (s.def !== 1 - team || s.bi !== sb || G.world.time - s.t >= SAVE_CHAIN || wonBack(s)) return;
+      statAdd(s.by, 'blocks', -1); if (G.dbg) G.dbg.push({ r: 'block-x', t: G.world.time, round: G.round, by: s.by });
+    });
     G.hlw = null;
   }
   // the attackers touched the saved ball again after the save (a rebound, a new shot)
   function wonBack(s) { var b = G.world.balls[s.bi]; return !!b && b.touchT[1 - s.def] > s.t + 1e-6; }
   function finishHighlights() {
     if (G.hlw) {
+      endShots(G.hlw, -1, -1);
       endFlight(G.world, G.hlw, 0); endFlight(G.world, G.hlw, 1);
       G.hlw.miss.forEach(function (m) { fileMiss(m); });
       closeGroup(true); G.hlw = null;
@@ -2152,6 +2176,120 @@
     return out.join(' + ');
   }
 
+  // ---------- the sides' stats of a match: possession, territory, shots, near misses, clearances ----------
+  // Counted on every physics step of play (not while a point is celebrated or replayed), for each ball (two balls:
+  // both). Per body; shown per side (2 players / vs bot / 2 vs 2) or per player (4 alone).
+  //  - possession: the ball belongs to whoever touched it last (before the first touch of a round, to nobody)
+  //  - territory: the ball in the half of the pitch a side attacks
+  //  - shots (goals, hoops, posts): a touch starts a flight, followed until the next touch (the same player touching
+  //    again less than SHOT_GAP s after his last touch, nobody else in between, is the same flight: a dribble, a ball
+  //    held against him), SHOT_LOOK s after his last touch, the ball resting on the ground, or a point. It is a shot
+  //    ON TARGET if it went in for his side, or - from outside the third of the pitch at his own end - the ball on its
+  //    own would have gone in at any moment of it (as the saves see it: within SAVE_LOOK s); OFF TARGET if not, from
+  //    outside his own third too, kicked at SHOT_SPEED or more (its pace in the first
+  //    0.15 s after a touch of his) and coming within shotNear of counting while heading for the goal (E.scoreGap,
+  //    as the near misses measure it, from 0.1 s after his last touch); OFF THE WOODWORK too if it hit the frame of
+  //    the goal it attacks (frameHit: the bar over the goal mouth, the ring or the board, a post) and did not go in.
+  //    Into his own goal: no shot.
+  //  - near misses: the near misses the highlight finds (fileMiss), all of them
+  //  - clearances (goals, hoops, posts): a flight from a touch in the third of the pitch at his own end that did not go
+  //    in, the ball not going into his own goal just before that touch (that is a save / block or nothing), kicked
+  //    at CLEAR_SPEED or more, and taken CLEAR_DIST px or more further from his own end before the flight is over
+  //    (even all the way to the other goal: from there that is a clearance, not a shot)
+  // (players' blocks: with the saves - endThreat)
+  var SHOT_SPEED = 450, SHOT_GAP = 0.5, SHOT_LOOK = 2.5, CLEAR_SPEED = 500, CLEAR_DIST = 400, CLEAR_ZONE = W / 3, BLOCK_PACE = 150;
+  var SHOT_TYPES = { goal: 1, hoop: 1, posts: 1 };
+  // how close (px, as E.scoreGap measures) a hard kick at the goal has to come to be a shot off target: three
+  // quarters of the goal's height over the bar, a ring's width off the ring, three quarters of the bar's height
+  function shotNear(A) {
+    return A.type === 'goal' ? 0.75 * (GROUND - A.goalTop) : A.type === 'hoop' ? A.rimFront - A.boardX : A.type === 'posts' ? 0.75 * (GROUND - A.barY) : 0;
+  }
+  function newTeamStats() { var z = function () { return [0, 0, 0, 0]; }; return { poss: z(), terr: [0, 0], on: z(), off: z(), wood: z(), miss: z(), clear: z(), shotRounds: 0 }; }
+  function statsStep(w) {
+    var T = G.ts, S = G.hlw, A = w.arena, shots = !!(S && SHOT_TYPES[A.type]);
+    for (var bi = 0; bi < w.balls.length && bi < 2; bi++) {
+      var b = w.balls[bi];
+      if (b.lastPid >= 0 && b.lastPid < 4) T.poss[b.lastPid] += DT;
+      if (b.x > W / 2) T.terr[0] += DT; else if (b.x < W / 2) T.terr[1] += DT;
+      if (shots) followShot(w, S, bi, b);
+    }
+  }
+  // this step, did ball b hit the frame of the goal team D attacks: the bar over the goal mouth (not the roof of the
+  // goal behind it), the ring or the board (not the pole or the arm under it), a post
+  function frameHit(w, b, D) {
+    var A = w.arena, R = A.P.ballR, ev = w.events;
+    for (var i = 0; i < ev.length; i++) {
+      var e = ev[i];
+      if (e.t !== 'post' || (D === 0 ? e.x < W / 2 : e.x > W / 2) || Math.hypot(e.x - b.x, e.y - b.y) > R + 14) continue;
+      var x = D === 0 ? W - e.x : e.x; // (from the end of the goal it attacks)
+      if (A.type === 'goal' ? Math.abs(x - A.goalD) <= 24 : A.type === 'hoop' ? x >= A.boardX - 3 && e.y <= A.rimY + 50 : A.type === 'posts') return true;
+    }
+    return false;
+  }
+  function followShot(w, S, bi, b) {
+    var A = w.arena, f = S.sf[bi], last = Math.max(b.touchT[0], b.touchT[1]);
+    if (f && last > f.last + 1e-9) {
+      // touched again: the same player again soon - the same flight goes on; anybody else, or later - it is over
+      if (b.lastPid === f.by && b.touchT[1 - f.team] <= f.last + 1e-9 && last - f.last < SHOT_GAP) f.last = last;
+      else { endShot(S, f, -1); f = S.sf[bi] = null; }
+    }
+    if (!f) {
+      if (b.lastTeam < 0 || b.lastPid < 0 || last < 0 || w.time - last > 0.03) return; // (a flight starts right at a touch)
+      f = S.sf[bi] = { bi: bi, team: b.lastTeam, by: b.lastPid, last: last, x0: b.x, danger: S.futPrev[bi] === 1 - b.lastTeam, sp: 0, on: false, gap: Infinity, post: false, far: 0 };
+    }
+    var D = f.team, age = w.time - f.last, sp = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
+    if (age <= 0.15) f.sp = Math.max(f.sp, sp);
+    if (S.futNow[bi] === D) f.on = true;
+    if (frameHit(w, b, D)) f.post = true;
+    if (age >= MISS_FROM && (A.type === 'hoop' || (D === 1 ? -b.vx : b.vx) > 100)) f.gap = Math.min(f.gap, E.scoreGap(A, b, D));
+    f.far = Math.max(f.far, (D === 0 ? b.x - f.x0 : f.x0 - b.x));
+    if (age > SHOT_LOOK || (b.touchGround && sp < 20)) { endShot(S, f, -1); S.sf[bi] = null; }
+  }
+  // a flight is over (goal: the side the ball just scored for, or -1)
+  function endShot(S, f, goal) {
+    var T = G.ts, A = G.world.arena, D = f.team;
+    if (!T || goal === 1 - D) return; // (into his own goal: no shot, no clearance)
+    // (from the third of the pitch at his own end a kick is a clearance, not a shot - unless it went in)
+    var x0 = D === 0 ? f.x0 : W - f.x0, deep = x0 <= CLEAR_ZONE;
+    var on = goal === D || (f.on && !deep), off = !on && !deep && f.sp >= SHOT_SPEED && f.gap <= shotNear(A);
+    if (G.dbg) G.dbg.push({ r: on ? 'shot-on' : (off ? 'shot-off' : 'flight'), t: f.last, round: G.round, by: f.by, wood: f.post && goal !== D });
+    if (on) { T.on[f.by]++; statAdd(f.by, 'shots'); } // (the players' table: shots on target)
+    else if (off) T.off[f.by]++;
+    if ((on || off) && f.post && goal !== D) T.wood[f.by]++;
+    if (goal !== D && deep && !f.danger && f.sp >= CLEAR_SPEED && f.far >= CLEAR_DIST) {
+      T.clear[f.by]++; if (G.dbg) G.dbg.push({ r: 'clear', t: f.last, round: G.round, by: f.by });
+    }
+  }
+  // every flight is over (a point for `team` with ball `sb`, or the round / match ends: -1)
+  function endShots(S, team, sb) {
+    for (var bi = 0; bi < 2; bi++) if (S.sf[bi]) { endShot(S, S.sf[bi], bi === sb ? team : -1); S.sf[bi] = null; }
+  }
+  // the sides' stats as shown: per side (2 players, vs bot, 2 vs 2) or per player (4 alone); possession and
+  // territory as shares of the time (territory not with 4 alone: two rivals attack the same goal there)
+  function teamStats() {
+    var T = G.ts;
+    if (!T) return null;
+    var ffa = G.mode === 'ffa', n = ffa ? 4 : 2, out = [], pt = 0, tt = T.terr[0] + T.terr[1], k;
+    for (k = 0; k < n; k++) out.push({ poss: 0, terr: null, shots: 0, on: 0, wood: 0, miss: 0, clear: 0 });
+    for (var id = 0; id < 4; id++) {
+      var o = out[ffa ? id : slotTeam(id)];
+      o.poss += T.poss[id]; pt += T.poss[id];
+      o.shots += T.on[id] + T.off[id]; o.on += T.on[id]; o.wood += T.wood[id]; o.miss += T.miss[id]; o.clear += T.clear[id];
+    }
+    var poss = shares(out.map(function (o) { return o.poss; }));
+    out.forEach(function (o, k) { o.poss = poss[k]; });
+    if (!ffa) { var terr = shares(T.terr); out[0].terr = terr[0]; out[1].terr = terr[1]; }
+    return { list: out, shots: T.shotRounds > 0, timed: pt > 0 };
+  }
+  // whole percentages that add up to 100 (largest remainders); all 0 when there was nothing to share
+  function shares(v) {
+    var sum = v.reduce(function (a, x) { return a + x; }, 0);
+    if (!(sum > 0)) return v.map(function () { return 0; });
+    var raw = v.map(function (x) { return 100 * x / sum; }), out = raw.map(Math.floor), left = 100 - out.reduce(function (a, x) { return a + x; }, 0);
+    raw.map(function (x, i) { return [x - Math.floor(x), i]; }).sort(function (a, b) { return b[0] - a[0]; }).slice(0, left).forEach(function (q) { out[q[1]]++; });
+    return out;
+  }
+
   // ---------- player stats of a match, rating and MVP ----------
   // "player" = a person: each side in 2-player and bot matches (one button moves both bodies), each slot with 4 players
   function personOf(id) { return is4(G.mode) ? id : slotTeam(id); }
@@ -2162,7 +2300,7 @@
   }
   function newStats() {
     var out = [];
-    for (var i = 0; i < (is4(G.mode) ? 4 : 2); i++) out.push({ goals: 0, saves: 0, shots: 0, touches: 0, own: 0 });
+    for (var i = 0; i < (is4(G.mode) ? 4 : 2); i++) out.push({ goals: 0, saves: 0, blocks: 0, shots: 0, touches: 0, own: 0 });
     return out;
   }
   function statAdd(id, key, n) { if (G.ps && id >= 0 && id < 4) G.ps[personOf(id)][key] += n || 1; }
@@ -2178,7 +2316,7 @@
   // 6.0 for an ordinary match. The result and the score margin weigh most (losing 1–6 ends far under 6),
   // then goals, saves, shots on target and touches; own goals cost a lot. Range 3.0–10.0.
   function rate(st, result, margin) {
-    var d = 0.6 * st.goals + 0.4 * st.saves + 0.08 * st.shots + 0.01 * Math.min(st.touches, 40) - 0.45 * st.own +
+    var d = 0.6 * st.goals + 0.4 * st.saves + 0.15 * (st.blocks || 0) + 0.08 * st.shots + 0.01 * Math.min(st.touches, 40) - 0.45 * st.own +
       (result > 0 ? 0.6 : (result < 0 ? -1.2 : 0)) + Math.max(-1.8, Math.min(1.8, 0.3 * margin));
     var r = d >= 0 ? 6 + 4 * Math.tanh(d / 4) : 6 + 3 * Math.tanh(d / 2.5);
     return Math.round(Math.max(3, Math.min(10, r)) * 10) / 10;
@@ -2195,7 +2333,7 @@
     if (!G.ps) return null;
     var list = G.ps.map(function (st, i) {
       var won = G.mode === 'team4' ? slotTeam(i) === slotTeam(winner) : i === winner;
-      return { n: personName(i), g: st.goals, s: st.saves, sh: st.shots, t: st.touches, o: st.own, r: rate(st, draw ? 0 : (won ? 1 : -1), marginOf(i)), win: !draw && won };
+      return { n: personName(i), g: st.goals, s: st.saves, b: st.blocks, sh: st.shots, t: st.touches, o: st.own, r: rate(st, draw ? 0 : (won ? 1 : -1), marginOf(i)), win: !draw && won };
     });
     var mvp = 0;
     list.forEach(function (x, i) {
@@ -2205,11 +2343,64 @@
     return { list: list, mvp: mvp };
   }
   function fmtRating(r) { return r.toFixed(1).replace('.', ','); }
+  // the sides' stats (end of match screen and history): possession and territory as bars in the sides' colours, then
+  // shots (on target), off the woodwork, near misses, clearances; with 4 alone, a column per player
+  // (r: a match of the history, in its own colours and names)
+  function teamPanel(ts, mode, r) {
+    var L = ts.list, n = L.length, four = n > 2, box = el('div', 'tstats' + (four ? ' four' : ''));
+    var side = function (k) {
+      if (four) return rowCol(mode, k, r);
+      if (mode === 'team4') return r ? (r.side ? r.side[k] : DEF_TEAM[k]) : teamCol(k);
+      return r ? (r.side ? r.side[k] : DEF_TEAM[k]) : teamCol(k);
+    };
+    var names = r ? histNames(r, n) : (four ? [0, 1, 2, 3].map(shortName) : sideNames());
+    box.appendChild(el('div', 'th', '📊 Thống kê trận'));
+    // two sides: rows of  value | what | value, possession and territory as bars; four players: one grid, a column each
+    var grid = four ? el('div', 'tgrid') : null;
+    var cell = function (parent, cls, txt, c) { var e = el('span', cls, txt); if (c) e.style.color = textCol(c); parent.appendChild(e); return e; };
+    if (four) { cell(grid, 'tl', ''); names.forEach(function (nm, k) { cell(grid, 'tv tn', nm, side(k)); }); }
+    else { var head = el('div', 'trow names'); cell(head, 'tv', names[0], side(0)); cell(head, 'tl', ''); cell(head, 'tv', names[1], side(1)); box.appendChild(head); }
+    var row = function (label, f) {
+      if (four) { cell(grid, 'tl', label); for (var k = 0; k < 4; k++) cell(grid, 'tv', f(L[k])); return; }
+      var e = el('div', 'trow'); cell(e, 'tv', f(L[0])); cell(e, 'tl', label); cell(e, 'tv', f(L[1])); box.appendChild(e);
+    };
+    var bar = function (label, key) {
+      if (!ts.timed || L.some(function (o) { return o[key] === null; })) return;
+      if (four) { row(label, function (o) { return o[key] + '%'; }); return; }
+      box.appendChild(el('div', 'tlab', label));
+      var b = el('div', 'tbar');
+      [0, 1].forEach(function (k) {
+        var seg = el('span', 'tseg', L[k][key] + '%'), c = side(k);
+        seg.style.flexGrow = Math.max(L[k][key], 12); seg.style.background = c.main; seg.style.color = lum(c.main) > 0.62 ? INK : '#ffffff';
+        b.appendChild(seg);
+      });
+      box.appendChild(b);
+    };
+    bar('Kiểm soát bóng', 'poss');
+    bar('Bóng ở phần sân đối phương', 'terr');
+    if (ts.shots) {
+      row('Sút (trúng đích)', function (o) { return o.shots + ' (' + o.on + ')'; });
+      row('Trúng cột / xà', function (o) { return String(o.wood); });
+      row('Suýt vào', function (o) { return String(o.miss); });
+      row('Phá bóng', function (o) { return String(o.clear); });
+    }
+    if (grid) box.appendChild(grid);
+    return box;
+  }
+  // a player in a narrow column (4 alone): a bot by its place ("🤖 P2"), his colour tells the rest
+  function shortName(i) { return G.bots[i] ? '🤖 P' + (i + 1) : nameOf(i); }
+  // the names of a history match's sides (or players with 4 alone)
+  function histNames(r, n) {
+    if (n > 2) return [0, 1, 2, 3].map(function (i) { return r.bots && r.bots[i] ? '🤖 P' + (i + 1) : histName(r, i); });
+    if (r.mode === 'team4') return [histSide(r, 0), histSide(r, 2)];
+    if (r.mode === 'bot') { var bot = histBot(r); return r.me ? [bot, (r.names || [])[0]] : [(r.names || [])[0], bot]; }
+    return [histName(r, 0), histName(r, 1)];
+  }
   // the table of a match's player stats (end of match screen and history)
   // (r: a match of the history, with the colours it was played in)
   function statsTable(ms, mode, r) {
     var box = el('div', 'pstats'), own = ms.list.some(function (x) { return x.o > 0; });
-    var cols = [['⚽', 'g', 'Bàn thắng'], ['🧤', 's', 'Cứu thua'], ['🎯', 'sh', 'Sút trúng đích'], ['👟', 't', 'Chạm bóng']];
+    var cols = [['⚽', 'g', 'Bàn thắng'], ['🧤', 's', 'Cứu thua'], ['🛑', 'b', 'Chặn bóng'], ['🎯', 'sh', 'Sút trúng đích'], ['👟', 't', 'Chạm bóng']];
     if (own) cols.push(['😬', 'o', 'Phản lưới']);
     cols.push(['⭐', 'r', 'Điểm (rating)']);
     box.style.gridTemplateColumns = 'minmax(0, 1fr) repeat(' + cols.length + ', auto)';
@@ -2219,7 +2410,7 @@
       var mvp = i === ms.mvp, nm = el('span', 'pn' + (mvp ? ' mvp' : ''), (mvp ? '🏅 ' : '') + x.n);
       nm.style.color = textCol(rowCol(mode, i, r));
       box.appendChild(nm);
-      cols.forEach(function (c) { box.appendChild(el('span', 'pv' + (mvp ? ' mvp' : '') + (c[1] === 'r' ? ' pr' : ''), c[1] === 'r' ? fmtRating(x.r) : String(x[c[1]]))); });
+      cols.forEach(function (c) { box.appendChild(el('span', 'pv' + (mvp ? ' mvp' : '') + (c[1] === 'r' ? ' pr' : ''), c[1] === 'r' ? fmtRating(x.r) : String(x[c[1]] || 0))); });
     });
     var foot = el('div', 'pmvp', '🏅 MVP: ' + ms.list[ms.mvp].n + ' · ⭐ ' + fmtRating(ms.list[ms.mvp].r));
     var wrap = el('div', 'pwrap'); wrap.appendChild(box); wrap.appendChild(foot);
@@ -2403,8 +2594,8 @@
   }
   function voterCol(id) { return G.mode === 'ffa' ? pCol(id) : teamCol(G.mode === '2p' ? id : (G.mode === 'bot' ? G.me : slotTeam(id))); }
   function scoreHtml() {
-    if (G.mode === 'ffa') return [0, 1, 2, 3].map(function (i) { return scoreSpan(pCol(i), esc(nameOf(i)) + ': ' + G.score[i]); }).join(' · ');
-    if (G.mode === 'team4') return '<span class="r">' + esc(nameOf(0) + '+' + nameOf(1)) + ' ' + G.score[0] + '</span> – <span class="b">' + G.score[2] + ' ' + esc(nameOf(2) + '+' + nameOf(3)) + '</span>';
+    if (G.mode === 'ffa') return [0, 1, 2, 3].map(function (i) { return scoreSpan(pCol(i), esc(shortName(i)) + ': ' + G.score[i]); }).join(' · ');
+    if (G.mode === 'team4') { var sn = sideNames(); return scoreSpan(teamCol(0), esc(sn[0]) + ' ' + G.score[0]) + ' – ' + scoreSpan(teamCol(1), G.score[2] + ' ' + esc(sn[1])); }
     if (G.mode === '2p') return scoreSpan(teamCol(0), G.score[0]) + ' – ' + scoreSpan(teamCol(1), G.score[1]);
     return scoreSpan(teamCol(0), G.score[0]) + ' – ' + scoreSpan(teamCol(1), G.score[1]);
   }
@@ -2650,6 +2841,7 @@
       (has ? '🎬 ' + r.hl.clips + ' pha · ' + fmtMB(r.hl.bytes) : (r.hl ? 'không còn highlight' : 'không lưu highlight')) +
       (r.ps ? ' · 🏅 MVP ' + r.ps[r.mvp].n : '')));
     if (hOpen[r.id]) {
+      if (r.ts) main.appendChild(teamPanel(r.ts, r.mode, r));
       if (r.ps) main.appendChild(statsTable({ list: r.ps, mvp: r.mvp }, r.mode, r));
       var gl = el('div', 'hgoals');
       (r.goals || []).forEach(function (g) {
@@ -3003,6 +3195,7 @@
     if (G.mode === 'tutorial') tutorialTick(DT, w);
     if (!G.demo && G.rec && (G.state === 'play' || G.state === 'scored')) G.rec.push(w);
     if (G.hlw && G.state === 'play') watchSaves(w);
+    if (G.ts && G.state === 'play') statsStep(w);
     if (G.ps && G.state === 'play') countTouches(w);
     if (!quiet) pushTrails(w);
     w.events.length = 0;
@@ -3331,9 +3524,9 @@
   }
   // over each player a small name (everybody wears his own colour, so the name is all that is needed), with a small
   // pointer in his colour; one above the top of the screen gets an arrow in his colour, his name and how high he is.
-  // Small, but never under 12 px so it can be read on a phone
+  // Small, but never under 14 px so it reads well on a phone (up to 20 px on a big screen)
   function drawPlayerMarks(c, u, w) {
-    var v = view, hidden = playback() ? barH(u) : 4, fs = Math.round(Math.max(12, Math.min(17, 2.8 * u)));
+    var v = view, hidden = playback() ? barH(u) : 4, fs = Math.round(Math.max(14, Math.min(20, 3.2 * u)));
     for (var i = 0; i < 4; i++) {
       var p = w.players[i];
       if (!p.active) continue;
@@ -3374,10 +3567,10 @@
     }
   }
   // a small "7,4m" under an arrow: how high above the ground (100 px = 1 m: a player is about 1.75 m tall); small,
-  // but never under 12 px so it can be read on a phone
+  // but never under 14 px so it reads well on a phone (up to 21 px on a big screen)
   function heightM(px) { var m = Math.max(0, px) / 100; return (m < 10 ? m.toFixed(1).replace('.', ',') : String(Math.round(m))) + 'm'; }
   function heightLabel(c, u, x, top, px) {
-    var fs = Math.round(Math.max(12, Math.min(18, 2.7 * u)));
+    var fs = Math.round(Math.max(14, Math.min(21, 3.1 * u)));
     c.font = '900 ' + fs + 'px ' + D.FONT; c.textAlign = 'center'; c.textBaseline = 'middle';
     D.textOutlined(c, heightM(px), x, top + fs * 0.6, fs, '#ffffff', INK);
   }
