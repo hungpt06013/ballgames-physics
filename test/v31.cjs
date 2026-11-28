@@ -14,6 +14,16 @@ const path = require('path');
   await page.evaluate(() => { const p = JSON.parse(localStorage.getItem('bgp_prefs')); p.hlAsked = true; p.hlMode = 'all'; localStorage.setItem('bgp_prefs', JSON.stringify(p)); });
   await page.reload(); await page.waitForTimeout(500);
   const ev = (f, a) => page.evaluate(f, a);
+  // every match starts from the same random numbers (the players' sway, the world's seed), so every run is the same
+  // (SEED=n to try others)
+  await ev(seed => {
+    const start = __api.startMatch;
+    __api.startMatch = function () {
+      let s = seed;
+      Math.random = function () { s = (s + 0x6D2B79F5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+      return start.apply(this, arguments);
+    };
+  }, +(process.env.SEED || 31));
   let fails = 0;
   const check = (name, ok, info) => { if (!ok) fails++; console.log((ok ? 'ok   ' : 'FAIL ') + name + (info ? '  ' + info : '')); };
 
@@ -69,8 +79,11 @@ const path = require('path');
   let r2 = await lob1({ defX: 1200, pressAt: -1 });
   check('video 2, nobody there: the lob bounces once and rolls in', r2.score === '0-1', JSON.stringify(r2));
   // a real jump and header that clears it (search the defender's spot and the moment he jumps, as the bot or player would)
+  // - only where standing still would not have kept it out: there it is a block, whatever he does (the rules)
   let found = null, tried = 0;
   for (const defX of [440, 420, 400, 460, 380, 480]) {
+    const still = await lob1({ defX, pressAt: -1 });
+    if (still.touched && still.score === '0-0') continue;
     for (const pressAt of [0.05, 0.1, 0.15, 0.2, 0.25, 0, 0.3]) {
       tried++;
       const x = await lob1({ defX, pressAt });
