@@ -515,7 +515,7 @@
     var tx = -15, ty = SH_Y - 3, tw = 30, th = HIP_Y - SH_Y + 6;
     rrect(c, tx, ty, tw, th, 11); c.fillStyle = col.main; c.fill(); c.lineWidth = 3.5; c.strokeStyle = INK; c.stroke();
     shirtPattern(c, look.shirt, col, look.num, tx, ty, tw, th);
-    rrect(c, -16, HIP_Y - 7, 32, 20, 6); c.fillStyle = col.dark; c.fill(); c.stroke();
+    rrect(c, -16, HIP_Y - 7, 32, 20, 6); c.fillStyle = look.shorts || col.dark; c.fill(); c.stroke(); // (2 vs 2: the team's shorts)
     // head
     var hx = 3, hy = HEAD_Y, r = 19, gear = mid === 'football';
     var hairKind = look.hair || 'default';

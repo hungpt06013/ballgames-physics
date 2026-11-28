@@ -1,4 +1,4 @@
-# ⚽ Ballgames Physics – v4.0
+# ⚽ Ballgames Physics – v4.1
 
 Game thể thao ragdoll vui nhộn: 2 đội × 2 cầu thủ, mỗi đội chỉ **1 nút**.
 
@@ -43,11 +43,12 @@ Game thể thao ragdoll vui nhộn: 2 đội × 2 cầu thủ, mỗi đội ch�
 - 📊 Thống kê từng người + 🏅 MVP
 - 🎬 Highlight (bàn thắng, cứu thua, suýt vào) – tải về thành video MP4
 - 📜 Lịch sử trận · 🛒 Cửa hàng (18 mũ, 12 kiểu tóc, 12 áo, 14 quả bóng) · ⚙️ Cài đặt vật lý · 🌙 Giao diện tối
-- 👤 Người chơi: đổi tên, chọn đồ theo từng mục 🎩 Mũ · 💇 Tóc · 👕 Áo cho mỗi người, ⚽ Bóng dùng chung
+- 👤 Người chơi: đổi tên, chọn đồ theo từng mục 🎩 Mũ · 💇 Tóc · 👕 Áo cho mỗi người **và cho bot**, ⚽ Bóng dùng chung
+- 🎨 **Mỗi người một màu áo** ở mọi chế độ (cả 2 vs 2 – quần theo màu đội): 16 màu, không có 2 màu nào gần giống nhau, không bao giờ 2 người trùng màu; tên nhỏ trên đầu mỗi cầu thủ; bóng / người bay quá màn hình có cả độ cao (vd. "12m")
 
 ## 🛠️ Cho người sửa game
 - Code nằm trong `www/`: `engine.js` (vật lý, bot), `game.js` (luồng game), `draw.js` (hình), `audio.js` (âm thanh), `net.js` + `online.js` (chơi online). Mở `www/index.html` bằng Chrome là chơi được.
-- Kiểm tra: `node test/sanity2.cjs`; các bài dùng Playwright như `node test/cases.cjs`; chơi online: `node test/netsync.cjs` (mạng giả lập) và `node test/online.cjs` (trình duyệt thật).
+- Kiểm tra: `node test/sanity2.cjs`; các bài dùng Playwright như `node test/cases.cjs`; cứu thua: `node test/sweep.cjs` (66.906 tình huống chấm lại bằng một trọng tài độc lập); chơi online: `node test/netsync.cjs` (mạng giả lập) và `node test/online.cjs` (trình duyệt thật).
 - **APK:** GitHub tự build và ký mỗi khi đẩy code (khoá nằm trong secret `KEYSTORE_B64`, không có trong repo). Ra bản mới thì tăng `VERSION_CODE` trong `android/version.env`.
 - File HTML chơi offline: `python3 build_html.py dist/BallgamesPhysics.html`
 - Mọi luật chính xác và ghi chú kỹ thuật: [CHI_TIET.md](CHI_TIET.md)

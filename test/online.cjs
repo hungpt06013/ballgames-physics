@@ -75,6 +75,11 @@ const NET = { lat: +(process.argv[5] || 0), jit: +(process.argv[6] || 0), loss: 
     if (states.every(s => s === 'play')) break;
   }
   check('the match starts on every device', states.every(s => s === 'play'), states.join(','));
+  // (v4.1) everybody in his own colour, the same on every device, and the small names over the players
+  const lk = await Promise.all(all.map(p => p.evaluate(() => { const L = window.__game.looks; return { cols: L.p.map(x => x.col.main).join(), side: L.side.map(x => x.main).join(), names: L.p.map(x => x.name).join() }; })));
+  const ppl = MODE === '2p' ? lk[0].cols.split(',').filter((_, i) => i % 2 === 0) : lk[0].cols.split(',');
+  check('every device shows the same shirts, side colours and names; nobody in the same colour', lk.every(x => x.cols === lk[0].cols && x.side === lk[0].side && x.names === lk[0].names) &&
+    new Set(ppl).size === ppl.length && /Chủ/.test(lk[0].names), JSON.stringify(lk[0]));
   // a guest's press moves his own player in the host's real match
   const g0slot = await guests[0].evaluate(() => window.__game.net.slot);
   const pid = MODE === '2p' ? g0slot * 2 : g0slot;

@@ -198,6 +198,7 @@
   .swatches { display: flex; flex-wrap: wrap; gap: calc(1 * var(--u)); }
   .swatches button { width: calc(6.4 * var(--u)); height: calc(6.4 * var(--u)); border-radius: 50%; border: calc(0.5 * var(--u)) solid var(--ink); cursor: pointer; padding: 0; }
   .swatches button.on { outline: calc(0.8 * var(--u)) solid var(--ink); outline-offset: 2px; }
+  .swatches button.taken::after { content: attr(data-who); font-size: calc(2.1 * var(--u)); font-weight: 900; line-height: 1; } /* someone else wears it */
   input.name { font: inherit; font-weight: 800; font-size: calc(3.8 * var(--u)); padding: calc(1 * var(--u)) calc(2 * var(--u)); border: calc(0.5 * var(--u)) solid var(--ink); border-radius: calc(2 * var(--u)); width: 100%; user-select: text; -webkit-user-select: text;  background: var(--btn); color: var(--text); }
   .stat { display: flex; justify-content: space-between; font-size: calc(3.6 * var(--u)); padding: calc(0.8 * var(--u)) 0; border-bottom: 1px dashed var(--rule); font-weight: 700; }
   .stat b { font-weight: 900; }
@@ -424,7 +425,7 @@
   <div class="panel wide">
     <h2>👤 Người chơi · Trang phục</h2>
     <div class="row profTop">
-      <div class="seg" id="profMode"><button data-v="2">👥 Chơi 2 người</button><button data-v="4">🙋 Chơi 4 người</button></div>
+      <div class="seg" id="profMode"><button data-v="2">👥 Chơi 2 người</button><button data-v="4">🙋 Chơi 4 người</button><button data-v="bot">🤖 Bot</button></div>
       <div class="seg" id="profFour"><button data-v="team4">🤝 2 vs 2</button><button data-v="ffa">🙋 Mỗi người 1 đội</button></div>
     </div>
     <div class="profBody">
@@ -434,7 +435,7 @@
       <div class="profDress">
         <div class="tabs" id="profTabs"><button class="chip" data-tab="hat">🎩 Mũ</button><button class="chip" data-tab="hair">💇 Tóc</button><button class="chip" data-tab="shirt">👕 Áo</button><button class="chip" data-tab="ball">⚽ Bóng</button></div>
         <div class="sub" id="profFor"></div>
-        <div id="profColorBox"><div class="hint">Màu áo khi mỗi người 1 đội</div><div class="swatches" id="profColors"></div></div>
+        <div id="profColorBox"><div class="hint">Màu áo – mỗi người một màu (chọn màu người khác đang mặc thì hai người đổi cho nhau)</div><div class="swatches" id="profColors"></div></div>
         <div class="grid dress" id="profGrid"></div>
       </div>
     </div>
@@ -2208,13 +2209,18 @@
   function load(k, d) { try { var v = localStorage.getItem('bgp_' + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } }
   function save(k, v) { try { localStorage.setItem('bgp_' + k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } }
 
-  // jersey colours a player can pick (used for their own player in 4-player solo mode)
+  // shirt colours a player (or the bot) can pick: 16, no two alike - every pair at least 26 apart in CIEDE2000
+  // (about 20 is already 'clearly different'); the first 10 keep their places (saved profiles keep their colour), red
+  // and blue are the classic sides. In a match nobody wears the same colour as anyone else (game.js: personColors).
   var COLORS = [
-    { main: '#ef5b5b', dark: '#c63e44', name: 'Đỏ' }, { main: '#f5a524', dark: '#c98316', name: 'Cam' },
-    { main: '#3fb4ea', dark: '#2387bd', name: 'Xanh dương' }, { main: '#4cc36b', dark: '#2f9a4f', name: 'Xanh lá' },
-    { main: '#a66bea', dark: '#7c45c0', name: 'Tím' }, { main: '#f37ac1', dark: '#c94e96', name: 'Hồng' },
-    { main: '#f2d33a', dark: '#c4a612', name: 'Vàng' }, { main: '#2fc6b5', dark: '#1b968a', name: 'Ngọc' },
-    { main: '#5a5f6b', dark: '#373a42', name: 'Đen' }, { main: '#f4f4f4', dark: '#c4c4c4', name: 'Trắng' }
+    { main: '#ef5b5b', dark: '#c63e44', name: 'Đỏ' }, { main: '#f29a3f', dark: '#c87923', name: 'Cam' },
+    { main: '#3fb4ea', dark: '#2387bd', name: 'Xanh dương' }, { main: '#6ade5f', dark: '#4ab843', name: 'Xanh lá' },
+    { main: '#8b70f4', dark: '#6651c9', name: 'Tím' }, { main: '#ffa9e7', dark: '#d688c1', name: 'Hồng' },
+    { main: '#fee526', dark: '#d6c100', name: 'Vàng' }, { main: '#009f8b', dark: '#007c6a', name: 'Ngọc' },
+    { main: '#2b2b2b', dark: '#3c3c3c', name: 'Đen' }, { main: '#ffffff', dark: '#dadada', name: 'Trắng' },
+    { main: '#3222a1', dark: '#4c35b7', name: 'Xanh đậm' }, { main: '#8a5123', dark: '#653408', name: 'Nâu' },
+    { main: '#910042', dark: '#690026', name: 'Đỏ đô' }, { main: '#8d8a15', dark: '#6a6900', name: 'Xanh rêu' },
+    { main: '#8a888c', dark: '#69676b', name: 'Xám' }, { main: '#13631f', dark: '#004303', name: 'Xanh lá đậm' }
   ];
 
   var SHOP = {
@@ -2286,7 +2292,11 @@
   Object.keys(SHOP).forEach(function (k) { var free = SHOP[k][0]; SHOP[k] = [free].concat(SHOP[k].slice(1).sort(function (a, b) { return a.price - b.price; })); });
   var SHOP_TABS = [{ id: 'hat', name: 'Mũ' }, { id: 'hair', name: 'Tóc' }, { id: 'shirt', name: 'Áo' }, { id: 'ball', name: 'Bóng' }];
 
-  function defaultProfile(i) { return { name: 'P' + (i + 1), color: i, hat: 'none', hair: 'default', shirt: 'plain' }; }
+  // (P1 red and P2 blue, the classic sides; P3 green, P4 orange)
+  var DEFAULT_COLOR = [0, 2, 3, 1];
+  function defaultProfile(i) { return { name: 'P' + (i + 1), color: DEFAULT_COLOR[i], hat: 'none', hair: 'default', shirt: 'plain' }; }
+  // what the bots wear (every bot; a bot whose colour someone else already wears gets another one)
+  function defaultBot() { return { color: 2, hat: 'none', hair: 'default', shirt: 'number' }; }
   function defaultStats() {
     return { played: 0, byMode: {}, botWins: { easy: 0, normal: 0, hard: 0 }, botLosses: { easy: 0, normal: 0, hard: 0 }, botDraws: { easy: 0, normal: 0, hard: 0 },
       goals: 0, goalsBySport: {}, fastest: 0, streak: 0, bestStreak: 0, coinsEarned: 0 };
@@ -2297,7 +2307,14 @@
   D.owned = D.owned || {};
   SHOP_TABS.forEach(function (t) { D.owned[t.id] = D.owned[t.id] || {}; D.owned[t.id][SHOP[t.id][0].id] = 1; });
   D.profiles = D.profiles || [];
+  // profiles saved before v4.1 that still have the old colours (P1 red, P2 orange, P3 blue, P4 green, never changed)
+  // get the new ones, so P2 keeps the blue he always wore with 2 players
+  if (!D.colorsV && D.profiles.length === 4 && D.profiles.every(function (p, k) { return p && p.color === k; })) D.profiles.forEach(function (p, k) { p.color = DEFAULT_COLOR[k]; });
+  D.colorsV = 2;
   for (var i = 0; i < 4; i++) D.profiles[i] = Object.assign(defaultProfile(i), D.profiles[i] || {});
+  D.bot = Object.assign(defaultBot(), D.bot || {});
+  if (!(D.bot.color >= 0 && D.bot.color < COLORS.length)) D.bot.color = 2;
+  D.profiles.forEach(function (p, k) { if (!(p.color >= 0 && p.color < COLORS.length)) p.color = DEFAULT_COLOR[k]; });
   D.ball = D.ball || 'classic';
   D.stats = Object.assign(defaultStats(), D.stats || {});
   // data of removed features (challenges, tournament) from older versions
@@ -2322,13 +2339,14 @@
       if (!it || this.owns(cat, id) || D.coins < it.price) return false;
       D.coins -= it.price; D.owned[cat][id] = 1; persist(); return true;
     },
+    // slot: 0-3 (a player) or 'bot'
     equip: function (cat, id, slot) {
       if (!this.owns(cat, id)) return false;
-      if (cat === 'ball') D.ball = id; else D.profiles[slot][cat] = id;
+      if (cat === 'ball') D.ball = id; else this.profile(slot)[cat] = id;
       persist(); return true;
     },
-    profile: function (i) { return D.profiles[i]; },
-    color: function (i) { return COLORS[D.profiles[i].color] || COLORS[i]; },
+    profile: function (i) { return i === 'bot' ? D.bot : D.profiles[i]; },
+    color: function (i) { return COLORS[this.profile(i).color] || COLORS[0]; },
     stats: function () { return D.stats; },
     resetStats: function () { D.stats = defaultStats(); persist(); }
   };
@@ -2853,7 +2871,7 @@
     var tx = -15, ty = SH_Y - 3, tw = 30, th = HIP_Y - SH_Y + 6;
     rrect(c, tx, ty, tw, th, 11); c.fillStyle = col.main; c.fill(); c.lineWidth = 3.5; c.strokeStyle = INK; c.stroke();
     shirtPattern(c, look.shirt, col, look.num, tx, ty, tw, th);
-    rrect(c, -16, HIP_Y - 7, 32, 20, 6); c.fillStyle = col.dark; c.fill(); c.stroke();
+    rrect(c, -16, HIP_Y - 7, 32, 20, 6); c.fillStyle = look.shorts || col.dark; c.fill(); c.stroke(); // (2 vs 2: the team's shorts)
     // head
     var hx = 3, hy = HEAD_Y, r = 19, gear = mid === 'football';
     var hairKind = look.hair || 'default';
@@ -4227,7 +4245,6 @@
   var LEVEL_COINS = { easy: 10, normal: 20, hard: 40 };
   var SCORE_WORDS = { goal: 'VÀOOO!', hoop: 'VÀO RỔ!', posts: 'QUA CỘT!', volley: 'ĂN ĐIỂM!', bomb: 'BÙM!' };
   var FLASH_WORDS = { goal: 'VÀO! ✔', hoop: 'VÀO RỔ! ✔', posts: 'QUA CỘT! ✔', volley: 'CHẠM SÂN!', bomb: 'BÙM!' };
-  var BOT_LOOK = { hat: 'none', hair: 'default', shirt: 'number' };
   var NO_SCORER = '#aab4bf';
   var TOOL_SCREENS = ['menu', 'setup', 'settings', 'help', 'shop', 'profiles', 'stats', 'history', 'pause', 'over', 'vote', 'firstRun', 'online'];
   // weather & disasters: how often each comes (seconds, counted while nothing else is going on) and how long it lasts
@@ -4303,14 +4320,46 @@
     word: '', sub: '', hold: [0, 0, 0, 0], tut: null, earned: 0,
     replay: null, modName: '', wx: null, noPoint: '', wxv: { fog: 0, bolt: null, warn: null, zap: 0, bombGone: false }, rwxv: null, screenFlash: 0
   };
-  function teamCol(t) { return DEF_TEAM[t]; }
+  // a side's colour: in a match (and its highlights) the colour its person wears - red / blue otherwise, and for the
+  // two teams of 2 vs 2 / the sides of 4 players
+  function teamCol(t) { var s = G.looks && G.looks.side; return !G.demo && s && s[t] ? s[t] : DEF_TEAM[t]; }
   function is4(mode) { return mode === 'ffa' || mode === 'team4'; }
   function soloish(mode) { return mode === 'bot' || mode === 'tutorial'; }
   function slotTeam(i) { return i < 2 ? 0 : 1; }
-  function slotColor(i) { return G.mode === 'ffa' ? pCol(i) : teamCol(slotTeam(i)); }
+  // a player's own colour (his button, his score with 4 players): the shirt he wears - in 2 vs 2 too, where only the
+  // shorts and the goals are the team's
+  function slotColor(i) {
+    if (is4(G.mode) && !G.demo && G.looks && G.looks.four && G.looks.p[i]) return G.looks.p[i].col;
+    return G.mode === 'ffa' ? pCol(i) : teamCol(slotTeam(i));
+  }
   function nameOf(i) { if (G.netNames) return G.netNames[i] || ('P' + (i + 1)); return Meta.profile(i).name || ('P' + (i + 1)); }
   // a player's own jersey colour (4 players each on his own): in an online match the one he chose on his device
-  function pCol(i) { return G.netColors && G.netColors[i] ? G.netColors[i] : Meta.color(i); }
+  function pCol(i) {
+    if (!G.demo && G.looks && G.looks.ffa && G.looks.p[i]) return G.looks.p[i].col;
+    return G.netColors && G.netColors[i] ? G.netColors[i] : Meta.color(i);
+  }
+  // ---------- shirt colours: nobody wears the same colour as anyone else ----------
+  // (when the colour someone wants is taken: the classic ones first, then the rest)
+  var COLOR_ORDER = [0, 2, 3, 1, 4, 6, 5, 7, 9, 8, 10, 11, 12, 13, 14, 15];
+  // wants[k] = { c: the colour he picked, bot: true for a bot } -> the colour each one wears: the people first (in
+  // order), then the bots; one whose colour is taken by someone before him gets the first free one
+  function distinctColors(wants) {
+    var used = {}, out = [];
+    [false, true].forEach(function (bots) {
+      wants.forEach(function (w, k) {
+        if (!w || !!w.bot !== bots) return;
+        var c = Meta.COLORS[w.c] ? w.c : COLOR_ORDER[k];
+        if (used[c]) c = COLOR_ORDER.filter(function (x) { return !used[x]; })[0];
+        used[c] = 1; out[k] = c;
+      });
+    });
+    return out;
+  }
+  // the colours the people of the slots `sl` ('h' / 'b') will wear (the setup screen shows them as in the match)
+  function slotsColors(sl) {
+    return distinctColors(sl.map(function (x, k) { return x === 'h' ? { c: Meta.profile(k).color } : { c: Meta.profile('bot').color, bot: true }; }))
+      .map(function (c) { return Meta.COLORS[c]; });
+  }
   function slotLabel(i) { var n = nameOf(i); return n === 'P' + (i + 1) ? n : 'P' + (i + 1) + ' · ' + n; }
 
   // ---------- canvas ----------
@@ -4450,8 +4499,7 @@
       var b = document.createElement('button'); b.className = 'chip' + (sl[i] === 'h' ? ' on' : '');
       var nm = nameOf(i), tag = 'P' + (i + 1);
       b.textContent = sl[i] === 'h' ? '🙋 ' + (nm === tag ? nm : tag + ' ' + nm) : '🤖 ' + tag + ' Bot ' + LEVEL_LABEL[lv[i]];
-      var mark = setupMode === 'ffa' ? Meta.color(i).main : (two ? teamCol(i).main : null);
-      if (mark) b.style.boxShadow = 'inset 0 -6px 0 ' + mark;
+      b.style.boxShadow = 'inset 0 -6px 0 ' + slotsColors(sl)[i].main; // (the shirt he will wear)
       b.addEventListener('click', function () {
         // person -> bot Dễ -> Thường -> Khó -> person (all of them may be bots: a match to watch)
         if (sl[i] === 'h') { sl[i] = 'b'; lv[i] = 'easy'; }
@@ -4581,11 +4629,11 @@
     });
     $('shopFor').classList.toggle('hidden', shopTab === 'ball');
     var ss = $('shopSlot'); ss.innerHTML = '';
-    for (var i = 0; i < 4; i++) (function (i) {
-      var b = document.createElement('button'); b.textContent = nameOf(i); b.className = i === shopSlot ? 'on' : '';
+    [0, 1, 2, 3, 'bot'].forEach(function (i) {
+      var b = document.createElement('button'); b.textContent = i === 'bot' ? '🤖 Bot' : nameOf(i); b.className = i === shopSlot ? 'on' : '';
       b.addEventListener('click', function () { shopSlot = i; Snd.click(); buildShop(); });
       ss.appendChild(b);
-    })(i);
+    });
     var grid = $('shopGrid'); grid.innerHTML = '';
     Meta.SHOP[shopTab].forEach(function (it) {
       var owned = Meta.owns(shopTab, it.id);
@@ -4611,19 +4659,31 @@
   // "4 người": P1-P4, one body each with the name tag over the head, in the 2 vs 2 kits or each in his own colour.
   // Every card is a small tall picture of the match look; tap one to dress that player.
   var profSlot = 0, profPlayers = 2, profFour = 'team4', profTab = 'hat', previewP = null;
+  // the cards of the players screen: 2 players, 4 players, or the player and the bot ('bot')
+  function profCount() { return profPlayers === 4 ? 4 : 2; }
+  function profKey(i) { return profPlayers === 'bot' && i === 1 ? 'bot' : i; }
+  // what each card's person wears there (nobody in the same colour as anyone else, as in the match)
+  function profColors() {
+    var n = profCount(), wants = [];
+    for (var k = 0; k < n; k++) wants.push({ c: Meta.profile(profKey(k)).color, bot: profKey(k) === 'bot' });
+    return distinctColors(wants).map(function (c) { return Meta.COLORS[c]; });
+  }
   function buildProfiles() {
-    if (profSlot >= profPlayers) profSlot = 0;
+    if (profSlot >= profCount()) profSlot = 0;
     segSelect('profMode', profPlayers); segSelect('profFour', profFour);
     $('profFour').classList.toggle('hidden', profPlayers !== 4);
     var box = $('profCards'); box.innerHTML = ''; box.classList.toggle('four', profPlayers === 4);
     $('profDone').textContent = G.dressThen ? '▶ Vào trận' : '✔ Xong';
-    for (var i = 0; i < profPlayers; i++) (function (i) {
+    for (var i = 0; i < profCount(); i++) (function (i) {
+      var key = profKey(i), bot = key === 'bot';
       var card = document.createElement('div'); card.className = 'pcard' + (i === profSlot ? ' on' : '');
       var cv = document.createElement('canvas'); cv.width = 240; cv.height = 360; cv.id = 'profCv' + i;
       var inp = document.createElement('input'); inp.className = 'name'; inp.maxLength = 10; inp.autocomplete = 'off';
-      inp.value = Meta.profile(i).name; inp.setAttribute('aria-label', 'Tên P' + (i + 1));
+      inp.value = bot ? '🤖 Bot' : Meta.profile(i).name; inp.setAttribute('aria-label', bot ? 'Bot' : 'Tên P' + (i + 1));
+      if (bot) { inp.readOnly = true; inp.title = 'Bot được gọi theo độ khó (🤖 Bot Dễ / Thường / Khó)'; }
       inp.addEventListener('focus', function () { if (profSlot !== i) { profSlot = i; buildDress(); markCards(); } });
       inp.addEventListener('input', function () {
+        if (bot) return;
         var v = inp.value.replace(/[<>]/g, '').slice(0, 10);
         Meta.profile(i).name = v || ('P' + (i + 1)); Meta.save();
         drawCard(i); $('profFor').textContent = dressTitle();
@@ -4636,19 +4696,31 @@
   }
   function markCards() { Array.prototype.forEach.call($('profCards').children, function (c, k) { c.classList.toggle('on', k === profSlot); }); }
   var DRESS_TAB = { hat: 'Mũ', hair: 'Tóc', shirt: 'Áo', ball: 'Bóng' };
-  function dressTitle() { return profTab === 'ball' ? '⚽ Bóng dùng chung cho mọi người chơi' : DRESS_TAB[profTab] + ' của ' + slotLabel(profSlot); }
-  function dressOn(cat, id) { return cat === 'ball' ? Meta.D.ball === id : Meta.profile(profSlot)[cat] === id; }
+  function dressTitle() { return profTab === 'ball' ? '⚽ Bóng dùng chung cho mọi người chơi' : DRESS_TAB[profTab] + ' của ' + (profKey(profSlot) === 'bot' ? '🤖 Bot' : slotLabel(profSlot)); }
+  function dressOn(cat, id) { return cat === 'ball' ? Meta.D.ball === id : Meta.profile(profKey(profSlot))[cat] === id; }
   // the chosen kind (hat, hair, shirt: of the chosen player; the ball: everybody's): what he has, and a way to the shop
   function buildDress() {
-    var pr = Meta.profile(profSlot), cat = profTab, ball = cat === 'ball';
+    var key = profKey(profSlot), pr = Meta.profile(key), cat = profTab, ball = cat === 'ball';
     Array.prototype.forEach.call($('profTabs').children, function (b) { b.classList.toggle('on', b.dataset.tab === cat); });
     $('profFor').textContent = dressTitle();
     $('profCards').classList.toggle('shared', ball);
-    $('profColorBox').classList.toggle('hidden', profPlayers !== 4 || cat !== 'shirt');
-    var sw = $('profColors'); sw.innerHTML = '';
+    // the shirt colour, in every mode: a colour someone else on this screen wears is marked with his number, and
+    // choosing it swaps the two (nobody wears the same colour as anyone else)
+    $('profColorBox').classList.toggle('hidden', cat !== 'shirt');
+    var sw = $('profColors'), cols = profColors(), mine = cols[profSlot];
+    sw.innerHTML = '';
     Meta.COLORS.forEach(function (c, ci) {
-      var b = document.createElement('button'); b.style.background = c.main; b.title = c.name; b.className = pr.color === ci ? 'on' : '';
-      b.addEventListener('click', function () { pr.color = ci; Meta.save(); Snd.click(); if (profFour !== 'ffa') profFour = 'ffa'; buildProfiles(); });
+      var b = document.createElement('button'), who = -1;
+      for (var k = 0; k < profCount(); k++) if (k !== profSlot && cols[k] === c) who = k;
+      b.style.background = c.main; b.title = c.name + (who >= 0 ? ' – ' + (profKey(who) === 'bot' ? '🤖 Bot' : nameOf(who)) + ' đang mặc' : '');
+      b.className = c === mine ? 'on' : (who >= 0 ? 'taken' : '');
+      if (who >= 0) { b.dataset.who = profKey(who) === 'bot' ? '🤖' : 'P' + (who + 1); b.style.color = lum(c.main) > 0.55 ? INK : '#ffffff'; }
+      b.addEventListener('click', function () {
+        if (c === mine) return;
+        var old = Meta.COLORS.indexOf(mine);
+        if (who >= 0) Meta.profile(profKey(who)).color = old; // (the other one takes this one's colour)
+        pr.color = ci; Meta.save(); Snd.click(); buildProfiles();
+      });
       sw.appendChild(b);
     });
     var grid = $('profGrid'), left = 0; grid.innerHTML = '';
@@ -4657,7 +4729,7 @@
       var on = dressOn(cat, it.id), card = document.createElement('div');
       card.className = 'card' + (on ? ' eq' : ' owned'); card.dataset.id = it.id;
       card.innerHTML = '<div class="ic">' + it.icon + '</div><div>' + it.name + '</div>' + (on ? '<div class="price">✔ Đang dùng</div>' : '');
-      card.addEventListener('click', function () { Meta.equip(cat, it.id, profSlot); Snd.click(); buildDress(); drawCards(); });
+      card.addEventListener('click', function () { Meta.equip(cat, it.id, key); Snd.click(); buildDress(); drawCards(); });
       grid.appendChild(card);
     });
     if (left) {
@@ -4667,32 +4739,39 @@
       grid.appendChild(more);
     }
   }
-  function drawCards() { for (var k = 0; k < profPlayers; k++) drawCard(k); }
+  function drawCards() { for (var k = 0; k < profCount(); k++) drawCard(k); }
   // the shop from the player screen opens on the kind being chosen, for the player being dressed
-  function openShop() { shopTab = profTab; shopSlot = profSlot; G.shopFrom = 'profiles'; buildShop(); show('shop'); }
+  function openShop() { shopTab = profTab; shopSlot = profKey(profSlot); G.shopFrom = 'profiles'; buildShop(); show('shop'); }
   $('profTabs').addEventListener('click', function (e) {
     var b = e.target.closest('button'); if (!b || b.dataset.tab === profTab) return;
     profTab = b.dataset.tab; Snd.click(); buildDress(); drawCards();
   });
-  $('profMode').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; profPlayers = +b.dataset.v; Snd.click(); buildProfiles(); });
+  $('profMode').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; profPlayers = b.dataset.v === 'bot' ? 'bot' : +b.dataset.v; Snd.click(); buildProfiles(); });
   $('profFour').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; profFour = b.dataset.v; Snd.click(); buildProfiles(); });
   // one card: grass, the player's body (or the side's two bodies) as in a match, and his name as the match shows it
+  // a player card: the small name over the player's head as the match shows it, with a pointer in his colour
+  function cardName(c, name, x, top, col, fs) {
+    var ty = Math.max(fs, top - 16), py = ty + fs * 0.6;
+    c.beginPath(); c.moveTo(x - 7, py); c.lineTo(x + 7, py); c.lineTo(x, py + 9); c.closePath();
+    c.fillStyle = col.main; c.fill(); c.lineWidth = 2; c.strokeStyle = INK; c.stroke();
+    D.textOutlined(c, name, x, ty, fs, '#ffffff', INK);
+  }
   function drawCard(i) {
     var cv = $('profCv' + i);
     if (!cv) return;
-    var c = cv.getContext('2d'), Wc = cv.width, Hc = cv.height, gy = Hc - 64, pr = Meta.profile(i), name = nameOf(i);
+    var key = profKey(i), c = cv.getContext('2d'), Wc = cv.width, Hc = cv.height, gy = Hc - 64, pr = Meta.profile(key), name = key === 'bot' ? '🤖 Bot' : nameOf(i);
     if (!previewP) previewP = E.createWorld('soccer', null, 1).players;
     c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, Wc, Hc);
     c.fillStyle = '#4fae48'; c.fillRect(0, gy, Wc, Hc - gy); c.fillStyle = '#3f9a39'; c.fillRect(0, gy, Wc, 6);
-    var two = profPlayers === 2, side = two ? i : slotTeam(i), face = side === 0 ? 1 : -1;
-    var col = two || profFour === 'team4' ? teamCol(side) : Meta.color(i);
+    var two = profPlayers !== 4, side = two ? i : slotTeam(i), face = side === 0 ? 1 : -1;
+    var col = profColors()[i], shorts = !two && profFour === 'team4' ? DEF_TEAM[side].main : null; // (2 vs 2: the team's shorts)
     var bodies = two ? [{ id: side * 2, x: Wc / 2 - face * 50, role: 1 }, { id: side * 2 + 1, x: Wc / 2 + face * 34, role: 0 }] : [{ id: i, x: Wc / 2, role: 0 }];
     var sc = two ? 1.05 : 1.3, fs = two ? 26 : 22;
     bodies.forEach(function (b, k) {
       var p = previewP[k];
       p.x = b.x; p.y = gy - COM_H * sc; p.a = 0; p.f = face; p.leg = -0.12; E.setScale(p, sc); p.id = b.id;
       c.fillStyle = 'rgba(0,0,0,0.16)'; c.beginPath(); c.ellipse(b.x, gy + 2, 30 * sc, 7, 0, 0, TAU); c.fill();
-      D.player(c, p, { col: { main: col.main, dark: col.dark }, hat: pr.hat, hair: pr.hair, shirt: pr.shirt, num: two ? b.role + 1 : i + 1, face: 'happy',
+      D.player(c, p, { col: { main: col.main, dark: col.dark }, shorts: shorts, hat: pr.hat, hair: pr.hair, shirt: pr.shirt, num: two ? b.role + 1 : i + 1, face: 'happy',
         hairCol: b.id % 2 ? '#5b3a1f' : INK, armT: 0.6, mapId: 'soccer' });
     });
     // choosing the ball: the same ball at everybody's feet
@@ -4714,12 +4793,8 @@
       D.textOutlined(c, name, side === 0 ? nx - tw / 2 : nx + tw / 2, py + ph / 2 + 1, nfs, '#ffffff', INK);
       D.textOutlined(c, side === 0 ? 'Bên trái' : 'Bên phải', Wc / 2, Hc - 30, 20, '#ffffff', INK);
     } else {
-      // the name tag over his head
-      var mark = profFour === 'team4' ? teamCol(side) : Meta.color(i), top = gy - COM_H * sc - 118 * sc;
-      var ty = Math.max(24, top - 20);
-      c.beginPath(); c.moveTo(Wc / 2 - 8, ty + 14); c.lineTo(Wc / 2 + 8, ty + 14); c.lineTo(Wc / 2, ty + 24); c.closePath();
-      c.fillStyle = mark.main; c.fill(); c.lineWidth = 2; c.strokeStyle = INK; c.stroke();
-      tag(c, Wc / 2, ty, name, mark, fs);
+      // the small name over his head, as in the match
+      cardName(c, name, Wc / 2, gy - COM_H * sc - 118 * sc, col, 27);
       // where his button is in a match: a corner of the screen (P1 bottom left, P2 top left, P3 bottom right, P4 top
       // right), named under him and pointed at by an arrow in that corner of the card
       var left = i < 2, bottom = i % 2 === 0, k = CORNERS[i];
@@ -4727,7 +4802,7 @@
       c.save();
       c.translate(left ? 24 : Wc - 24, bottom ? Hc - 24 : 24); c.rotate(Math.atan2(bottom ? 1 : -1, left ? -1 : 1));
       c.beginPath(); c.moveTo(-15, -5); c.lineTo(1, -5); c.lineTo(1, -12); c.lineTo(17, 0); c.lineTo(1, 12); c.lineTo(1, 5); c.lineTo(-15, 5); c.closePath();
-      c.fillStyle = mark.main; c.fill(); c.lineWidth = 3; c.strokeStyle = INK; c.stroke();
+      c.fillStyle = col.main; c.fill(); c.lineWidth = 3; c.strokeStyle = INK; c.stroke();
       c.restore();
     }
   }
@@ -4864,7 +4939,7 @@
     dialog('👤 Tên & trang phục', body, [['👤 Đổi', 'dress'], ['▶ Đá luôn', 'play', 'green']], 'stay').then(function (v) {
       if (cb.checked) { prefs.askDress = false; savePrefs(); }
       if (v === 'dress') {
-        G.dressThen = mode; profPlayers = is4(mode) ? 4 : 2; if (is4(mode)) profFour = mode;
+        G.dressThen = mode; profPlayers = is4(mode) ? 4 : (mode === 'bot' ? 'bot' : 2); if (is4(mode)) profFour = mode;
         buildProfiles(); show('profiles');
       } else if (v === 'play') { show(null); startMatch({ mode: mode }); }
     });
@@ -5049,6 +5124,8 @@
       maps: (G.playedMaps || []).slice(), score: G.score.slice(), names: [0, 1, 2, 3].map(nameOf), bots: G.bots.map(Boolean),
       winner: draw ? -1 : winner, draw: !!draw, dur: Math.round(G.matchT || 0), goals: G.goalsLog || [], hl: null
     };
+    // what everybody wore (the history shows the match in its own colours)
+    if (G.looks) { r.side = G.looks.side.map(function (c) { return { main: c.main, dark: c.dark }; }); r.cols = G.looks.p.map(function (x) { return { main: x.col.main, dark: x.col.dark }; }); }
     if (mode === 'bot') r.level = G.cfg.level;
     else if (G.bots.some(Boolean)) {
       r.levels = G.botLv.slice();
@@ -5195,15 +5272,15 @@
     var ns = netSlots(v.mode), four = ns === 4;
     box.classList.toggle('four', four);
     for (var i = 0; i < ns; i++) (function (i) {
-      var s = v.slots[i] || {}, card = document.createElement('div'), col = four ? (v.mode === 'ffa' ? null : teamCol(slotTeam(i))) : teamCol(i);
+      var s = v.slots[i] || {}, card = document.createElement('div'), col = four ? (v.mode === 'ffa' ? null : DEF_TEAM[slotTeam(i)]) : DEF_TEAM[i];
       card.className = 'onSlot' + (s.kind === 'open' ? ' open' : '') + (s.mine ? ' mine' : '');
       var where = four ? 'P' + (i + 1) + ' · ' + (v.mode === 'ffa' ? 'mỗi người 1 đội' : (i < 2 ? 'đội đỏ' : 'đội xanh')) : (i === 0 ? '◀ bên trái (đỏ)' : 'bên phải (xanh) ▶');
       var who = s.kind === 'open' ? '⏳ Đang chờ người vào…' : (s.kind === 'bot' ? '🤖 Bot ' + (LEVEL_LABEL[s.bot] || '') : (s.kind === 'host' ? '👑 ' : '🙋 ') + s.name + (s.mine ? ' (bạn)' : ''));
       var what = s.kind === 'host' ? 'chủ phòng' : (s.kind === 'guest' ? (s.ping ? 'ping ' + s.ping + ' ms' : 'đã vào') :
         (n.host ? 'chạm để đổi: trống → bot Dễ → Thường → Khó' : (s.kind === 'open' ? 'chạm để vào chỗ này' : 'bot đá chỗ này')));
       [['where', where], ['who', who], ['what', what]].forEach(function (x) { var e = document.createElement('div'); e.className = x[0]; e.textContent = x[1]; card.appendChild(e); });
-      if (col) card.style.borderLeftColor = col.main;
-      else if (s.color >= 0 && Meta.COLORS[s.color]) card.style.borderLeftColor = Meta.COLORS[s.color].main;
+      if (s.color >= 0 && Meta.COLORS[s.color] && s.kind !== 'bot' && s.kind !== 'open') card.style.borderLeftColor = Meta.COLORS[s.color].main;
+      else if (col) card.style.borderLeftColor = col.main;
       card.addEventListener('click', function () {
         if (n.host) { if (s.kind === 'open' || s.kind === 'bot') { Snd.click(); netCycleBot(i); } }
         else if (s.kind === 'open') { Snd.click(); n.room.send({ t: 'want', slot: i }, true); }
@@ -5333,13 +5410,14 @@
     netBroadcastRoom();
   }
   function netLooks() {
-    var n = G.net, four = is4(G.mode), out = [];
-    for (var i = 0; i < 4; i++) {
-      var team = slotTeam(i), k = four ? i : team, s = n.slots[k], p = s.who === 'host' ? n.me : (s.who ? n.people[s.who] : null);
-      var prof = p && !G.bots[k] ? p : BOT_LOOK, col = G.mode === 'ffa' ? pCol(i) : teamCol(team);
-      out.push({ hat: prof.hat, hair: prof.hair, shirt: prof.shirt, col: { main: col.main, dark: col.dark }, mark: { main: col.main, dark: col.dark }, label: four ? slotName(i) : '' });
+    var n = G.net, four = is4(G.mode), people = [];
+    for (var k = 0; k < (four ? 4 : 2); k++) {
+      var s = n.slots[k], p = s.who === 'host' ? n.me : (s.who ? n.people[s.who] : null);
+      people.push(p && !G.bots[k] ? { look: p } : { bot: true });
     }
-    return { four: four, ffa: G.mode === 'ffa', p: out, ball: Meta.D.ball };
+    var L = looksFor(people, four);
+    G.netColors = L.p.map(function (x) { return x.col; }); // (what everybody wears, sent to the guests too)
+    return L;
   }
   // (from startRound) a new round for everybody
   function netRound(id, mods) {
@@ -5536,12 +5614,15 @@
     var out = [], ok = function (cat, id, d) { return typeof id === 'string' && Meta.find(cat, id) ? id : d; };
     var hex = function (c, d) { return typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c) ? c : d; };
     for (var i = 0; i < 4; i++) {
-      var x = L && Array.isArray(L.p) && L.p[i] ? L.p[i] : {}, tc = teamCol(slotTeam(i));
+      var x = L && Array.isArray(L.p) && L.p[i] ? L.p[i] : {}, tc = DEF_TEAM[slotTeam(i)];
       var col = { main: hex(x.col && x.col.main, tc.main), dark: hex(x.col && x.col.dark, tc.dark) };
       out.push({ hat: ok('hat', x.hat, 'none'), hair: ok('hair', x.hair, 'default'), shirt: ok('shirt', x.shirt, 'plain'), col: col,
-        mark: { main: hex(x.mark && x.mark.main, col.main), dark: hex(x.mark && x.mark.dark, col.dark) }, label: cleanName(x.label) });
+        mark: { main: hex(x.mark && x.mark.main, col.main), dark: hex(x.mark && x.mark.dark, col.dark) }, label: cleanName(x.label),
+        shorts: typeof x.shorts === 'string' ? hex(x.shorts, null) : null, name: typeof x.name === 'string' ? x.name.replace(/[<>]/g, '').slice(0, 16) : undefined });
     }
-    return { four: is4(G.mode), ffa: G.mode === 'ffa', p: out, ball: L && typeof L.ball === 'string' && Meta.find('ball', L.ball) ? L.ball : 'classic' };
+    // (a host of an older version sends no side colours: red / blue)
+    var side = [0, 1].map(function (t) { var y = L && Array.isArray(L.side) && L.side[t] || {}, d = DEF_TEAM[t]; return { main: hex(y.main, d.main), dark: hex(y.dark, d.dark) }; });
+    return { four: is4(G.mode), ffa: G.mode === 'ffa', p: out, ball: L && typeof L.ball === 'string' && Meta.find('ball', L.ball) ? L.ball : 'classic', side: side };
   }
   function netGuestRound(m) {
     var n = G.net, info = m.info || {};
@@ -5980,8 +6061,9 @@
   var ZAP_COL = { main: '#ffd23f', dark: '#c4a612' };
   // The last CF_KEEP seconds of the round: every step's buttons, and a copy of the world every CF_EVERY steps, so a
   // possible save can be played again as if the saver had not pressed (goesInWithout).
-  // (played on CF_MORE s past the touch, with the cheaper physics the bots plan with: no hitch when it runs)
-  var CF_KEEP = 2.6, CF_EVERY = 4, CF_N = Math.round(CF_KEEP / DT), CF_MORE = 1.2, CF_ITERS = 2;
+  // (played on CF_MORE s past the touch, with exactly the physics of the match - the cheaper physics the bots plan
+  // with sometimes told a borderline shot differently, and costs about the same here: ~4 ms on a computer)
+  var CF_KEEP = 2.6, CF_EVERY = 4, CF_N = Math.round(CF_KEEP / DT), CF_MORE = 1.2;
   var cfWorld = null;
   function CfLog() { this.n = 0; this.t = new Float64Array(CF_N); this.m = new Uint8Array(CF_N); this.snaps = []; this.pool = []; }
   // (called just before each physics step, with the buttons of that step)
@@ -6023,14 +6105,14 @@
     for (k = snap.n; sim.time < end; k++) {
       var mk = k < this.n && sim.time < at - 1e-6 ? m[k % CF_N] : 0;
       for (i = 0; i < 4; i++) pr[i] = !!(mk & (1 << i)) && !((off & (1 << i)) && k >= k0);
-      var sc = E.stepPlayers(sim, pr, CF_ITERS);
+      var sc = E.stepPlayers(sim, pr);
       if (sc >= 0) { went = sc === att && sim.scoreBall === bi; break; }
     }
     if (keep) { A.goalTop = keep[0]; A.segs[0].y1 = keep[1]; A.segs[0].y2 = keep[2]; A.segs[1].y1 = keep[3]; A.segs[1].y2 = keep[4]; }
     if (G.dbg) G.dbg.push({ r: went ? 'cf-in' : 'cf-out', t: at, round: G.round, by: by });
     return went;
   };
-  function newWatch() { return { tick: 0, threat: [null, null], cand: [], group: null, flight: [null, null], miss: [], lastT: [-1, -1] }; }
+  function newWatch() { return { tick: 0, threat: [null, null], cand: [], group: null, flight: [null, null], miss: [], lastT: [-1, -1], act: [null, null] }; }
   // he did something when he touched it at t: pressed his button just before (whatever part of him the ball met: a
   // kick, a header, or his body as the jump starts), or he is in the air after his own jump or dive
   function activeTouch(b, pid, t) { return G.pressT[pid] >= t - SAVE_ACTIVE || (b.lastAir && G.pressT[pid] >= t - SAVE_JUMP); }
@@ -6041,8 +6123,13 @@
     var team = b.lastTeam, pid = b.lastPid, tt = team >= 0 ? b.touchT[team] : -1;
     if (team < 0 || tt <= S.lastT[bi]) return;
     S.lastT[bi] = tt;
-    var th = S.threat[bi];
-    if (th && team === 1 - th.att && activeTouch(b, pid, tt)) { th.act = pid; th.actX = b.x; th.actT = tt; }
+    // whether he had done something by the moment of this touch (a press a step after the ball has bounced off
+    // him standing there does not make it his doing)
+    var on = activeTouch(b, pid, tt), th = S.threat[bi];
+    S.act[bi] = { t: tt, pid: pid, on: on };
+    if (th && team === 1 - th.att && on) { th.act = pid; th.actX = b.x; th.actT = tt; }
+    // the attackers touched it again: a new shot - a deflection of the one before does not make stopping this one his
+    if (th && team === th.att) th.act = undefined;
     S.cand.forEach(function (c) { if (c.bi === bi && pid !== c.by && tt > c.t) c.other = true; });
   }
   function watchSaves(w) {
@@ -6053,7 +6140,8 @@
     for (i = 0; i < ev.length; i++) if (ev[i].t === 'post') S.flight.forEach(function (f) { if (f) f.post = true; });
     for (i = 0; i < w.balls.length && i < 2; i++) { followFlight(w, S, i, w.balls[i]); watchTouches(w, S, i, w.balls[i]); }
     for (i = S.miss.length - 1; i >= 0; i--) if (w.time >= S.miss[i].at + CLIP_POST) fileMiss(S.miss.splice(i, 1)[0]);
-    if (++S.tick % 2) return; // 60 looks a second are plenty for the saves
+    // (every step: looking only every other step let a touch right on a limit - the gap after the shot, the ball
+    // turned away for one step - go either way)
     for (var bi = 0; bi < w.balls.length && bi < 2; bi++) {
       var b = w.balls[bi], th = S.threat[bi], fut = E.ballFuture(A, b, SAVE_LOOK);
       // the danger is over - no longer going in, or now going in at the OTHER end (a big clearance up an empty
@@ -6067,7 +6155,9 @@
       S.cand = S.cand.filter(function (c) {
         if (c.bi !== bi || c.att !== att) return true;
         var last = Math.max(b.touchT[0], b.touchT[1]);
-        if (c.other || (last > c.t + 1e-6 && !(b.lastTeam === c.def && b.lastPid === c.by))) { addSave(c); return false; }
+        // (the attackers' own touch counts even when he touched it again in the same step - only the last toucher of
+        // a step is seen as such)
+        if (c.other || wonBack(c) || (last > c.t + 1e-6 && !(b.lastTeam === c.def && b.lastPid === c.by))) { addSave(c); return false; }
         back = c.th; return false;
       });
       if (!th && back) th = S.threat[bi] = back;
@@ -6078,7 +6168,7 @@
       // a shot on target: the attacking side's touch just now sent it goalwards (one per touch, dribbling counts once)
       if (b.lastTeam === att && b.touchT[att] >= w.time - 0.5 && b.touchT[att] - (th.counted || -9) > 0.5) { th.counted = b.touchT[att]; statAdd(b.lastBy[att], 'shots'); }
     }
-    for (i = S.cand.length - 1; i >= 0; i--) if (w.time - S.cand[i].t >= SAVE_CONFIRM) addSave(S.cand.splice(i, 1)[0]);
+    for (i = S.cand.length - 1; i >= 0; i--) if (w.time - S.cand[i].t >= SAVE_CONFIRM - 1e-9) addSave(S.cand.splice(i, 1)[0]); // (0.425 - 0.175 is 0.2499999...)
     if (S.group && w.time - S.group.last > SAVE_CHAIN) closeGroup(true);
   }
 
@@ -6093,8 +6183,8 @@
     if (t - shot < SAVE_GAP) { why('scramble', bi, by, x); return; } // touched by both sides in a scramble
     // he did something (activeTouch); or a defender did something to it earlier in this danger and it ends here
     // (his deflection, then the ball dies against him or a team-mate): the save is his
-    var active = activeTouch(b, by, t), at = t;
-    if (!active && th.act !== undefined) { by = th.act; x = th.actX; at = th.actT; active = true; }
+    var ta = S.act[bi], active = ta && ta.t === t && ta.pid === by ? ta.on : activeTouch(b, by, t), at = t;
+    if (!active && th.act !== undefined && th.actT > b.touchT[th.att]) { by = th.act; x = th.actX; at = th.actT; active = true; }
     if (!active) { why('standing', bi, by, x); return; } // it hit him standing there
     if (def === 0 ? x > W / 2 : x < W / 2) { why('their half', bi, by, x); return; } // not in his own half
     // what he did has to be what kept it out: played again without his press, would it have gone in? A ball that
@@ -6244,22 +6334,30 @@
   function hlScored(team) {
     var S = G.hlw;
     if (!S) return;
-    S.cand.forEach(function (c) { if (c.att !== team) addSave(c); }); // a touch just before the ball went in saved nothing
+    var sb = G.world.scoreBall;
+    // touches still waiting to be sure: one on the ball that just went in for the same side saved nothing - unless
+    // the scorers had to win that ball back first (the keeper parried it, a rebound or a new shot went in: the first
+    // shot was saved). A touch before the OTHER side scored, or on the other ball (two balls), kept its ball out.
+    S.cand.forEach(function (c) { if (c.att !== team || c.bi !== sb || wonBack(c)) addSave(c); });
     S.cand = []; S.threat = [null, null];
     S.flight = [null, null]; // (a flight still going went in)
     // a 'near miss' of the side that has just scored was the start of this point (it went in in the end): not a miss
     S.miss.forEach(function (m) { if (m.team !== team) fileMiss(m); });
     S.miss = [];
-    var g = S.group, lost = !!g && team >= 0 && g.def === 1 - team && G.world.time - g.last < SAVE_CHAIN;
-    // saves made just before the same side conceded were not enough; one after which the scorers never touched the
-    // ball again (it went in off him, or off his side) saved nothing at all
-    if (lost) g.saves.forEach(function (s) {
-      var b = G.world.balls[s.bi];
-      if (b && b.touchT[team] < s.t) { statAdd(s.by, 'saves', -1); if (G.dbg) G.dbg.push({ r: 'save-x', t: G.world.time, round: G.round, by: s.by }); }
+    // the same side conceded soon after its saves: a save after which the scorers never touched that ball again (it
+    // went in off him, or off his side) saved nothing at all. One they had to win the ball back after (a header over
+    // the bar, then the rebound knocked in) was a real save: it stays, and the goal's clip shows it (video 4).
+    var g = S.group;
+    if (g && team >= 0 && g.def === 1 - team && G.world.time - g.last < SAVE_CHAIN) g.saves = g.saves.filter(function (s) {
+      if (s.bi !== sb || wonBack(s)) return true;
+      statAdd(s.by, 'saves', -1); if (G.dbg) G.dbg.push({ r: 'save-x', t: G.world.time, round: G.round, by: s.by });
+      return false;
     });
-    if (g) closeGroup(!lost);
+    if (g) closeGroup(g.saves.length > 0);
     G.hlw = null;
   }
+  // the attackers touched the saved ball again after the save (a rebound, a new shot)
+  function wonBack(s) { var b = G.world.balls[s.bi]; return !!b && b.touchT[1 - s.def] > s.t + 1e-6; }
   function finishHighlights() {
     if (G.hlw) {
       endFlight(G.world, G.hlw, 0); endFlight(G.world, G.hlw, 1);
@@ -6342,7 +6440,8 @@
   }
   function fmtRating(r) { return r.toFixed(1).replace('.', ','); }
   // the table of a match's player stats (end of match screen and history)
-  function statsTable(ms, mode) {
+  // (r: a match of the history, with the colours it was played in)
+  function statsTable(ms, mode, r) {
     var box = el('div', 'pstats'), own = ms.list.some(function (x) { return x.o > 0; });
     var cols = [['⚽', 'g', 'Bàn thắng'], ['🧤', 's', 'Cứu thua'], ['🎯', 'sh', 'Sút trúng đích'], ['👟', 't', 'Chạm bóng']];
     if (own) cols.push(['😬', 'o', 'Phản lưới']);
@@ -6352,7 +6451,7 @@
     cols.forEach(function (c) { var h = el('span', 'ph', c[0]); h.title = c[2]; box.appendChild(h); });
     ms.list.forEach(function (x, i) {
       var mvp = i === ms.mvp, nm = el('span', 'pn' + (mvp ? ' mvp' : ''), (mvp ? '🏅 ' : '') + x.n);
-      nm.style.color = textCol(mode === 'ffa' ? pCol(i) : teamCol(mode === 'team4' ? slotTeam(i) : i));
+      nm.style.color = textCol(rowCol(mode, i, r));
       box.appendChild(nm);
       cols.forEach(function (c) { box.appendChild(el('span', 'pv' + (mvp ? ' mvp' : '') + (c[1] === 'r' ? ' pr' : ''), c[1] === 'r' ? fmtRating(x.r) : String(x[c[1]]))); });
     });
@@ -6540,7 +6639,7 @@
   function scoreHtml() {
     if (G.mode === 'ffa') return [0, 1, 2, 3].map(function (i) { return scoreSpan(pCol(i), esc(nameOf(i)) + ': ' + G.score[i]); }).join(' · ');
     if (G.mode === 'team4') return '<span class="r">' + esc(nameOf(0) + '+' + nameOf(1)) + ' ' + G.score[0] + '</span> – <span class="b">' + G.score[2] + ' ' + esc(nameOf(2) + '+' + nameOf(3)) + '</span>';
-    if (G.mode === '2p') return '<span class="r">' + G.score[0] + '</span> – <span class="b">' + G.score[1] + '</span>';
+    if (G.mode === '2p') return scoreSpan(teamCol(0), G.score[0]) + ' – ' + scoreSpan(teamCol(1), G.score[1]);
     return scoreSpan(teamCol(0), G.score[0]) + ' – ' + scoreSpan(teamCol(1), G.score[1]);
   }
   function startVote() {
@@ -6730,8 +6829,15 @@
   function histBot(r, i) { var lv = r.levels && r.levels[i] ? r.levels[i] : r.level; return '🤖 Bot' + (lv ? ' ' + LEVEL_LABEL[lv] : ''); }
   function histName(r, i) { return r.bots && r.bots[i] ? histBot(r, i) : (r.names || [])[i] || ''; }
   function histSide(r, a) { var x = histName(r, a), y = histName(r, a + 1); return x === y && r.bots && r.bots[a] ? x + ' ×2' : x + '+' + y; }
+  // the colour of row i of a stats table: the player's own shirt with 4 players, his side's with 2 (r: a match of the
+  // history, in its own colours - older ones red / blue)
+  function rowCol(mode, i, r) {
+    if (r) return is4(mode) ? (r.cols ? r.cols[i] : (mode === 'ffa' ? Meta.color(i) : DEF_TEAM[slotTeam(i)])) : (r.side ? r.side[i] : DEF_TEAM[i]);
+    return is4(mode) ? (G.looks ? G.looks.p[i].col : pCol(i)) : teamCol(i);
+  }
   function scoreLine(r) {
-    var n = r.names || [], s = r.score, R = '<span class="r">', B = '<span class="b">', X = '</span>';
+    var n = r.names || [], s = r.score, X = '</span>';
+    var R = r.side ? '<span style="color:' + textCol(r.side[0]) + '">' : '<span class="r">', B = r.side ? '<span style="color:' + textCol(r.side[1]) + '">' : '<span class="b">';
     if (r.mode === 'ffa') return n.map(function (nm, i) { return (r.winner === i ? '<b>' : '') + esc(histName(r, i)) + ' ' + s[i] + (r.winner === i ? '</b>' : ''); }).join(' · ');
     if (r.mode === 'team4') return R + esc(histSide(r, 0)) + ' ' + s[0] + X + ' – ' + B + s[2] + ' ' + esc(histSide(r, 2)) + X;
     var left = histName(r, 0), right = histName(r, 1);
@@ -6778,11 +6884,11 @@
       (has ? '🎬 ' + r.hl.clips + ' pha · ' + fmtMB(r.hl.bytes) : (r.hl ? 'không còn highlight' : 'không lưu highlight')) +
       (r.ps ? ' · 🏅 MVP ' + r.ps[r.mvp].n : '')));
     if (hOpen[r.id]) {
-      if (r.ps) main.appendChild(statsTable({ list: r.ps, mvp: r.mvp }, r.mode));
+      if (r.ps) main.appendChild(statsTable({ list: r.ps, mvp: r.mvp }, r.mode, r));
       var gl = el('div', 'hgoals');
       (r.goals || []).forEach(function (g) {
         var line = el('div', '', fmtDur(g.t) + '  ' + (E.MAP_BY_ID[g.map] ? E.MAP_BY_ID[g.map].icon : '') + ' ' + (g.who || '') + (g.sub ? ' — ' + g.sub : ''));
-        line.style.color = textCol(r.mode === 'ffa' && g.credit >= 0 ? Meta.color(g.credit) : teamCol(g.team));
+        line.style.color = textCol(r.mode === 'ffa' && g.credit >= 0 ? (r.cols ? r.cols[g.credit] : Meta.color(g.credit)) : (r.side ? r.side[g.team] : DEF_TEAM[g.team]));
         gl.appendChild(line);
       });
       if (!(r.goals || []).length) gl.appendChild(el('div', '', 'Không có bàn thắng.'));
@@ -7333,17 +7439,27 @@
   // what each player of a match looks like, taken when it starts and kept with its highlights
   function matchLooks() {
     if (G.net && G.net.host) return netLooks();
-    var four = is4(G.mode), out = [];
+    var four = is4(G.mode), people = [], k;
+    if (four) for (k = 0; k < 4; k++) people.push(G.bots[k] ? { bot: true } : { p: k });
+    else if (G.mode === '2p') for (k = 0; k < 2; k++) people.push(G.bots[k] ? { bot: true } : { p: k });
+    else for (k = 0; k < 2; k++) people.push(k === G.me ? { p: 0 } : { bot: true });
+    return looksFor(people, four);
+  }
+  // the looks of a match from who plays where: people[k] (k: the slot with 4 players, the side with 2) =
+  // { p: profile } | { look: what an online player sent } | { bot: true }. Everybody in his own colour (a side's two
+  // bodies are one person); in 2 vs 2 the team's shorts tell the teams apart
+  function looksFor(people, four) {
+    var prof = people.map(function (x) { return x.look || Meta.profile(x.bot ? 'bot' : x.p); });
+    var cols = distinctColors(prof.map(function (pr, k) { return { c: pr.color, bot: !!people[k].bot }; })).map(function (c) { return Meta.COLORS[c]; });
+    var out = [], copy = function (c) { return { main: c.main, dark: c.dark }; };
     for (var i = 0; i < 4; i++) {
-      var team = slotTeam(i), prof, col;
-      if (four) { prof = Meta.profile(i); col = G.mode === 'ffa' ? Meta.color(i) : teamCol(team); }
-      else if (G.mode === '2p') { prof = G.bots[team] ? BOT_LOOK : Meta.profile(team); col = teamCol(team); }
-      else { prof = team === G.me ? Meta.profile(0) : BOT_LOOK; col = teamCol(team); }
-      var mk = four ? slotColor(i) : col;
-      out.push({ hat: prof.hat, hair: prof.hair, shirt: prof.shirt, col: { main: col.main, dark: col.dark }, mark: { main: mk.main, dark: mk.dark },
-        label: four ? slotName(i) : '' });
+      var k = four ? i : slotTeam(i), pr = prof[k], col = cols[k];
+      var L = { hat: pr.hat, hair: pr.hair, shirt: pr.shirt, col: copy(col), mark: copy(col), label: four ? slotName(i) : '',
+        name: four ? slotName(i) : sideNames()[slotTeam(i)] }; // (the small name over him in the match)
+      if (G.mode === 'team4') L.shorts = DEF_TEAM[slotTeam(i)].main;
+      out.push(L);
     }
-    return { four: four, ffa: G.mode === 'ffa', p: out, ball: Meta.D.ball };
+    return { four: four, ffa: G.mode === 'ffa', p: out, ball: Meta.D.ball, side: (four ? DEF_TEAM : cols).map(copy) };
   }
   var DEMO_LOOK = { hat: 'none', hair: 'default', shirt: 'plain' };
   // the side cheering right now (scored, replay or highlight after the ball went in), or -1
@@ -7362,7 +7478,7 @@
     else if (cheer >= 0) face = p.team === cheer ? 'happy' : 'sad';
     else if (Math.abs(p.a) > 1.4 && p.cT < 0.1) face = 'dizzy';
     else if (p.press) face = 'effort';
-    return { col: col, hat: prof.hat, hair: prof.hair, shirt: prof.shirt, num: L && G.looks.four ? i + 1 : p.role + 1, face: face, frozen: frozen,
+    return { col: col, shorts: !burnt && L ? L.shorts : null, hat: prof.hat, hair: prof.hair, shirt: prof.shirt, num: L && G.looks.four ? i + 1 : p.role + 1, face: face, frozen: frozen,
       burnt: burnt, hairCol: burnt ? INK : (p.id % 2 ? '#5b3a1f' : INK), armT: G.armT[i], mapId: m.id };
   }
   // replay or highlight: recorded frames are being shown
@@ -7447,30 +7563,33 @@
     var half = is4(G.mode) ? 38 * u : 22 * u + (G.mode === 'tutorial' ? 0 : Math.max(sideW[0], sideW[1]) + 2 * u); // (the scoreboard, with the names)
     return Math.abs(x - view.cw / 2) < half ? hudTop(u) + 11 * u + 7 * u : 3;
   }
+  // over each player a small name (everybody wears his own colour, so the name is all that is needed), with a small
+  // pointer in his colour; one above the top of the screen gets an arrow in his colour, his name and how high he is.
+  // Small, but never under 12 px so it can be read on a phone
   function drawPlayerMarks(c, u, w) {
-    var v = view, four = !!(G.looks && G.looks.four), hidden = playback() ? barH(u) : 4;
-    var fs = Math.round(Math.max(13, 3.9 * u));
-    c.font = '900 ' + fs + 'px ' + D.FONT;
-    c.textAlign = 'center'; c.textBaseline = 'middle'; c.lineJoin = 'round';
+    var v = view, hidden = playback() ? barH(u) : 4, fs = Math.round(Math.max(12, Math.min(17, 2.8 * u)));
     for (var i = 0; i < 4; i++) {
       var p = w.players[i];
       if (!p.active) continue;
-      var L = G.looks.p[i], col = four ? L.mark : teamCol(p.team), label = four ? L.label : '';
-      var top = 1e9;
-      for (var j = 0; j < E.NS; j++) top = Math.min(top, p.sy[j] - p.rad[j]);
+      var L = G.looks && G.looks.p[i], col = L ? L.mark : teamCol(p.team);
+      var name = G.mode === 'tutorial' || !L ? '' : (L.name !== undefined ? L.name : L.label); // (highlights of older versions: the 4-player labels)
+      var top = 1e9, low = -1e9;
+      for (var j = 0; j < E.NS; j++) { top = Math.min(top, p.sy[j] - p.rad[j]); low = Math.max(low, p.sy[j] + p.rad[j]); }
       var sx = v.ox + p.x * v.s, sy = v.oy + top * v.s;
       if (sy < hidden) {
         sx = Math.max(18, Math.min(v.cw - 18, sx));
-        var ah = Math.max(14, fs * 1.1), ey = edgeY(sx, u);
+        var ah = 14, ey = edgeY(sx, u), y = ey + ah + 3;
         c.beginPath(); c.moveTo(sx, ey); c.lineTo(sx - ah * 0.75, ey + ah); c.lineTo(sx + ah * 0.75, ey + ah); c.closePath();
         c.fillStyle = col.main; c.fill(); c.lineWidth = 2.5; c.strokeStyle = INK; c.stroke();
-        if (label) tag(c, sx, ey + ah + fs * 0.85, label, col, fs);
-        else { D.circle(c, sx, ey + ah + 9, 7); c.fillStyle = col.main; c.fill(); c.lineWidth = 2.5; c.strokeStyle = INK; c.stroke(); }
-      } else if (label) {
-        var ph = fs * 1.4, ty = Math.max(ph / 2 + 2, sy - 8 - ph / 2);
-        c.beginPath(); c.moveTo(sx - 6, ty + ph / 2 - 1); c.lineTo(sx + 6, ty + ph / 2 - 1); c.lineTo(sx, ty + ph / 2 + 7); c.closePath();
-        c.fillStyle = col.main; c.fill(); c.lineWidth = 2; c.strokeStyle = INK; c.stroke();
-        tag(c, sx, ty, label, col, fs);
+        if (name) { D.textOutlined(c, name, sx, y + fs * 0.55, fs, '#ffffff', INK); y += fs * 1.15; }
+        heightLabel(c, u, sx, y, E.GROUND - low);
+      } else if (name) {
+        // (above his hat, if he wears one - not on the American football pitch, where everybody wears a helmet)
+        if (L.hat && L.hat !== 'none' && w.arena.map.id !== 'football') sy -= 26 * p.sc * v.s;
+        var ty = Math.max(fs * 0.7, sy - 8 - fs * 0.55), py = ty + fs * 0.6;
+        c.beginPath(); c.moveTo(sx - 5, py); c.lineTo(sx + 5, py); c.lineTo(sx, py + 6); c.closePath();
+        c.fillStyle = col.main; c.fill(); c.lineWidth = 1.5; c.strokeStyle = INK; c.stroke();
+        D.textOutlined(c, name, sx, ty, fs, '#ffffff', INK);
       }
     }
   }
@@ -7484,8 +7603,17 @@
         var sx = Math.max(20, Math.min(v.cw - 20, v.ox + b.x * v.s)), by0 = edgeY(sx, u) + 3;
         c.fillStyle = INK; c.beginPath(); c.moveTo(sx, by0); c.lineTo(sx - 9, by0 + 14); c.lineTo(sx + 9, by0 + 14); c.closePath(); c.fill();
         D.circle(c, sx, by0 + 26, 9); c.fillStyle = '#ffffff'; c.fill(); c.lineWidth = 3; c.strokeStyle = INK; c.stroke();
+        heightLabel(c, u, sx, by0 + 37, E.GROUND - (b.y + R)); // (the bottom of the ball above the ground)
       }
     }
+  }
+  // a small "7,4m" under an arrow: how high above the ground (100 px = 1 m: a player is about 1.75 m tall); small,
+  // but never under 12 px so it can be read on a phone
+  function heightM(px) { var m = Math.max(0, px) / 100; return (m < 10 ? m.toFixed(1).replace('.', ',') : String(Math.round(m))) + 'm'; }
+  function heightLabel(c, u, x, top, px) {
+    var fs = Math.round(Math.max(12, Math.min(18, 2.7 * u)));
+    c.font = '900 ' + fs + 'px ' + D.FONT; c.textAlign = 'center'; c.textBaseline = 'middle';
+    D.textOutlined(c, heightM(px), x, top + fs * 0.6, fs, '#ffffff', INK);
   }
   // ---------- re-drop warning ----------
   // a ball out of play (3 s) or lying still untouched (15 s) is dropped again in the middle: the last 3 seconds

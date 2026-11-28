@@ -198,6 +198,7 @@
   .swatches { display: flex; flex-wrap: wrap; gap: calc(1 * var(--u)); }
   .swatches button { width: calc(6.4 * var(--u)); height: calc(6.4 * var(--u)); border-radius: 50%; border: calc(0.5 * var(--u)) solid var(--ink); cursor: pointer; padding: 0; }
   .swatches button.on { outline: calc(0.8 * var(--u)) solid var(--ink); outline-offset: 2px; }
+  .swatches button.taken::after { content: attr(data-who); font-size: calc(2.1 * var(--u)); font-weight: 900; line-height: 1; } /* someone else wears it */
   input.name { font: inherit; font-weight: 800; font-size: calc(3.8 * var(--u)); padding: calc(1 * var(--u)) calc(2 * var(--u)); border: calc(0.5 * var(--u)) solid var(--ink); border-radius: calc(2 * var(--u)); width: 100%; user-select: text; -webkit-user-select: text;  background: var(--btn); color: var(--text); }
   .stat { display: flex; justify-content: space-between; font-size: calc(3.6 * var(--u)); padding: calc(0.8 * var(--u)) 0; border-bottom: 1px dashed var(--rule); font-weight: 700; }
   .stat b { font-weight: 900; }
@@ -424,7 +425,7 @@
   <div class="panel wide">
     <h2>👤 Người chơi · Trang phục</h2>
     <div class="row profTop">
-      <div class="seg" id="profMode"><button data-v="2">👥 Chơi 2 người</button><button data-v="4">🙋 Chơi 4 người</button></div>
+      <div class="seg" id="profMode"><button data-v="2">👥 Chơi 2 người</button><button data-v="4">🙋 Chơi 4 người</button><button data-v="bot">🤖 Bot</button></div>
       <div class="seg" id="profFour"><button data-v="team4">🤝 2 vs 2</button><button data-v="ffa">🙋 Mỗi người 1 đội</button></div>
     </div>
     <div class="profBody">
@@ -434,7 +435,7 @@
       <div class="profDress">
         <div class="tabs" id="profTabs"><button class="chip" data-tab="hat">🎩 Mũ</button><button class="chip" data-tab="hair">💇 Tóc</button><button class="chip" data-tab="shirt">👕 Áo</button><button class="chip" data-tab="ball">⚽ Bóng</button></div>
         <div class="sub" id="profFor"></div>
-        <div id="profColorBox"><div class="hint">Màu áo khi mỗi người 1 đội</div><div class="swatches" id="profColors"></div></div>
+        <div id="profColorBox"><div class="hint">Màu áo – mỗi người một màu (chọn màu người khác đang mặc thì hai người đổi cho nhau)</div><div class="swatches" id="profColors"></div></div>
         <div class="grid dress" id="profGrid"></div>
       </div>
     </div>

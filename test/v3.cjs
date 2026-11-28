@@ -156,7 +156,8 @@ const SH = path.resolve(__dirname, '../shots_v3');
   await page.tap('#profColors button:nth-child(5)'); await page.waitForTimeout(200);
   ui = await ev(() => ({ title: document.getElementById('profFor').textContent, color: BGMeta.profile(3).color, ffa: document.querySelector('#profFour .on').dataset.v,
     picked: document.querySelectorAll('#profCards .pcard.on').length, on: Array.from(document.querySelectorAll('#profCards .pcard')).findIndex(c => c.classList.contains('on')) }));
-  check('tapping card 4 dresses P4; a colour shows the each-alone look', ui.title.indexOf('P4') >= 0 && ui.color === 4 && ui.ffa === 'ffa' && ui.picked === 1 && ui.on === 3, JSON.stringify(ui));
+  // (v4.1: every player wears his own colour in every mode, 2 vs 2 too: choosing one keeps the 2 vs 2 view)
+  check('tapping card 4 dresses P4; a colour is his in 2 vs 2 too', ui.title.indexOf('P4') >= 0 && ui.color === 4 && ui.ffa === 'team4' && ui.picked === 1 && ui.on === 3, JSON.stringify(ui));
   await page.screenshot({ path: SH + '/05_players_4_ffa.png' });
   check('hat unchanged by picking a colour', (await ev(() => BGMeta.profile(3).hat)) === hatBefore);
 
